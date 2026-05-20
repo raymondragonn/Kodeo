@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Kodeo Editorial** is a React + Vite landing page for a digital agency (Kodeo, Mexico). It showcases services, portfolio projects, testimonials, and business metrics. The site supports both Spanish and English via a language toggle component.
+**Kodeo Website** is a React + Vite landing page for a digital agency (Kodeo, Mexico). It showcases services, portfolio projects, testimonials, and business metrics. The site supports both Spanish and English via a language toggle component.
 
 Key features:
 - Multi-section landing page (Hero, Services, Projects, Testimonials, Stats, CTA)
