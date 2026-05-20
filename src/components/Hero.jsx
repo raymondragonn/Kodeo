@@ -112,7 +112,7 @@ export default function Hero({ copy, motionSpeed = 1 }) {
 
         <div ref={ctaRef} style={{ display: 'flex', gap: 12, alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
           <a
-            href={`https://wa.me/5212298493706?text=${encodeURIComponent(copy.cta.waMsg)}`}
+            href={`https://wa.me/522298493706?text=${encodeURIComponent(copy.cta.waMsg)}`}
             target="_blank"
             rel="noopener noreferrer"
             style={{

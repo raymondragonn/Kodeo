@@ -499,7 +499,7 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
               {copy.cta.email}
             </a>
             <a
-              href={`https://wa.me/5212298493706?text=${encodeURIComponent(sp.waMsgs?.[service.code] ?? copy.cta.waMsg)}`}
+              href={`https://wa.me/522298493706?text=${encodeURIComponent(sp.waMsgs?.[service.code] ?? copy.cta.waMsg)}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{

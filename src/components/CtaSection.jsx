@@ -122,7 +122,7 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
           </a>
 
           <a
-            href={`https://wa.me/5212298493706?text=${encodeURIComponent(copy.cta.waMsg)}`}
+            href={`https://wa.me/522298493706?text=${encodeURIComponent(copy.cta.waMsg)}`}
             target="_blank"
             rel="noopener noreferrer"
             style={{

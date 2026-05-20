@@ -96,7 +96,7 @@ export const COPY = {
       btn: "Empezar proyecto",
       label: "05 — Contacto",
       heading: ["Tu próximo cliente", "está buscándote."],
-      waMsg: "Hola, quiero empezar mi proyecto web con Kodeo.",
+      waMsg: "Hola, quiero empezar mi proyecto web.",
     },
     about: {
       label: "Kodeo · Veracruz, MX",
@@ -233,9 +233,9 @@ export const COPY = {
       ctaStart: "Empezar",
       downloadPdf: "Descargar PDF",
       waMsgs: {
-        '01': "Hola, me interesa cotizar una *Landing Page* con Kodeo. ¿Me pueden dar más información?",
-        '02': "Hola, me interesa cotizar un *Sitio Web* con Kodeo. ¿Me pueden dar más información?",
-        '03': "Hola, me interesa cotizar una *Tienda Online* con Kodeo. ¿Me pueden dar más información?",
+        '01': "Hola, me interesa adquirir una *Landing Page*. ¿Me pueden dar más información?",
+        '02': "Hola, me interesa adquirir un *Sitio Web*. ¿Me pueden dar más información?",
+        '03': "Hola, me interesa adquirir una *Tienda Online*. ¿Me pueden dar más información?",
       },
     },
     legal: {
@@ -403,7 +403,7 @@ export const COPY = {
       btn: "Start a project",
       label: "05 — Contact",
       heading: ["Your next client", "is looking for you."],
-      waMsg: "Hi, I want to start my web project with Kodeo.",
+      waMsg: "Hi, I want to start my web project.",
     },
     about: {
       label: "Kodeo · Veracruz, MX",
@@ -540,9 +540,9 @@ export const COPY = {
       ctaStart: "Get started",
       downloadPdf: "Download PDF",
       waMsgs: {
-        '01': "Hi, I'm interested in a *Landing Page* with Kodeo. Can you give me more information?",
-        '02': "Hi, I'm interested in a *Website* with Kodeo. Can you give me more information?",
-        '03': "Hi, I'm interested in an *Online Store* with Kodeo. Can you give me more information?",
+        '01': "Hi, I'm interested in acquiring a *Landing Page*. Can you give me more information?",
+        '02': "Hi, I'm interested in acquiring a *Website*. Can you give me more information?",
+        '03': "Hi, I'm interested in acquiring an *Online Store*. Can you give me more information?",
       },
     },
     legal: {
