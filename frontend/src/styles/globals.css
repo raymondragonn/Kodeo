@@ -1,0 +1,175 @@
+:root {
+  color-scheme: dark light;
+
+  /* Dark theme (default) */
+  --bg: #161616;
+  --bg-2: #0e0e0e;
+  --bg-3: #1f1f1f;
+  --line: #2a2a2a;
+  --line-2: #404040;
+  --type: #ffffff;
+  --type-soft: #9b9b9b;
+  --type-muted: #666;
+
+  /* Component-specific tokens */
+  --nav-bg: rgba(22,22,22,0.85);
+  --overlay-bg: rgba(10,10,10,0.92);
+  --modal-shadow: 0 40px 100px rgba(0,0,0,0.6);
+  --card-frost: rgba(255,255,255,0.04);
+  --badge-bg: rgba(0,0,0,0.6);
+  --badge-color: #ffffff;
+  --glow: rgba(255,255,255,0.04);
+  --logo-filter: none;
+
+  /* Accents — same in both modes */
+  --accent-yellow: #FFDE59;
+  --accent-green: #63C44D;
+  --accent-red: #FF3131;
+  --accent-blue: #5170ff;
+
+  /* Typography */
+  --display: Arial, "Helvetica Neue", sans-serif;
+  --body: Arial, "Helvetica Neue", sans-serif;
+  --ui: Arial, "Helvetica Neue", sans-serif;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f4f4f4;
+    --bg-2: #ececec;
+    --bg-3: #e3e3e3;
+    --line: #d0d0d0;
+    --line-2: #b5b5b5;
+    --type: #0d0d0d;
+    --type-soft: #606060;
+    --type-muted: #909090;
+
+    --nav-bg: rgba(244,244,244,0.88);
+    --overlay-bg: rgba(220,220,220,0.94);
+    --modal-shadow: 0 40px 100px rgba(0,0,0,0.18);
+    --card-frost: rgba(0,0,0,0.03);
+    --badge-bg: rgba(255,255,255,0.82);
+    --badge-color: #0d0d0d;
+    --glow: rgba(0,0,0,0.04);
+    --logo-filter: invert(1);
+  }
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f4f4;
+  --bg-2: #ececec;
+  --bg-3: #e3e3e3;
+  --line: #d0d0d0;
+  --line-2: #b5b5b5;
+  --type: #0d0d0d;
+  --type-soft: #606060;
+  --type-muted: #909090;
+
+  --nav-bg: rgba(244,244,244,0.88);
+  --overlay-bg: rgba(220,220,220,0.94);
+  --modal-shadow: 0 40px 100px rgba(0,0,0,0.18);
+  --card-frost: rgba(0,0,0,0.03);
+  --badge-bg: rgba(255,255,255,0.82);
+  --badge-color: #0d0d0d;
+  --glow: rgba(0,0,0,0.04);
+  --logo-filter: invert(1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #161616;
+  --bg-2: #0e0e0e;
+  --bg-3: #1f1f1f;
+  --line: #2a2a2a;
+  --line-2: #404040;
+  --type: #ffffff;
+  --type-soft: #9b9b9b;
+  --type-muted: #666;
+
+  --nav-bg: rgba(22,22,22,0.85);
+  --overlay-bg: rgba(10,10,10,0.92);
+  --modal-shadow: 0 40px 100px rgba(0,0,0,0.6);
+  --card-frost: rgba(255,255,255,0.04);
+  --badge-bg: rgba(0,0,0,0.6);
+  --badge-color: #ffffff;
+  --glow: rgba(255,255,255,0.04);
+  --logo-filter: none;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--type);
+  font-family: var(--body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  /* Desactivar selección de texto en toda la página */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Permitir selección solo dentro de campos de formulario */
+input, textarea, select, [contenteditable] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Protección de imágenes: deshabilitar arrastre y puntero */
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
+}
+
+/* Ocultar contenido al imprimir */
+@media print {
+  body { display: none !important; }
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+
+/* hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* clip path for hero mask reveal */
+.clip-reveal {
+  clip-path: inset(0 0 100% 0);
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes scrollline {
+  0%, 100% { transform: translateX(-100%); }
+  50%       { transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
