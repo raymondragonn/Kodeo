@@ -4,188 +4,217 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Kodeo Website** is a React + Vite landing page for a digital agency (Kodeo, Mexico). It showcases services, portfolio projects, testimonials, and business metrics. The site supports both Spanish and English via a language toggle component.
+**Kodeo Website** is a full-stack application for a digital agency (Kodeo, Mexico). It consists of:
+- A **React + Vite frontend** (landing page + portal de clientes)
+- A **PHP backend** that handles auth, payments, and orders
+- A **MySQL 8.4 database** for users and orders
+- **Docker Compose** to orchestrate backend + database locally
 
 Key features:
 - Multi-section landing page (Hero, Services, Projects, Testimonials, Stats, CTA)
-- Dual-language support (Spanish/English) with centralized copy in `src/data/copy.js`
-- Smooth animations using GSAP (GreenSock Animation Platform)
-- Page-based navigation via React state (landing page vs. individual service pages)
-- Responsive design with CSS custom properties for theming
+- Dual-language support (Spanish/English) with centralized copy in `frontend/src/data/copy.js`
+- Smooth animations using GSAP
+- Page-based navigation via React state
+- JWT authentication (email/password + Google OAuth + Apple OAuth)
+- Stripe payment processing (tarjeta con MSI, OXXO, SPEI)
+- Orders management with role-based access (cliente / administrador)
+
+## Repository Structure
+
+```
+kodeo-editorial/
+├── frontend/            # React + Vite app
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── data/        # copy.js — todo el texto del sitio
+│   │   ├── hooks/       # Custom hooks (useMagneticCursor)
+│   │   └── styles/      # globals.css con CSS custom properties
+│   └── package.json
+├── backend/             # PHP API (Apache + PHP en Docker)
+│   ├── config.php       # Constantes Stripe, CORS, helpers JSON
+│   ├── db.php           # Singleton PDO (carga .env automáticamente)
+│   ├── register.php     # POST /register
+│   ├── login.php        # POST /login
+│   ├── oauth.php        # POST /oauth  (Google / Apple)
+│   ├── orders.php       # GET/PATCH /orders
+│   ├── create-payment-intent.php  # POST — tarjeta + MSI
+│   ├── create-oxxo.php            # POST — pago OXXO
+│   ├── create-spei.php            # POST — transferencia SPEI
+│   ├── webhook.php      # POST /webhook  (eventos Stripe)
+│   ├── composer.json    # stripe/stripe-php ^13, firebase/php-jwt ^7
+│   ├── Dockerfile
+│   ├── .env             # Variables de entorno (NO commitear)
+│   └── .env.example     # Plantilla de variables requeridas
+├── database/
+│   ├── init.sql         # Schema inicial (users + orders)
+│   └── migration_oauth.sql  # Migración: columnas oauth_provider / oauth_id
+└── docker-compose.yml   # MySQL 8.4 (puerto 3307) + Backend PHP (puerto 8080)
+```
 
 ## Development Commands
 
-### Core Commands
+### Frontend
 
 ```bash
-npm run dev           # Start development server with HMR (http://localhost:5000)
-npm run dev:clean     # Clean Vite cache and restart dev server (if slow)
-npm run build         # Build for production (output in ./dist)
-npm run build:analyze # Build with debug info for analyzing performance
-npm run lint          # Run ESLint on all .js/.jsx files
-npm run preview       # Preview production build locally (http://localhost:5000)
+cd frontend
+npm run dev           # Dev server con HMR (http://localhost:5000)
+npm run dev:clean     # Limpia caché Vite y reinicia
+npm run build         # Build de producción (./dist)
+npm run build:analyze # Build con info de debug
+npm run lint          # ESLint sobre .js/.jsx
+npm run preview       # Preview del build (http://localhost:5000)
 ```
 
-### Development Workflow
+### Backend (Docker)
 
-1. **Start dev server**: `npm run dev`
-2. **Edit components** in `src/components/` — changes auto-reload
-3. **Update copy/content**: Edit `src/data/copy.js` (controls all visible text)
-4. **Run lint before committing**: `npm run lint`
-
-### If Dev Server is Slow
-
-Run `npm run dev:clean` to clear Vite's cache and rebuild dependency metadata.
-
-## Code Architecture
-
-### Directory Structure
-
+```bash
+docker compose up -d          # Levantar MySQL + PHP backend
+docker compose down           # Detener
+docker compose logs backend   # Ver logs del backend PHP
+docker compose logs db        # Ver logs de MySQL
 ```
-src/
-├── components/       # React components (one per feature)
-├── data/            # Content & configuration (copy.js is the central copy)
-├── hooks/           # Custom React hooks (e.g., useMagneticCursor)
-├── styles/          # Global CSS (globals.css contains CSS custom properties)
-├── assets/          # Images, project assets organized by category
-│   └── projects/    # Project portfolio images grouped by project
-└── main.jsx         # React entry point
+
+El backend queda disponible en `http://localhost:8080`.
+MySQL queda en `localhost:3307` (usuario: `kodeo`, password: `kodeopass`).
+
+### Composer (dependencias PHP)
+
+```bash
+cd backend && composer install   # Instalar dependencias (requerido la primera vez)
 ```
+
+## Backend API
+
+Base URL local: `http://localhost:8080`
+
+### Autenticación
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/register.php` | Crear cuenta (name, username, email, password) |
+| POST | `/login.php` | Login por email o username → devuelve JWT |
+| POST | `/oauth.php` | Login OAuth → `{ provider: 'google'\|'apple', token, name? }` |
+
+El JWT tiene vigencia de 7 días y lleva `sub`, `name`, `username`, `email`, `role`.
+
+### Pedidos
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/orders.php` | Listar pedidos (cliente ve los suyos; administrador ve todos) |
+| PATCH | `/orders.php?id={id}` | Actualizar pedido — solo `administrador` |
+
+Requiere header `Authorization: Bearer <token>`.
+
+### Pagos Stripe
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/create-payment-intent.php` | Tarjeta de crédito (+ MSI: 3/6/9/12/18/24 meses) |
+| POST | `/create-oxxo.php` | Pago en efectivo OXXO (genera voucher) |
+| POST | `/create-spei.php` | Transferencia SPEI (genera CLABE única) |
+| POST | `/webhook.php` | Receptor de eventos Stripe (firma verificada) |
+
+### Roles en base de datos
+
+- `cliente` — acceso solo a sus propios pedidos
+- `administrador` — acceso completo a todos los pedidos
+
+## Base de Datos (MySQL)
+
+### Tablas
+
+**`users`** — Cuentas de usuario
+- `id`, `name`, `username`, `role`, `email`, `password_hash` (nullable para OAuth)
+- `oauth_provider` (google / apple), `oauth_id`
+- `verified_at`, `created_at`, `updated_at`
+
+**`orders`** — Pedidos de servicios
+- `id`, `user_id` (FK → users), `service`, `amount`
+- `status`: `pendiente` | `en_proceso` | `completado` | `cancelado`
+- `notes`, `start_date`, `delivery_date`, `created_at`, `updated_at`
+
+El schema se aplica automáticamente al crear el contenedor MySQL (`database/init.sql`).
+
+## Variables de Entorno del Backend
+
+Copiar `backend/.env.example` → `backend/.env` y completar:
+
+```env
+STRIPE_SECRET_KEY=sk_test_...          # Dashboard Stripe → API keys
+STRIPE_PUBLISHABLE_KEY=pk_test_...     # Dashboard Stripe → API keys
+STRIPE_WEBHOOK_SECRET=whsec_...        # Dashboard Stripe → Webhooks
+
+ALLOWED_ORIGIN=http://localhost:5000   # URL del frontend (sin trailing slash)
+
+DB_HOST=db
+DB_PORT=3306
+DB_NAME=kodeo-website
+DB_USER=kodeo
+DB_PASSWORD=kodeopass
+
+JWT_SECRET=cambia_esto_en_produccion
+GOOGLE_CLIENT_ID=                      # Opcional: validación de audience Google
+```
+
+## Frontend Architecture
+
+El frontend vive en `frontend/`. Todo lo documentado abajo asume `cd frontend` o rutas relativas desde ahí.
 
 ### Component Architecture
 
-The app uses **state-based routing** instead of a router library:
-- `page` state determines current view: `'landing'` or `'svc-01'`/`'svc-02'`/`'svc-03'` (service detail pages)
-- `lang` state controls language: `'es'` or `'en'`
-- `motionSpeed` state controls animation pacing across all components
-
-**App.jsx flow:**
-1. Renders `LangToggle` (top-right language switcher)
-2. If `page === 'landing'`: renders full landing page with all sections
-3. Otherwise: renders `ServicePage` component for individual service details
+El app usa **state-based routing** (sin React Router):
+- `page` — vista actual: `'landing'` | `'svc-01'` | `'svc-02'` | `'svc-03'`
+- `lang` — idioma: `'es'` | `'en'`
+- `motionSpeed` — velocidad de animaciones GSAP (default 0.8)
 
 ### Key Components
 
 | Component | Purpose |
 |-----------|---------|
-| `Nav` | Header navigation with logo, links, contact button |
-| `Hero` | Main hero section with headline and CTA |
-| `Marquee` | Animated scrolling text banner |
-| `Services` | Service tiers grid (3 offerings with pricing) |
-| `Projects` | Portfolio showcase with modal preview |
-| `ProjectModal` | Modal overlay for selected project details |
-| `Testimonials` | Customer quotes carousel |
-| `Stats` | Key metrics display (4.9★, 98%, etc.) |
-| `CtaSection` | Call-to-action closing section |
-| `Footer` | Footer with links and branding |
-| `ServicePage` | Detail page for individual services |
-| `LangToggle` | Language switcher (ES/EN) |
+| `Nav` | Navegación con logo, links, botón de contacto |
+| `Hero` | Sección principal con headline y CTA |
+| `Marquee` | Banner de texto animado |
+| `Services` | Grid de servicios con precios |
+| `Projects` | Portafolio con modal de preview |
+| `ProjectModal` | Overlay de detalle de proyecto |
+| `Testimonials` | Carrusel de testimonios |
+| `Stats` | Métricas clave (4.9★, 98%, etc.) |
+| `CtaSection` | Sección de cierre con CTA |
+| `Footer` | Pie de página |
+| `ServicePage` | Página de detalle de servicio |
+| `LangToggle` | Selector de idioma ES/EN |
 
 ### Content Management
 
-**All visible text is centralized in `src/data/copy.js`:**
-- Contains a `COPY` object with `es` and `en` keys
-- Each language variant includes: nav labels, hero text, service descriptions, project details, testimonials, stats, CTA copy, etc.
-- Components receive `copy` prop and access nested properties: `copy.services.list`, `copy.projects.items`, etc.
-
-To update content: **Always edit `copy.js`**, not hardcoded text in components.
+**Todo el texto está centralizado en `frontend/src/data/copy.js`:**
+- Objeto `COPY` con claves `es` y `en`
+- Siempre editar `copy.js`, nunca texto hardcoded en componentes
 
 ## Styling & Animation
 
-### Styles
-
-- Global CSS in `src/styles/globals.css` defines CSS custom properties (e.g., `--bg`, `--text`, etc.)
-- Each component has inline styles or scoped CSS modules (check individual component files)
-- Color scheme and spacing controlled via CSS variables
-
-### Animation
-
-- **GSAP** (GreenSock) is the animation library for smooth, performant transitions
-- `motionSpeed` prop (default 0.8) controls animation duration across components
-- Check components like `Hero`, `Marquee`, `Services` for GSAP usage patterns
-
-### Custom Hooks
-
-- **`useMagneticCursor`** (`src/hooks/useMagneticCursor.js`): Implements a cursor that "follows" or "magnetizes" to interactive elements
-  - Used for enhanced interactivity on hover
-
-## Language & Content Updates
-
-1. **To add/change text:** Edit `src/data/copy.js`
-2. **To add a new language:** Add a new key (e.g., `fr`) to `COPY` object with all required nested properties
-3. **Component receives copy:** Components get `copy` prop from `App.jsx` based on current `lang` state
-4. **Language toggle:** `LangToggle` component updates `lang` state, triggering re-render with new copy
-
-## Page Navigation
-
-**Landing Page Flow:**
-- Default view shows full landing with all sections
-- User clicks on a service → `handleServiceClick()` sets `page` to `'svc-01'` (etc.) and scrolls to top
-- `ServicePage` component displays detail view
-- "Back" button in `ServicePage` calls `handleBack()` to reset `page` to `'landing'`
-
-**Smooth Scrolling:**
-- Navigation items scroll to section IDs: `document.getElementById(id).scrollIntoView({ behavior: 'smooth' })`
-- Section IDs map: `NAV_SECTION_MAP` in `App.jsx` (e.g., "Servicios" → "services")
+- CSS custom properties en `frontend/src/styles/globals.css`
+- **GSAP** para animaciones — la prop `motionSpeed` controla la duración
+- Hook `useMagneticCursor` para cursor magnético en elementos interactivos
 
 ## ESLint & Code Quality
 
-- ESLint config in `eslint.config.js` includes:
-  - React Hooks rules (`eslint-plugin-react-hooks`)
-  - React Refresh rules for HMR (`eslint-plugin-react-refresh`)
-  - Browser globals enabled
-- Run `npm run lint` before committing
-- No TypeScript currently (JSX only)
+```bash
+cd frontend && npm run lint
+```
+
+ESLint corre sobre `.js`/`.jsx` con reglas de React Hooks y React Refresh.
 
 ## Building & Deployment
 
-- `npm run build` outputs to `./dist/` (production-ready static files)
-- Vite handles minification, code splitting, and asset optimization
-- `index.html` is the entry point; `src/main.jsx` loads React app
-
-## Performance & Compilation Optimizations
-
-**Node.js Version:** v22.22.2 (leverages modern JavaScript features for faster builds)
-
-**Vite Optimizations Applied:**
-- **Port 5000** for faster startup and less conflicts
-- **ESBuild** for ultra-fast minification (10-100x faster than Terser)
-- **Dependency pre-bundling** for React, React-DOM, and GSAP
-- **Tree-shaking** to remove dead code from production builds
-- **Code splitting** for GSAP as a separate chunk to improve caching
-- **Console/debugger cleanup** in production builds
-
-**To accelerate dev server if it slows down:**
-- Run `npm run dev:clean` to clear Vite's dependency cache
-- Restart the dev server
-- Vite's dependency pre-bundling only happens once per installation
-
-**Build analysis:**
-- Use `npm run build:analyze` if you need to debug build performance
-
-## Common Development Tasks
-
-### Adding a new component
-
-1. Create `src/components/MyComponent.jsx`
-2. Import in `App.jsx` if needed
-3. Pass `copy` and `motionSpeed` props for consistency
-4. Use GSAP for animations (or CSS if simple)
-
-### Updating service offerings
-
-1. Edit `copy.es.services.list` and `copy.en.services.list` in `src/data/copy.js`
-2. Services auto-render in `Services` component via `.map()`
-
-### Adding a project to portfolio
-
-1. Add image(s) to `src/assets/projects/{project-name}/`
-2. Add project object to `copy.es.projects.items` and `copy.en.projects.items`
-3. `Projects` component auto-renders with correct path and metadata
+- `npm run build` genera `frontend/dist/` (archivos estáticos listos para producción)
+- El backend PHP se sirve con Apache dentro del contenedor Docker
+- En producción: apuntar `ALLOWED_ORIGIN` al dominio real del frontend
 
 ## Notes for Future Work
 
-- The app uses state-based routing; consider adding React Router if the site expands beyond landing + 3 service pages
-- GSAP animations are performance-friendly but watch for layout shifts on slow devices
-- CSS custom properties make theme changes easy (see `globals.css`)
-- All copy is client-side; to make content dynamic, integrate a CMS or API
+- Agregar componentes de checkout en el frontend que consuman `/create-payment-intent.php`, `/create-oxxo.php` y `/create-spei.php`
+- Implementar el portal de cliente con login, historial de pedidos, y seguimiento de estado
+- Considerar React Router si el sitio crece más allá de 3 páginas de servicio
+- El webhook actualmente solo hace `error_log`; conectar con la tabla `orders` para actualizar el status real
+- Para producción: cambiar `JWT_SECRET` por un valor aleatorio seguro (≥32 caracteres)

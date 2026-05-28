@@ -152,6 +152,8 @@ button { font-family: inherit; cursor: pointer; }
 
 /* hide scrollbar utility */
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
 .no-scrollbar { scrollbar-width: none; }
 
 /* clip path for hero mask reveal */

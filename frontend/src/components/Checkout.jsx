@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import logoSvg from '../assets/logo_black_transparent.svg';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost/backend';
+const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
 
 const MSI_OPTIONS = [
   { value: 0,  label: 'Pago de contado' },
@@ -12,11 +13,53 @@ const MSI_OPTIONS = [
   { value: 24, label: '24 meses sin intereses' },
 ];
 
-export default function Checkout({ amount = 150000, currency = 'MXN' }) {
+const METHODS = [
+  {
+    id: 'card',
+    label: 'Tarjeta',
+    description: 'Crédito o débito con MSI',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="4" width="22" height="16" rx="2" />
+        <line x1="1" y1="10" x2="23" y2="10" />
+      </svg>
+    ),
+  },
+  {
+    id: 'oxxo',
+    label: 'OXXO',
+    description: 'Pago en efectivo en tienda',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v20M2 12h20" />
+      </svg>
+    ),
+  },
+  {
+    id: 'spei',
+    label: 'SPEI',
+    description: 'Transferencia bancaria',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+    ),
+  },
+];
+
+export default function Checkout({
+  amount    = 650000,
+  currency  = 'MXN',
+  service   = 'Landing Page',
+  theme     = 'dark',
+  onBack,
+  onNavigate,
+}) {
   const [method, setMethod]         = useState('card');
   const [installments, setInstallments] = useState(0);
   const [loading, setLoading]       = useState(false);
-  const [result, setResult]         = useState(null); // { type: 'success'|'error'|'info', html }
+  const [result, setResult]         = useState(null);
   const [stripeReady, setStripeReady] = useState(false);
 
   const stripeRef    = useRef(null);
@@ -27,75 +70,69 @@ export default function Checkout({ amount = 150000, currency = 'MXN' }) {
     style: 'currency', currency,
   });
 
+  const monthlyAmount = (plan) =>
+    plan > 0
+      ? (amount / 100 / plan).toLocaleString('es-MX', { style: 'currency', currency })
+      : null;
+
   // ── Cargar Stripe.js ──────────────────────────────────────────────────────
   useEffect(() => {
-    const initStripe = async () => {
+    const init = async () => {
       if (stripeRef.current) return;
 
-      // Esperar a que stripe-js cargue desde el script tag en index.html
       const waitForStripe = () =>
         new Promise((resolve) => {
           if (window.Stripe) { resolve(); return; }
           const script = document.querySelector('script[src*="js.stripe.com"]');
-          if (script) {
-            script.addEventListener('load', resolve, { once: true });
-          } else {
-            resolve();
-          }
+          script ? script.addEventListener('load', resolve, { once: true }) : resolve();
         });
 
       await waitForStripe();
       if (!window.Stripe) return;
 
       try {
-        const res  = await fetch(`${BACKEND_URL}/create-payment-intent.php`, {
+        const res  = await fetch(`${API}/create-payment-intent.php`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount, installments: 0 }),
         });
         const data = await res.json();
         if (data.error || !data.publishableKey) return;
-
         stripeRef.current = window.Stripe(data.publishableKey);
         setStripeReady(true);
-      } catch {
-        // Stripe no disponible; se mostrará al intentar pagar
-      }
+      } catch { /* Stripe no disponible */ }
     };
-
-    initStripe();
+    init();
   }, [amount]);
 
-  // ── Montar / desmontar card element según método activo ───────────────────
+  // ── Montar card element ───────────────────────────────────────────────────
   useEffect(() => {
     if (!stripeReady || method !== 'card') return;
-    if (cardRef.current) return; // ya montado
+    if (cardRef.current) return;
 
+    const isDark   = theme === 'dark';
     const elements = stripeRef.current.elements();
     cardRef.current = elements.create('card', {
       style: {
         base: {
-          color: '#f0f0f0',
-          fontFamily: 'inherit',
-          fontSize: '16px',
-          '::placeholder': { color: '#666' },
+          color:      isDark ? '#ffffff' : '#0d0d0d',
+          fontFamily: 'Arial, Helvetica Neue, sans-serif',
+          fontSize:   '15px',
+          '::placeholder': { color: isDark ? '#666' : '#aaa' },
         },
-        invalid: { color: '#e74c3c' },
+        invalid: { color: '#e05050' },
       },
     });
     cardRef.current.mount(cardMountRef.current);
 
-    return () => {
-      cardRef.current?.destroy();
-      cardRef.current = null;
-    };
-  }, [stripeReady, method]);
+    return () => { cardRef.current?.destroy(); cardRef.current = null; };
+  }, [stripeReady, method, theme]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const clearResult = () => setResult(null);
 
-  const postBackend = async (endpoint, body) => {
-    const res  = await fetch(`${BACKEND_URL}/${endpoint}`, {
+  const postAPI = async (endpoint, body) => {
+    const res  = await fetch(`${API}/${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -109,248 +146,413 @@ export default function Checkout({ amount = 150000, currency = 'MXN' }) {
   const handleCard = async (e) => {
     e.preventDefault();
     if (!stripeRef.current || !cardRef.current) {
-      setResult({ type: 'error', msg: 'Stripe no está listo. Recarga la página.' });
+      setResult({ type: 'error', title: 'Stripe no está listo. Recarga la página.' });
       return;
     }
-    setLoading(true);
-    clearResult();
+    setLoading(true); clearResult();
     try {
-      const { clientSecret } = await postBackend('create-payment-intent.php', {
-        amount, installments,
+      const { clientSecret } = await postAPI('create-payment-intent.php', { amount, installments });
+      const { paymentIntent, error } = await stripeRef.current.confirmCardPayment(clientSecret, {
+        payment_method: { card: cardRef.current },
       });
-      const { paymentIntent, error } = await stripeRef.current.confirmCardPayment(
-        clientSecret,
-        { payment_method: { card: cardRef.current } },
-      );
       if (error) throw new Error(error.message);
       if (paymentIntent.status === 'succeeded') {
-        const plan = installments > 0 ? `${installments} meses sin intereses` : 'pago de contado';
         setResult({
           type: 'success',
           title: '¡Pago exitoso!',
           lines: [
             `Monto: ${displayAmount}`,
-            `Plan: ${plan}`,
-            `ID: ${paymentIntent.id}`,
+            installments > 0 ? `Plan: ${installments} meses sin intereses` : 'Plan: pago de contado',
           ],
+          id: paymentIntent.id,
         });
       }
     } catch (err) {
       setResult({ type: 'error', title: 'Error al procesar', lines: [err.message] });
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleOxxo = async (e) => {
     e.preventDefault();
-    const name  = e.target.name.value.trim();
-    const email = e.target.email.value.trim();
-    if (!name || !email) { setResult({ type: 'error', title: 'Completa todos los campos.' }); return; }
-    setLoading(true);
-    clearResult();
+    const name  = e.target.oxxoName.value.trim();
+    const email = e.target.oxxoEmail.value.trim();
+    setLoading(true); clearResult();
     try {
-      const data = await postBackend('create-oxxo.php', { amount, name, email });
+      const data = await postAPI('create-oxxo.php', { amount, name, email });
       setResult({
         type: 'info',
         title: 'Voucher OXXO generado',
-        lines: [
-          `Monto: ${displayAmount}`,
-          'Vigencia: 3 días — paga antes de que expire.',
-        ],
+        lines: [`Monto a pagar: ${displayAmount}`, 'Vigencia: 3 días'],
         link: data.voucherUrl ? { href: data.voucherUrl, label: 'Ver e imprimir voucher →' } : null,
+        note: 'Paga en cualquier tienda OXXO antes de que expire.',
         id: data.paymentIntentId,
       });
     } catch (err) {
       setResult({ type: 'error', title: 'Error al generar voucher', lines: [err.message] });
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleSpei = async (e) => {
     e.preventDefault();
-    const name  = e.target.name.value.trim();
-    const email = e.target.email.value.trim();
-    if (!name || !email) { setResult({ type: 'error', title: 'Completa todos los campos.' }); return; }
-    setLoading(true);
-    clearResult();
+    const name  = e.target.speiName.value.trim();
+    const email = e.target.speiEmail.value.trim();
+    setLoading(true); clearResult();
     try {
-      const data = await postBackend('create-spei.php', { amount, name, email });
+      const data = await postAPI('create-spei.php', { amount, name, email });
       const bd   = data.bankDetails;
       setResult({
         type: 'info',
         title: 'Datos para transferencia SPEI',
         lines: [
           `Monto: ${displayAmount}`,
-          bd ? `Banco: ${bd.bankName}` : null,
+          bd?.bankName ? `Banco: ${bd.bankName}` : null,
         ].filter(Boolean),
         clabe: bd?.clabe,
-        note: 'La confirmación puede tardar algunos minutos.',
+        note: 'La confirmación puede tardar de minutos a unas horas.',
         id: data.paymentIntentId,
       });
     } catch (err) {
       setResult({ type: 'error', title: 'Error al generar CLABE', lines: [err.message] });
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={s.wrapper}>
-      <div style={s.card}>
-        <h2 style={s.title}>Completa tu pago</h2>
-        <p style={s.amount}>{displayAmount}</p>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Tabs */}
-        <div style={s.tabs}>
-          {['card', 'oxxo', 'spei'].map((m) => (
-            <button
-              key={m}
-              style={{ ...s.tab, ...(method === m ? s.tabActive : {}) }}
-              onClick={() => { setMethod(m); clearResult(); }}
-            >
-              {m === 'card' ? 'Tarjeta' : m.toUpperCase()}
-            </button>
-          ))}
+      {/* Header */}
+      <header style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '0 32px', borderBottom: '1px solid var(--line)', height: 64, flexShrink: 0,
+      }}>
+        <a
+          href="/"
+          onClick={e => { e.preventDefault(); onNavigate?.('/'); }}
+          style={{ display: 'flex', alignItems: 'center' }}
+        >
+          <img src={logoSvg} alt="Kodeo" style={{ height: 44, filter: 'var(--logo-filter)' }} />
+        </a>
+        <button
+          onClick={() => onBack?.()}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
+            textTransform: 'uppercase', color: 'var(--type-soft)',
+            display: 'flex', alignItems: 'center', gap: 6, padding: 0,
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--type-soft)'}
+        >
+          ← Volver
+        </button>
+      </header>
+
+      {/* Content */}
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '48px 24px', gap: 32,
+        flexWrap: 'wrap',
+      }}>
+
+        {/* ── Resumen del pedido ── */}
+        <div style={{
+          width: '100%', maxWidth: 340,
+          display: 'flex', flexDirection: 'column', gap: 24,
+          position: 'sticky', top: 48,
+        }}>
+          <div>
+            <p style={eyebrowStyle}>Resumen del pedido</p>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.15 }}>
+              {service}
+            </h1>
+          </div>
+
+          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={labelStyle}>Servicio</span>
+              <span style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)' }}>{service}</span>
+            </div>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={labelStyle}>Moneda</span>
+              <span style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)' }}>{currency}</span>
+            </div>
+            {installments > 0 && method === 'card' && (
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={labelStyle}>Por mes</span>
+                <span style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)' }}>~{monthlyAmount(installments)}</span>
+              </div>
+            )}
+            <div style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={labelStyle}>Total</span>
+              <span style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)', fontWeight: 700 }}>{displayAmount}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '16px 20px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius)' }}>
+            <svg width="16" height="16" style={{ color: 'var(--type-muted)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: 0, lineHeight: 1.6 }}>
+              Pagos procesados de forma segura por <strong style={{ color: 'var(--type-soft)' }}>Stripe</strong>. Tus datos están encriptados.
+            </p>
+          </div>
         </div>
 
-        {/* ── TARJETA ── */}
-        {method === 'card' && (
-          <form onSubmit={handleCard} style={s.form}>
-            <Field label="Número de tarjeta">
-              <div ref={cardMountRef} style={s.stripeBox} />
-            </Field>
-            <Field label="Meses sin intereses">
-              <select
-                style={s.input}
-                value={installments}
-                onChange={(e) => setInstallments(Number(e.target.value))}
-              >
-                {MSI_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-              <Hint>Disponible en tarjetas de crédito mexicanas participantes.</Hint>
-            </Field>
-            <PayButton loading={loading} label="Pagar ahora" />
-          </form>
-        )}
+        {/* ── Formulario de pago ── */}
+        <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-        {/* ── OXXO ── */}
-        {method === 'oxxo' && (
-          <form onSubmit={handleOxxo} style={s.form}>
-            <Field label="Nombre completo">
-              <input name="name" type="text" placeholder="Juan Pérez García" style={s.input} required />
-            </Field>
-            <Field label="Correo electrónico">
-              <input name="email" type="email" placeholder="juan@correo.com" style={s.input} required />
-              <Hint>Recibirás el voucher en este correo.</Hint>
-            </Field>
-            <PayButton loading={loading} label="Generar voucher OXXO" />
-          </form>
-        )}
+          {/* Selección de método */}
+          <div>
+            <p style={eyebrowStyle}>Método de pago</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {METHODS.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => { setMethod(m.id); clearResult(); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '16px 20px',
+                    background: method === m.id ? 'var(--bg-2)' : 'transparent',
+                    border: `1px solid ${method === m.id ? 'var(--line-2)' : 'var(--line)'}`,
+                    borderRadius: 'var(--radius)',
+                    cursor: 'pointer', textAlign: 'left', width: '100%',
+                    transition: 'border-color 0.2s, background 0.2s',
+                  }}
+                >
+                  <span style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                    background: method === m.id ? 'var(--bg-3)' : 'var(--bg-2)',
+                    color: 'var(--type-soft)',
+                    transition: 'background 0.2s',
+                  }}>
+                    {m.icon}
+                  </span>
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block', fontFamily: 'var(--ui)', fontSize: 13, letterSpacing: '.04em', color: 'var(--type)', fontWeight: method === m.id ? 600 : 400 }}>
+                      {m.label}
+                    </span>
+                    <span style={{ display: 'block', fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', marginTop: 2 }}>
+                      {m.description}
+                    </span>
+                  </span>
+                  <span style={{
+                    width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                    border: `2px solid ${method === m.id ? 'var(--type)' : 'var(--line-2)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'border-color 0.2s',
+                  }}>
+                    {method === m.id && (
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--type)' }} />
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {/* ── SPEI ── */}
-        {method === 'spei' && (
-          <form onSubmit={handleSpei} style={s.form}>
-            <Field label="Nombre completo">
-              <input name="name" type="text" placeholder="Juan Pérez García" style={s.input} required />
-            </Field>
-            <Field label="Correo electrónico">
-              <input name="email" type="email" placeholder="juan@correo.com" style={s.input} required />
-              <Hint>Recibirás los datos de transferencia en este correo.</Hint>
-            </Field>
-            <PayButton loading={loading} label="Obtener CLABE SPEI" />
-          </form>
-        )}
+          {/* Formulario según método */}
+          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '28px 28px' }}>
 
-        {/* Resultado */}
-        {result && <ResultBox result={result} />}
+            {/* ── TARJETA ── */}
+            {method === 'card' && (
+              <form onSubmit={handleCard} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div>
+                  <label style={labelStyle}>Datos de la tarjeta</label>
+                  <div
+                    ref={cardMountRef}
+                    style={{
+                      padding: '13px 14px',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--line)',
+                      borderRadius: 'var(--radius)',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Meses sin intereses</label>
+                  <select
+                    value={installments}
+                    onChange={e => setInstallments(Number(e.target.value))}
+                    style={inputStyle}
+                  >
+                    {MSI_OPTIONS.map(({ value, label }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <p style={hintStyle}>Disponible en tarjetas de crédito mexicanas participantes.</p>
+                </div>
+
+                <SubmitBtn loading={loading} label="Pagar ahora" />
+              </form>
+            )}
+
+            {/* ── OXXO ── */}
+            {method === 'oxxo' && (
+              <form onSubmit={handleOxxo} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius)' }}>
+                  <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
+                    Generamos un voucher con número de referencia. Paga en cualquier tienda OXXO. La confirmación llega en ~1 hora.
+                  </p>
+                </div>
+                <div>
+                  <label style={labelStyle}>Nombre completo</label>
+                  <input name="oxxoName" type="text" placeholder="Juan Pérez García" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={labelStyle}>Correo electrónico</label>
+                  <input name="oxxoEmail" type="email" placeholder="juan@correo.com" style={inputStyle} required />
+                  <p style={hintStyle}>Recibirás el voucher en este correo.</p>
+                </div>
+                <SubmitBtn loading={loading} label="Generar voucher OXXO" />
+              </form>
+            )}
+
+            {/* ── SPEI ── */}
+            {method === 'spei' && (
+              <form onSubmit={handleSpei} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius)' }}>
+                  <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
+                    Generamos una CLABE interbancaria única para tu pago. Realiza la transferencia desde tu banca en línea o app.
+                  </p>
+                </div>
+                <div>
+                  <label style={labelStyle}>Nombre completo</label>
+                  <input name="speiName" type="text" placeholder="Juan Pérez García" style={inputStyle} required />
+                </div>
+                <div>
+                  <label style={labelStyle}>Correo electrónico</label>
+                  <input name="speiEmail" type="email" placeholder="juan@correo.com" style={inputStyle} required />
+                  <p style={hintStyle}>Recibirás los datos de transferencia en este correo.</p>
+                </div>
+                <SubmitBtn loading={loading} label="Obtener CLABE SPEI" />
+              </form>
+            )}
+
+            {/* Resultado */}
+            {result && <ResultBox result={result} />}
+          </div>
+
+          <p style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)', textAlign: 'center' }}>
+            Al continuar aceptas nuestros{' '}
+            <a href="/terminos" style={{ color: 'var(--type-soft)', textDecoration: 'underline' }}>Términos y condiciones</a>.
+          </p>
+        </div>
       </div>
-
-      <p style={s.footer}>
-        Pagos procesados por <strong>Stripe</strong> — tus datos están protegidos.
-      </p>
     </div>
   );
 }
 
 // ── Sub-componentes ────────────────────────────────────────────────────────
 
-function Field({ label, children }) {
+function SubmitBtn({ loading, label }) {
   return (
-    <div style={s.field}>
-      <label style={s.label}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function Hint({ children }) {
-  return <p style={s.hint}>{children}</p>;
-}
-
-function PayButton({ loading, label }) {
-  return (
-    <button type="submit" disabled={loading} style={s.btn}>
-      {loading ? <span style={s.spinner} /> : null}
+    <button
+      type="submit"
+      disabled={loading}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        width: '100%', padding: '13px 18px',
+        background: 'var(--type)', color: 'var(--bg)',
+        border: 0, borderRadius: 'var(--radius-pill)',
+        fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+        cursor: loading ? 'not-allowed' : 'pointer',
+        opacity: loading ? 0.6 : 1,
+        transition: 'opacity 0.2s',
+        marginTop: 4,
+      }}
+    >
+      {loading && <Spinner />}
       {loading ? 'Procesando...' : label}
     </button>
   );
 }
 
+function Spinner() {
+  return (
+    <span style={{
+      width: 14, height: 14, borderRadius: '50%',
+      border: '2px solid rgba(0,0,0,.2)',
+      borderTopColor: 'currentColor',
+      display: 'inline-block',
+      animation: 'spin .7s linear infinite',
+    }} />
+  );
+}
+
 function ResultBox({ result }) {
-  const colorMap = {
-    success: { bg: 'rgba(46,204,113,.1)', border: 'rgba(46,204,113,.3)', title: '#2ecc71' },
-    error:   { bg: 'rgba(231,76,60,.1)',  border: 'rgba(231,76,60,.3)',  title: '#e74c3c' },
-    info:    { bg: 'rgba(108,92,231,.1)', border: 'rgba(108,92,231,.3)', title: '#f0f0f0' },
+  const styles = {
+    success: { bg: 'rgba(99,196,77,.08)',  border: 'rgba(99,196,77,.25)',  title: '#63C44D' },
+    error:   { bg: 'rgba(224,80,80,.08)',  border: 'rgba(224,80,80,.3)',   title: '#e05050' },
+    info:    { bg: 'rgba(81,112,255,.08)', border: 'rgba(81,112,255,.25)', title: 'var(--type-soft)' },
   };
-  const c = colorMap[result.type];
+  const c = styles[result.type];
 
   return (
-    <div style={{ ...s.result, background: c.bg, borderColor: c.border }}>
-      {result.title && <p style={{ ...s.resultTitle, color: c.title }}>{result.title}</p>}
-      {result.lines?.map((l, i) => <p key={i}>{l}</p>)}
+    <div style={{
+      marginTop: 20,
+      background: c.bg, border: `1px solid ${c.border}`,
+      borderRadius: 'var(--radius)', padding: '16px 20px',
+      display: 'flex', flexDirection: 'column', gap: 6,
+      fontFamily: 'var(--body)', fontSize: 13, lineHeight: 1.6, color: 'var(--type-soft)',
+    }}>
+      {result.title && (
+        <p style={{ fontFamily: 'var(--ui)', fontSize: 12, letterSpacing: '.08em', fontWeight: 700, color: c.title, margin: 0 }}>
+          {result.title}
+        </p>
+      )}
+      {result.lines?.map((l, i) => <p key={i} style={{ margin: 0 }}>{l}</p>)}
       {result.clabe && (
-        <>
-          <p style={{ marginTop: 8 }}><strong>CLABE:</strong></p>
-          <p style={s.clabe}>{result.clabe}</p>
-        </>
+        <div style={{ marginTop: 8 }}>
+          <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
+            CLABE interbancaria
+          </p>
+          <p style={{
+            background: 'var(--bg)', border: '1px solid var(--line)',
+            borderRadius: 8, fontFamily: 'monospace', fontSize: 15,
+            letterSpacing: 2, padding: '10px 14px', margin: 0, color: 'var(--type)',
+          }}>
+            {result.clabe}
+          </p>
+        </div>
       )}
       {result.link && (
-        <a href={result.link.href} target="_blank" rel="noopener noreferrer" style={s.link}>
+        <a
+          href={result.link.href} target="_blank" rel="noopener noreferrer"
+          style={{ color: 'var(--accent-blue)', textDecoration: 'none', marginTop: 4, fontSize: 13 }}
+        >
           {result.link.label}
         </a>
       )}
-      {result.note && <p style={s.note}>{result.note}</p>}
-      {result.id   && <p style={s.note}>ID: {result.id}</p>}
+      {result.note && <p style={{ color: 'var(--type-muted)', fontSize: 12, margin: 0 }}>{result.note}</p>}
+      {result.id   && <p style={{ color: 'var(--type-muted)', fontSize: 11, margin: 0, fontFamily: 'monospace' }}>ID: {result.id}</p>}
     </div>
   );
 }
 
-// ── Estilos inline (sin dependencias externas) ─────────────────────────────
-const s = {
-  wrapper:    { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '2rem 1rem' },
-  card:       { width: '100%', maxWidth: 480, background: 'var(--surface, #141414)', border: '1px solid var(--border, #2a2a2a)', borderRadius: 12, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' },
-  title:      { fontSize: '1.25rem', fontWeight: 700, margin: 0 },
-  amount:     { fontSize: '2rem', fontWeight: 700, letterSpacing: '-1px', margin: 0 },
-  tabs:       { display: 'flex', gap: 8, borderBottom: '1px solid var(--border, #2a2a2a)', paddingBottom: 0 },
-  tab:        { background: 'none', border: 'none', borderBottom: '2px solid transparent', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: '0.9rem', padding: '0.5rem 1rem', marginBottom: -1, transition: '.2s' },
-  tabActive:  { borderBottomColor: 'var(--accent, #6c5ce7)', color: 'var(--text, #f0f0f0)', fontWeight: 600 },
-  form:       { display: 'flex', flexDirection: 'column', gap: '1.25rem' },
-  field:      { display: 'flex', flexDirection: 'column', gap: 4 },
-  label:      { fontSize: '0.85rem', color: 'var(--text-muted, #888)', fontWeight: 500 },
-  input:      { background: 'var(--bg, #0a0a0a)', border: '1px solid var(--border, #2a2a2a)', borderRadius: 8, color: 'var(--text, #f0f0f0)', fontSize: '1rem', padding: '0.75rem 1rem', width: '100%' },
-  stripeBox:  { background: 'var(--bg, #0a0a0a)', border: '1px solid var(--border, #2a2a2a)', borderRadius: 8, padding: '0.75rem 1rem' },
-  hint:       { color: 'var(--text-muted, #888)', fontSize: '0.78rem', margin: 0 },
-  btn:        { alignItems: 'center', background: 'var(--accent, #6c5ce7)', border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer', display: 'flex', fontSize: '1rem', fontWeight: 600, gap: 8, justifyContent: 'center', padding: '0.9rem', width: '100%' },
-  spinner:    { animation: 'spin .8s linear infinite', border: '2px solid rgba(255,255,255,.3)', borderRadius: '50%', borderTopColor: '#fff', display: 'inline-block', height: 16, width: 16 },
-  result:     { borderRadius: 8, border: '1px solid', fontSize: '0.9rem', lineHeight: 1.6, padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: 4 },
-  resultTitle:{ fontWeight: 700, margin: 0 },
-  clabe:      { background: 'var(--bg, #0a0a0a)', borderRadius: 6, fontFamily: 'monospace', fontSize: '1.1rem', letterSpacing: 1, padding: '0.5rem 0.75rem' },
-  link:       { color: 'var(--accent, #6c5ce7)', textDecoration: 'none', marginTop: 4 },
-  note:       { color: 'var(--text-muted, #888)', fontSize: '0.8rem', margin: 0 },
-  footer:     { color: 'var(--text-muted, #888)', fontSize: '0.8rem', textAlign: 'center' },
+// ── Estilos compartidos ────────────────────────────────────────────────────
+const eyebrowStyle = {
+  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em',
+  textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 14px',
+};
+
+const labelStyle = {
+  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em',
+  textTransform: 'uppercase', color: 'var(--type-soft)',
+  display: 'block', marginBottom: 8,
+};
+
+const inputStyle = {
+  width: '100%', padding: '12px 14px',
+  background: 'var(--bg)', border: '1px solid var(--line)',
+  borderRadius: 'var(--radius)', fontFamily: 'var(--body)', fontSize: 14,
+  color: 'var(--type)', outline: 'none', boxSizing: 'border-box',
+  transition: 'border-color 0.2s', appearance: 'none',
+};
+
+const hintStyle = {
+  fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)',
+  margin: '6px 0 0', lineHeight: 1.5,
 };

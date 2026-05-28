@@ -30,6 +30,7 @@ const LoginPage        = lazy(() => import('./components/LoginPage'));
 const RegisterPage     = lazy(() => import('./components/RegisterPage'));
 const OrdersPage       = lazy(() => import('./components/OrdersPage'));
 const AccountPage      = lazy(() => import('./components/AccountPage'));
+const Checkout         = lazy(() => import('./components/Checkout'));
 
 const NAV_SECTION_MAP = {
   'Servicios': 'services', 'Services': 'services',
@@ -331,6 +332,18 @@ export default function App() {
           <>
             <PageMeta title="Registrarme | Kodeo" description="Crea tu cuenta en Kodeo." path="/register" />
             <RegisterPage copy={copy} onNavigate={navigate} />
+          </>
+        } />
+
+        {/* ── Checkout ── */}
+        <Route path="/pago" element={
+          <>
+            <PageMeta title="Pago | Kodeo" description="Completa tu pago de forma segura." path="/pago" />
+            <Checkout
+              theme={theme}
+              onBack={handleBack}
+              onNavigate={navigate}
+            />
           </>
         } />
 
