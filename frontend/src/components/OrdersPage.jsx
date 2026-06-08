@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Nav from './Nav';
 
-const API = 'http://localhost:8080';
+const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
 
 const STATUS_MAP = {
   pendiente:  { label: 'Pendiente',  bg: 'rgba(148,163,184,0.1)', color: '#64748b', border: 'rgba(148,163,184,0.3)' },

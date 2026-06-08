@@ -74,8 +74,8 @@ try {
         'customerId'      => $customer->id,
         'status'          => $paymentIntent->status,
         'bankDetails'     => $bankTransfer ? [
-            'clabe'       => $bankTransfer->financial_addresses[0]->zengin->account_number ?? null,
-            'bankName'    => $bankTransfer->financial_addresses[0]->zengin->bank_name ?? 'STP',
+            'clabe'       => $bankTransfer->financial_addresses[0]->spei->clabe ?? null,
+            'bankName'    => $bankTransfer->financial_addresses[0]->spei->bank_name ?? 'STP',
             'reference'   => $bankTransfer->reference ?? null,
             'amountDue'   => $bankTransfer->amount_remaining ?? (int)$amount,
             'currency'    => 'MXN',

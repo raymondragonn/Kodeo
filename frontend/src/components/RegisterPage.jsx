@@ -3,7 +3,7 @@ import logoSvg from '../assets/logo_black_transparent.svg';
 import { auth } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
-const API = 'http://localhost:8080';
+const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('profile');
 googleProvider.addScope('email');

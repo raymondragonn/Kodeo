@@ -31,6 +31,7 @@ const RegisterPage     = lazy(() => import('./components/RegisterPage'));
 const OrdersPage       = lazy(() => import('./components/OrdersPage'));
 const AccountPage      = lazy(() => import('./components/AccountPage'));
 const Checkout         = lazy(() => import('./components/Checkout'));
+const PaymentConfirmedPage = lazy(() => import('./components/PaymentConfirmedPage'));
 
 const NAV_SECTION_MAP = {
   'Servicios': 'services', 'Services': 'services',
@@ -344,6 +345,14 @@ export default function App() {
               onBack={handleBack}
               onNavigate={navigate}
             />
+          </>
+        } />
+
+        {/* ── Pago confirmado (return_url de Stripe tras OXXO/SPEI/3DS) ── */}
+        <Route path="/pago-confirmado" element={
+          <>
+            <PageMeta title="Pago confirmado | Kodeo" description="Confirmación de tu pago." path="/pago-confirmado" />
+            <PaymentConfirmedPage />
           </>
         } />
 

@@ -1,15 +1,27 @@
 <?php
 
+// Cargar .env si existe (Docker lo inyecta como variables de entorno reales,
+// pero en hosting sin Docker hay que parsearlo aquí antes de leer getenv())
+$envFile = __DIR__ . '/.env';
+if (file_exists($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) continue;
+        [$key, $val] = explode('=', $line, 2);
+        if (!getenv(trim($key))) putenv(trim($key) . '=' . trim($val));
+    }
+}
+
 mb_internal_encoding('UTF-8');
 mb_language('neutral');
 
 define('STRIPE_SECRET_KEY',     getenv('STRIPE_SECRET_KEY')     ?: 'sk_test_REEMPLAZA_CON_TU_CLAVE_SECRETA');
 define('STRIPE_PUBLISHABLE_KEY', getenv('STRIPE_PUBLISHABLE_KEY') ?: 'pk_test_REEMPLAZA_CON_TU_CLAVE_PUBLICA');
 define('STRIPE_WEBHOOK_SECRET', getenv('STRIPE_WEBHOOK_SECRET')  ?: 'whsec_REEMPLAZA_CON_TU_WEBHOOK_SECRET');
+define('ALLOWED_ORIGIN',        getenv('ALLOWED_ORIGIN')        ?: 'http://localhost:5000');
 
 function setCorsHeaders(): void {
     $origin     = $_SERVER['HTTP_ORIGIN'] ?? '';
-    $envOrigin  = getenv('ALLOWED_ORIGIN') ?: '';
+    $envOrigin  = ALLOWED_ORIGIN;
 
     // En desarrollo acepta cualquier origen localhost; en producción usa ALLOWED_ORIGIN exacto
     $isLocalhost = (bool) preg_match('/^https?:\/\/localhost(:\d+)?$/', $origin);

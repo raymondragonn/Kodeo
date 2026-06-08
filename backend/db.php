@@ -1,14 +1,7 @@
 <?php
 
-// Cargar .env si existe (desarrollo local sin Docker env vars)
-$envFile = __DIR__ . '/.env';
-if (file_exists($envFile)) {
-    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) continue;
-        [$key, $val] = explode('=', $line, 2);
-        if (!getenv(trim($key))) putenv(trim($key) . '=' . trim($val));
-    }
-}
+// La carga de .env vive en config.php (que siempre se incluye primero,
+// y define constantes basadas en getenv() que deben quedar listas antes).
 
 function getDb(): PDO {
     static $pdo = null;

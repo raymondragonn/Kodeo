@@ -17,6 +17,9 @@ backend/.env
 frontend/.env
 backend/vendor/
 
+# Paquete de despliegue (contiene secretos generados localmente)
+deploy/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
