@@ -8,7 +8,7 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('profile');
 googleProvider.addScope('email');
 
-export default function LoginPage({ copy, theme, onThemeToggle, onNavigate, onLoginSuccess }) {
+export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword]     = useState('');
   const [showPass, setShowPass]     = useState(false);
