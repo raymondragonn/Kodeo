@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import logoSvg from '../assets/logo_black_transparent.svg';
+import { auth } from '../firebase';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 const API = 'http://localhost:8080';
+const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('profile');
+googleProvider.addScope('email');
 
 export default function LoginPage({ copy, theme, onThemeToggle, onNavigate, onLoginSuccess }) {
   const [identifier, setIdentifier] = useState('');
@@ -9,26 +14,9 @@ export default function LoginPage({ copy, theme, onThemeToggle, onNavigate, onLo
   const [showPass, setShowPass]     = useState(false);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
-  const googleLoaded = useRef(false);
   const appleLoaded  = useRef(false);
 
   useEffect(() => {
-    if (!googleLoaded.current) {
-      googleLoaded.current = true;
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        window.google?.accounts.id.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
-          callback: handleGoogleCredential,
-          ux_mode: 'popup',
-        });
-      };
-      document.body.appendChild(script);
-    }
-
     if (!appleLoaded.current) {
       appleLoaded.current = true;
       const script = document.createElement('script');
@@ -47,8 +35,20 @@ export default function LoginPage({ copy, theme, onThemeToggle, onNavigate, onLo
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleGoogleCredential = async (response) => {
-    await handleOAuth('google', response.credential, null);
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const idToken = await result.user.getIdToken();
+      const name = result.user.displayName || null;
+      await handleOAuth('google', idToken, name);
+    } catch (error) {
+      if (error?.code !== 'auth/popup-closed-by-user') {
+        setError('Error al iniciar sesión con Google: ' + error?.message);
+      }
+      setLoading(false);
+    }
   };
 
   const handleAppleSignIn = async () => {
@@ -310,7 +310,7 @@ export default function LoginPage({ copy, theme, onThemeToggle, onNavigate, onLo
             <button
               type="button"
               disabled={loading}
-              onClick={() => window.google?.accounts.id.prompt()}
+              onClick={handleGoogleSignIn}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                 width: '100%', height: 46,

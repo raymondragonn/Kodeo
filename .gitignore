@@ -12,8 +12,9 @@ dist
 dist-ssr
 *.local
 
-# Backend secrets & dependencies
+# Secrets & dependencies
 backend/.env
+frontend/.env
 backend/vendor/
 
 # Editor directories and files

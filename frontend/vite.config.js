@@ -9,6 +9,9 @@ export default defineConfig({
     port: 5001,
     host: 'localhost',
     strictPort: false,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
   },
   build: {
     outDir: '../dist',

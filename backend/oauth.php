@@ -7,6 +7,15 @@ require_once __DIR__ . '/vendor/autoload.php';
 use Firebase\JWT\JWT;
 use Firebase\JWT\JWK;
 
+// Debug logging
+$debug_log = function($msg) {
+    file_put_contents('/var/www/html/oauth_debug.log', date('Y-m-d H:i:s') . " - " . $msg . "\n", FILE_APPEND);
+};
+
+$debug_log("=== Nueva petición ===");
+$debug_log("Method: " . $_SERVER['REQUEST_METHOD']);
+$debug_log("Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'N/A'));
+
 setCorsHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -29,30 +38,53 @@ $oauthId = null;
 $email   = null;
 
 if ($provider === 'google') {
-    $ctx = stream_context_create(['http' => ['timeout' => 5]]);
-    $raw = @file_get_contents(
-        'https://oauth2.googleapis.com/tokeninfo?id_token=' . urlencode($token),
-        false,
-        $ctx
-    );
+    try {
+        $debug_log("Obteniendo claves JWK de Firebase...");
+        $ctx = stream_context_create(['http' => ['timeout' => 10]]);
+        $raw = @file_get_contents(
+            'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
+            false,
+            $ctx
+        );
 
-    if ($raw === false) jsonError('No se pudo verificar el token de Google', 502);
+        if ($raw === false) {
+            $debug_log("Error: No se pudo contactar a Google. PHP Error: " . (error_get_last()['message'] ?? 'Unknown'));
+            jsonError('No se pudo verificar el token: fallo al contactar los servidores de Google', 502);
+        }
 
-    $payload = json_decode($raw, true);
+        $debug_log("Claves JWK obtenidas: " . strlen($raw) . " bytes");
+        $jwks = json_decode($raw, true);
 
-    if (!empty($payload['error_description'])) {
-        jsonError('Token de Google inválido: ' . $payload['error_description'], 401);
+        if (!$jwks || !isset($jwks['keys'])) {
+            $debug_log("Error: Formato JWK inválido");
+            jsonError('Error interno al obtener claves de Firebase', 500);
+        }
+
+        $keys    = JWK::parseKeySet($jwks);
+        $decoded = JWT::decode($token, $keys);
+        $debug_log("JWT decodificado: sub=" . ($decoded->sub ?? 'N/A'));
+
+        $firebaseProjectId = getenv('FIREBASE_PROJECT_ID') ?: 'kodeoweb-c4691';
+        $expectedIss       = 'https://securetoken.google.com/' . $firebaseProjectId;
+
+        if (($decoded->aud ?? '') !== $firebaseProjectId) {
+            $debug_log("aud inválido: " . ($decoded->aud ?? 'N/A'));
+            jsonError('El token no pertenece a este proyecto Firebase', 401);
+        }
+        if (($decoded->iss ?? '') !== $expectedIss) {
+            $debug_log("iss inválido: " . ($decoded->iss ?? 'N/A'));
+            jsonError('Emisor del token inválido', 401);
+        }
+
+        $oauthId = $decoded->sub   ?? null;
+        $email   = $decoded->email ?? null;
+        if (!$name) $name = $decoded->name ?? null;
+        $debug_log("Token Firebase válido: oauthId=$oauthId, email=$email");
+
+    } catch (Exception $e) {
+        $debug_log("Exception: " . $e->getMessage());
+        jsonError('Token de Google inválido: ' . $e->getMessage(), 401);
     }
-
-    $clientId = getenv('GOOGLE_CLIENT_ID') ?: '';
-    if ($clientId && ($payload['aud'] ?? '') !== $clientId) {
-        jsonError('Token de Google no pertenece a esta aplicación', 401);
-    }
-
-    $oauthId = $payload['sub']   ?? null;
-    $email   = $payload['email'] ?? null;
-    if (!$name) $name = $payload['name'] ?? null;
-
 } elseif ($provider === 'apple') {
     $ctx  = stream_context_create(['http' => ['timeout' => 5]]);
     $raw  = @file_get_contents('https://appleid.apple.com/auth/keys', false, $ctx);
