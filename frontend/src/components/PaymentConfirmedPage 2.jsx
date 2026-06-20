@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoSvg from '../assets/logo_black_transparent.svg';
 
-const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
-
 const STATUS_COPY = {
   succeeded: {
     title: '¡Pago confirmado!',
@@ -29,29 +27,17 @@ const STATUS_COPY = {
 
 export default function PaymentConfirmedPage() {
   const navigate = useNavigate();
-  const [info] = useState(() => {
+  const [info, setInfo] = useState({ paymentIntentId: null, status: null });
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    return {
+    setInfo({
       paymentIntentId: params.get('payment_intent'),
       status: params.get('redirect_status'),
-    };
-  });
+    });
+  }, []);
 
   const status = STATUS_COPY[info.status] ?? STATUS_COPY.default;
-
-  // ── Respaldo: asegura que el pedido quede creado aunque el webhook de Stripe
-  //    no haya llegado (o llegue tarde) al backend ──────────────────────────
-  useEffect(() => {
-    if (info.status !== 'succeeded' || !info.paymentIntentId) return;
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    fetch(`${API}/confirm-payment.php`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ paymentIntentId: info.paymentIntentId }),
-    }).catch(() => { /* el webhook lo respaldará si esto falla */ });
-  }, [info.status, info.paymentIntentId]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
@@ -110,8 +96,8 @@ export default function PaymentConfirmedPage() {
           )}
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
-            <button onClick={() => navigate('/pedidos')} style={primaryBtnStyle}>Ir a panel</button>
-            <button onClick={() => { window.location.href = 'https://kodeo.mx'; }} style={secondaryBtnStyle}>Ir a inicio</button>
+            <button onClick={() => navigate('/pedidos')} style={primaryBtnStyle}>Ver mis pedidos</button>
+            <button onClick={() => navigate('/')} style={secondaryBtnStyle}>Volver al inicio</button>
           </div>
         </div>
       </div>

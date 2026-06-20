@@ -23,11 +23,11 @@ const AboutPage        = lazy(() => import('./components/AboutPage'));
 const PrivacyPage      = lazy(() => import('./components/PrivacyPage'));
 const TermsPage        = lazy(() => import('./components/TermsPage'));
 const StackPricingPage = lazy(() => import('./components/StackPricingPage'));
-const ExtrasPage       = lazy(() => import('./components/ExtrasPage'));
 const MethodologyPage  = lazy(() => import('./components/MethodologyPage'));
 const StackPage        = lazy(() => import('./components/StackPage'));
 const LoginPage        = lazy(() => import('./components/LoginPage'));
 const RegisterPage     = lazy(() => import('./components/RegisterPage'));
+const SelectProductPage = lazy(() => import('./components/SelectProductPage'));
 const OrdersPage       = lazy(() => import('./components/OrdersPage'));
 const AccountPage      = lazy(() => import('./components/AccountPage'));
 const Checkout         = lazy(() => import('./components/Checkout'));
@@ -116,7 +116,6 @@ export default function App() {
 
   const handleServiceClick = (code) => navigate(`/${SERVICE_SLUGS[code]}`);
   const handleBack         = () => navigate('/');
-  const handleExtrasClick  = () => navigate('/extras');
   const handleAuthClick    = (route) => navigate(`/${route}`);
   const handleLogout       = () => {
     localStorage.removeItem('token');
@@ -146,7 +145,6 @@ export default function App() {
     onNavItemClick: handleNavItemClick,
     onContact: () => goToSection('contact'),
     onServiceClick: handleServiceClick,
-    onExtrasClick: handleExtrasClick,
     onAuthClick: handleAuthClick,
     onLogout: handleLogout,
     user,
@@ -175,7 +173,6 @@ export default function App() {
                 onNavItemClick={handleNavItemClick}
                 onContact={() => goToSection('contact')}
                 onServiceClick={handleServiceClick}
-                onExtrasClick={handleExtrasClick}
                 onAuthClick={handleAuthClick}
                 onLogout={handleLogout}
                 user={user}
@@ -184,7 +181,7 @@ export default function App() {
               />
               <Hero copy={copy} motionSpeed={motionSpeed} />
               <Marquee motionSpeed={motionSpeed} />
-              <Services copy={copy} motionSpeed={motionSpeed} onServiceClick={handleServiceClick} onExtrasClick={handleExtrasClick} />
+              <Services copy={copy} motionSpeed={motionSpeed} onServiceClick={handleServiceClick} />
               <Projects copy={copy} motionSpeed={motionSpeed} />
               <Testimonials copy={copy} motionSpeed={motionSpeed} />
               <Stats copy={copy} motionSpeed={motionSpeed} />
@@ -254,18 +251,6 @@ export default function App() {
           </>
         } />
 
-        {/* ── Extras ── */}
-        <Route path="/extras" element={
-          <>
-            <PageMeta
-              title="Mantenimiento y Branding | Kodeo"
-              description="Servicios adicionales: mantenimiento web, actualización de contenido, branding y más para mantener tu presencia digital al día."
-              path="/extras"
-            />
-            <ExtrasPage {...sharedNavProps} onBack={handleBack} />
-          </>
-        } />
-
         {/* ── Privacidad ── */}
         <Route path="/privacidad" element={
           <>
@@ -300,7 +285,6 @@ export default function App() {
             onContact={() => goToSection('contact')}
             onNavigate={handleFooterNavigate}
             onServiceClick={handleServiceClick}
-            onExtrasClick={handleExtrasClick}
           />
         } />
 
@@ -336,12 +320,23 @@ export default function App() {
           </>
         } />
 
+        {/* ── Selección de producto ── */}
+        <Route path="/comprar" element={
+          <>
+            <PageMeta title="Elige tu proyecto | Kodeo" description="Selecciona el producto que quieres comprar: Landing Page, Sitio Web o Tienda Online." path="/comprar" />
+            <SelectProductPage {...sharedNavProps} onBack={handleBack} />
+          </>
+        } />
+
         {/* ── Checkout ── */}
         <Route path="/pago" element={
           <>
             <PageMeta title="Pago | Kodeo" description="Completa tu pago de forma segura." path="/pago" />
             <Checkout
-              theme={theme}
+              {...sharedNavProps}
+              amount={location.state?.amount}
+              service={location.state?.service}
+              code={location.state?.code}
               onBack={handleBack}
               onNavigate={navigate}
             />

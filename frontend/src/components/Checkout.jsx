@@ -1,7 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import logoSvg from '../assets/logo_black_transparent.svg';
+import Nav from './Nav';
+import Footer from './Footer';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { estimatedDeliveryDate, formatDateEs } from '../utils/deliveryDate';
 
 const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
+
+const ACCENT = {
+  '01': 'var(--accent-green)',
+  '02': 'var(--accent-blue)',
+  '03': 'var(--accent-yellow)',
+};
 
 const MSI_OPTIONS = [
   { value: 0,  label: 'Pago de contado' },
@@ -52,11 +61,22 @@ export default function Checkout({
   amount    = 650000,
   currency  = 'MXN',
   service   = 'Landing Page',
+  code      = '01',
+  copy,
+  motionSpeed = 1,
   theme     = 'dark',
   onBack,
   onNavigate,
+  onNavItemClick,
+  onContact,
+  onServiceClick,
+  onAuthClick,
+  onLogout,
+  user,
+  onThemeToggle,
 }) {
   const [method, setMethod]         = useState('card');
+  const [methodChosen, setMethodChosen] = useState(false);
   const [installments, setInstallments] = useState(0);
   const [loading, setLoading]       = useState(false);
   const [result, setResult]         = useState(null);
@@ -65,6 +85,16 @@ export default function Checkout({
   const stripeRef    = useRef(null);
   const cardRef      = useRef(null);
   const cardMountRef = useRef(null);
+  const token        = localStorage.getItem('token');
+  const { isMobile } = useBreakpoint();
+  const accent        = ACCENT[code] || ACCENT['01'];
+  const serviceInfo   = copy.services.list.find(s => s.code === code);
+  const deliveryDate  = formatDateEs(estimatedDeliveryDate(serviceInfo?.time ?? '8 días hábiles'));
+
+  // ── Requiere sesión: una compra debe quedar asociada a un usuario ──────────
+  useEffect(() => {
+    if (!token) onNavigate?.('/login');
+  }, [token, onNavigate]);
 
   const displayAmount = (amount / 100).toLocaleString('es-MX', {
     style: 'currency', currency,
@@ -90,11 +120,13 @@ export default function Checkout({
       await waitForStripe();
       if (!window.Stripe) return;
 
+      if (!token) return;
+
       try {
         const res  = await fetch(`${API}/create-payment-intent.php`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount, installments: 0 }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ amount, installments: 0, service }),
         });
         const data = await res.json();
         if (data.error || !data.publishableKey) return;
@@ -103,11 +135,11 @@ export default function Checkout({
       } catch { /* Stripe no disponible */ }
     };
     init();
-  }, [amount]);
+  }, [amount, service, token]);
 
   // ── Montar card element ───────────────────────────────────────────────────
   useEffect(() => {
-    if (!stripeReady || method !== 'card') return;
+    if (!stripeReady || method !== 'card' || !methodChosen) return;
     if (cardRef.current) return;
 
     const isDark   = theme === 'dark';
@@ -126,7 +158,7 @@ export default function Checkout({
     cardRef.current.mount(cardMountRef.current);
 
     return () => { cardRef.current?.destroy(); cardRef.current = null; };
-  }, [stripeReady, method, theme]);
+  }, [stripeReady, method, methodChosen, theme]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const clearResult = () => setResult(null);
@@ -134,8 +166,8 @@ export default function Checkout({
   const postAPI = async (endpoint, body) => {
     const res  = await fetch(`${API}/${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ...body, service, code }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -157,15 +189,11 @@ export default function Checkout({
       });
       if (error) throw new Error(error.message);
       if (paymentIntent.status === 'succeeded') {
-        setResult({
-          type: 'success',
-          title: '¡Pago exitoso!',
-          lines: [
-            `Monto: ${displayAmount}`,
-            installments > 0 ? `Plan: ${installments} meses sin intereses` : 'Plan: pago de contado',
-          ],
-          id: paymentIntent.id,
-        });
+        try {
+          await postAPI('confirm-payment.php', { paymentIntentId: paymentIntent.id });
+        } catch { /* el webhook lo respaldará si esto falla */ }
+        onNavigate?.(`/pago-confirmado?payment_intent=${paymentIntent.id}&redirect_status=succeeded`);
+        return;
       }
     } catch (err) {
       setResult({ type: 'error', title: 'Error al procesar', lines: [err.message] });
@@ -218,234 +246,274 @@ export default function Checkout({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--type)' }}>
+      <Nav
+        copy={copy}
+        onLogoClick={onBack}
+        onNavItemClick={onNavItemClick}
+        onContact={onContact}
+        onServiceClick={onServiceClick}
+        onAuthClick={onAuthClick}
+        onLogout={onLogout}
+        user={user}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
+      />
 
-      {/* Header */}
-      <header style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '0 32px', borderBottom: '1px solid var(--line)', height: 64, flexShrink: 0,
+      <main style={{
+        maxWidth: 760,
+        margin: '0 auto',
+        padding: isMobile ? '48px 20px 80px' : '80px 36px 120px',
       }}>
-        <a
-          href="/"
-          onClick={e => { e.preventDefault(); onNavigate?.('/'); }}
-          style={{ display: 'flex', alignItems: 'center' }}
-        >
-          <img src={logoSvg} alt="Kodeo" style={{ height: 44, filter: 'var(--logo-filter)' }} />
-        </a>
-        <button
-          onClick={() => onBack?.()}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
-            textTransform: 'uppercase', color: 'var(--type-soft)',
-            display: 'flex', alignItems: 'center', gap: 6, padding: 0,
-            transition: 'color 0.2s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--type-soft)'}
-        >
-          ← Volver
-        </button>
-      </header>
+        <div style={{ marginBottom: isMobile ? 36 : 56 }}>
+          <p style={eyebrowStyle}>Checkout · Pago seguro</p>
+          <h1 style={{
+            fontFamily: 'var(--display)',
+            fontWeight: 400,
+            fontSize: isMobile ? 'clamp(34px, 9vw, 52px)' : 'clamp(40px, 5vw, 64px)',
+            lineHeight: 1,
+            letterSpacing: '-0.03em',
+            margin: 0,
+            paddingBottom: '0.08em',
+          }}>
+            {service}
+          </h1>
+        </div>
 
-      {/* Content */}
-      <div style={{
-        flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        padding: '48px 24px', gap: 32,
-        flexWrap: 'wrap',
-      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-        {/* ── Resumen del pedido ── */}
-        <div style={{
-          width: '100%', maxWidth: 340,
-          display: 'flex', flexDirection: 'column', gap: 24,
-          position: 'sticky', top: 48,
-        }}>
-          <div>
-            <p style={eyebrowStyle}>Resumen del pedido</p>
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.15 }}>
-              {service}
-            </h1>
+          {/* ── Resumen del pedido ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ border: '1px solid var(--line)' }}>
+              <div style={{ height: 3, background: accent }} />
+              <Row label="Servicio">{service}</Row>
+              <Row label="Moneda">{currency}</Row>
+              <Row label="Entrega estimada">{deliveryDate}</Row>
+              {installments > 0 && method === 'card' && (
+                <Row label="Por mes">~{monthlyAmount(installments)}</Row>
+              )}
+              <Row label="Total">
+                <span style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)' }}>
+                  {displayAmount}
+                </span>
+              </Row>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '16px 18px', border: '1px solid var(--line)' }}>
+              <svg width="16" height="16" style={{ color: 'var(--type-muted)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: 0, lineHeight: 1.6 }}>
+                Pagos procesados de forma segura por <strong style={{ color: 'var(--type-soft)' }}>Stripe</strong>. Tus datos están encriptados.
+              </p>
+            </div>
           </div>
 
-          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={labelStyle}>Servicio</span>
-              <span style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)' }}>{service}</span>
+          {/* ── Formulario de pago ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+            {/* Selección de método */}
+            <div>
+              <p style={eyebrowStyle}>Método de pago</p>
+
+              {methodChosen ? (
+                (() => {
+                  const selected = METHODS.find(m => m.id === method);
+                  return (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 14,
+                      padding: '16px 20px',
+                      background: 'var(--bg-2)',
+                      border: '1px solid var(--line)',
+                    }}>
+                      <span style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 36, height: 36, flexShrink: 0,
+                        background: 'var(--bg-3)', color: accent,
+                      }}>
+                        {selected.icon}
+                      </span>
+                      <span style={{ flex: 1 }}>
+                        <span style={{ display: 'block', fontFamily: 'var(--ui)', fontSize: 13, letterSpacing: '.04em', color: 'var(--type)', fontWeight: 600 }}>
+                          {selected.label}
+                        </span>
+                        <span style={{ display: 'block', fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', marginTop: 2 }}>
+                          {selected.description}
+                        </span>
+                      </span>
+                      <button
+                        onClick={() => setMethodChosen(false)}
+                        style={{
+                          background: 'none', border: 0, cursor: 'pointer',
+                          fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.08em',
+                          textTransform: 'uppercase', color: accent, padding: 0,
+                        }}
+                      >
+                        Cambiar
+                      </button>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div style={{ border: '1px solid var(--line)' }}>
+                  {METHODS.map((m, i) => (
+                    <button
+                      key={m.id}
+                      onClick={() => { setMethod(m.id); setMethodChosen(true); clearResult(); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '16px 20px',
+                        background: method === m.id ? 'var(--bg-2)' : 'transparent',
+                        border: 0,
+                        borderTop: i === 0 ? 'none' : '1px solid var(--line)',
+                        cursor: 'pointer', textAlign: 'left', width: '100%',
+                        transition: 'background 0.2s',
+                      }}
+                    >
+                      <span style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 36, height: 36, flexShrink: 0,
+                        background: method === m.id ? 'var(--bg-3)' : 'var(--bg-2)',
+                        color: method === m.id ? accent : 'var(--type-soft)',
+                        transition: 'background 0.2s, color 0.2s',
+                      }}>
+                        {m.icon}
+                      </span>
+                      <span style={{ flex: 1 }}>
+                        <span style={{ display: 'block', fontFamily: 'var(--ui)', fontSize: 13, letterSpacing: '.04em', color: 'var(--type)', fontWeight: method === m.id ? 600 : 400 }}>
+                          {m.label}
+                        </span>
+                        <span style={{ display: 'block', fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', marginTop: 2 }}>
+                          {m.description}
+                        </span>
+                      </span>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        border: `2px solid ${method === m.id ? accent : 'var(--line-2)'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'border-color 0.2s',
+                      }}>
+                        {method === m.id && (
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: accent }} />
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={labelStyle}>Moneda</span>
-              <span style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)' }}>{currency}</span>
+
+            {/* Formulario según método */}
+            {methodChosen && (
+            <div style={{ border: '1px solid var(--line)', padding: 28 }}>
+
+              {/* ── TARJETA ── */}
+              {method === 'card' && (
+                <form onSubmit={handleCard} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div>
+                    <label style={labelStyle}>Datos de la tarjeta</label>
+                    <div
+                      ref={cardMountRef}
+                      style={{
+                        padding: '13px 14px',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--line)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Meses sin intereses</label>
+                    <select
+                      value={installments}
+                      onChange={e => setInstallments(Number(e.target.value))}
+                      style={inputStyle}
+                    >
+                      {MSI_OPTIONS.map(({ value, label }) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                    <p style={hintStyle}>Disponible en tarjetas de crédito mexicanas participantes.</p>
+                  </div>
+
+                  <SubmitBtn loading={loading} label="Pagar ahora" />
+                </form>
+              )}
+
+              {/* ── OXXO ── */}
+              {method === 'oxxo' && (
+                <form onSubmit={handleOxxo} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                    <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
+                      Generamos un voucher con número de referencia. Paga en cualquier tienda OXXO. La confirmación llega en ~1 hora.
+                    </p>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Nombre completo</label>
+                    <input name="oxxoName" type="text" placeholder="Juan Pérez García" style={inputStyle} required />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Correo electrónico</label>
+                    <input name="oxxoEmail" type="email" placeholder="juan@correo.com" style={inputStyle} required />
+                    <p style={hintStyle}>Recibirás el voucher en este correo.</p>
+                  </div>
+                  <SubmitBtn loading={loading} label="Generar voucher OXXO" />
+                </form>
+              )}
+
+              {/* ── SPEI ── */}
+              {method === 'spei' && (
+                <form onSubmit={handleSpei} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--line)' }}>
+                    <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
+                      Generamos una CLABE interbancaria única para tu pago. Realiza la transferencia desde tu banca en línea o app.
+                    </p>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Nombre completo</label>
+                    <input name="speiName" type="text" placeholder="Juan Pérez García" style={inputStyle} required />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Correo electrónico</label>
+                    <input name="speiEmail" type="email" placeholder="juan@correo.com" style={inputStyle} required />
+                    <p style={hintStyle}>Recibirás los datos de transferencia en este correo.</p>
+                  </div>
+                  <SubmitBtn loading={loading} label="Obtener CLABE SPEI" />
+                </form>
+              )}
+
+              {/* Resultado */}
+              {result && <ResultBox result={result} />}
             </div>
-            {installments > 0 && method === 'card' && (
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={labelStyle}>Por mes</span>
-                <span style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)' }}>~{monthlyAmount(installments)}</span>
-              </div>
             )}
-            <div style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={labelStyle}>Total</span>
-              <span style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)', fontWeight: 700 }}>{displayAmount}</span>
-            </div>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '16px 20px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius)' }}>
-            <svg width="16" height="16" style={{ color: 'var(--type-muted)', flexShrink: 0, marginTop: 1 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-            <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: 0, lineHeight: 1.6 }}>
-              Pagos procesados de forma segura por <strong style={{ color: 'var(--type-soft)' }}>Stripe</strong>. Tus datos están encriptados.
+            <p style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)', textAlign: 'center' }}>
+              Al continuar aceptas nuestros{' '}
+              <a href="/terminos" style={{ color: 'var(--type-soft)', textDecoration: 'underline' }}>Términos y condiciones</a>.
             </p>
           </div>
         </div>
+      </main>
 
-        {/* ── Formulario de pago ── */}
-        <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* Selección de método */}
-          <div>
-            <p style={eyebrowStyle}>Método de pago</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {METHODS.map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => { setMethod(m.id); clearResult(); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    padding: '16px 20px',
-                    background: method === m.id ? 'var(--bg-2)' : 'transparent',
-                    border: `1px solid ${method === m.id ? 'var(--line-2)' : 'var(--line)'}`,
-                    borderRadius: 'var(--radius)',
-                    cursor: 'pointer', textAlign: 'left', width: '100%',
-                    transition: 'border-color 0.2s, background 0.2s',
-                  }}
-                >
-                  <span style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-                    background: method === m.id ? 'var(--bg-3)' : 'var(--bg-2)',
-                    color: 'var(--type-soft)',
-                    transition: 'background 0.2s',
-                  }}>
-                    {m.icon}
-                  </span>
-                  <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', fontFamily: 'var(--ui)', fontSize: 13, letterSpacing: '.04em', color: 'var(--type)', fontWeight: method === m.id ? 600 : 400 }}>
-                      {m.label}
-                    </span>
-                    <span style={{ display: 'block', fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', marginTop: 2 }}>
-                      {m.description}
-                    </span>
-                  </span>
-                  <span style={{
-                    width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                    border: `2px solid ${method === m.id ? 'var(--type)' : 'var(--line-2)'}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'border-color 0.2s',
-                  }}>
-                    {method === m.id && (
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--type)' }} />
-                    )}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Formulario según método */}
-          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '28px 28px' }}>
-
-            {/* ── TARJETA ── */}
-            {method === 'card' && (
-              <form onSubmit={handleCard} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div>
-                  <label style={labelStyle}>Datos de la tarjeta</label>
-                  <div
-                    ref={cardMountRef}
-                    style={{
-                      padding: '13px 14px',
-                      background: 'var(--bg)',
-                      border: '1px solid var(--line)',
-                      borderRadius: 'var(--radius)',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Meses sin intereses</label>
-                  <select
-                    value={installments}
-                    onChange={e => setInstallments(Number(e.target.value))}
-                    style={inputStyle}
-                  >
-                    {MSI_OPTIONS.map(({ value, label }) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                  <p style={hintStyle}>Disponible en tarjetas de crédito mexicanas participantes.</p>
-                </div>
-
-                <SubmitBtn loading={loading} label="Pagar ahora" />
-              </form>
-            )}
-
-            {/* ── OXXO ── */}
-            {method === 'oxxo' && (
-              <form onSubmit={handleOxxo} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius)' }}>
-                  <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
-                    Generamos un voucher con número de referencia. Paga en cualquier tienda OXXO. La confirmación llega en ~1 hora.
-                  </p>
-                </div>
-                <div>
-                  <label style={labelStyle}>Nombre completo</label>
-                  <input name="oxxoName" type="text" placeholder="Juan Pérez García" style={inputStyle} required />
-                </div>
-                <div>
-                  <label style={labelStyle}>Correo electrónico</label>
-                  <input name="oxxoEmail" type="email" placeholder="juan@correo.com" style={inputStyle} required />
-                  <p style={hintStyle}>Recibirás el voucher en este correo.</p>
-                </div>
-                <SubmitBtn loading={loading} label="Generar voucher OXXO" />
-              </form>
-            )}
-
-            {/* ── SPEI ── */}
-            {method === 'spei' && (
-              <form onSubmit={handleSpei} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius)' }}>
-                  <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
-                    Generamos una CLABE interbancaria única para tu pago. Realiza la transferencia desde tu banca en línea o app.
-                  </p>
-                </div>
-                <div>
-                  <label style={labelStyle}>Nombre completo</label>
-                  <input name="speiName" type="text" placeholder="Juan Pérez García" style={inputStyle} required />
-                </div>
-                <div>
-                  <label style={labelStyle}>Correo electrónico</label>
-                  <input name="speiEmail" type="email" placeholder="juan@correo.com" style={inputStyle} required />
-                  <p style={hintStyle}>Recibirás los datos de transferencia en este correo.</p>
-                </div>
-                <SubmitBtn loading={loading} label="Obtener CLABE SPEI" />
-              </form>
-            )}
-
-            {/* Resultado */}
-            {result && <ResultBox result={result} />}
-          </div>
-
-          <p style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)', textAlign: 'center' }}>
-            Al continuar aceptas nuestros{' '}
-            <a href="/terminos" style={{ color: 'var(--type-soft)', textDecoration: 'underline' }}>Términos y condiciones</a>.
-          </p>
-        </div>
-      </div>
+      <Footer copy={copy} motionSpeed={motionSpeed} onNavigate={onNavigate} />
     </div>
   );
 }
 
 // ── Sub-componentes ────────────────────────────────────────────────────────
+
+function Row({ label, children }) {
+  return (
+    <div style={{
+      padding: '20px 22px',
+      borderTop: '1px solid var(--line)',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    }}>
+      <span style={labelStyle}>{label}</span>
+      <span style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)' }}>{children}</span>
+    </div>
+  );
+}
 
 function SubmitBtn({ loading, label }) {
   return (
@@ -482,6 +550,67 @@ function Spinner() {
   );
 }
 
+function ClabeCopy({ clabe }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(clabe);
+    } catch {
+      /* clipboard no disponible */
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
+        CLABE interbancaria
+      </p>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: 'var(--bg)', border: '1px solid var(--line)',
+        padding: '10px 14px',
+      }}>
+        <p style={{
+          fontFamily: 'monospace', fontSize: 15,
+          letterSpacing: 2, margin: 0, color: 'var(--type)', flex: 1,
+        }}>
+          {clabe}
+        </p>
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+            background: 'none', border: 0, cursor: 'pointer', padding: '4px 6px',
+            fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.06em',
+            color: copied ? '#63C44D' : 'var(--type-soft)',
+          }}
+        >
+          {copied ? (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Copiado
+            </>
+          ) : (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              Copiar
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ResultBox({ result }) {
   const styles = {
     success: { bg: 'rgba(99,196,77,.08)',  border: 'rgba(99,196,77,.25)',  title: '#63C44D' },
@@ -494,7 +623,7 @@ function ResultBox({ result }) {
     <div style={{
       marginTop: 20,
       background: c.bg, border: `1px solid ${c.border}`,
-      borderRadius: 'var(--radius)', padding: '16px 20px',
+      padding: '16px 20px',
       display: 'flex', flexDirection: 'column', gap: 6,
       fontFamily: 'var(--body)', fontSize: 13, lineHeight: 1.6, color: 'var(--type-soft)',
     }}>
@@ -504,20 +633,7 @@ function ResultBox({ result }) {
         </p>
       )}
       {result.lines?.map((l, i) => <p key={i} style={{ margin: 0 }}>{l}</p>)}
-      {result.clabe && (
-        <div style={{ marginTop: 8 }}>
-          <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
-            CLABE interbancaria
-          </p>
-          <p style={{
-            background: 'var(--bg)', border: '1px solid var(--line)',
-            borderRadius: 8, fontFamily: 'monospace', fontSize: 15,
-            letterSpacing: 2, padding: '10px 14px', margin: 0, color: 'var(--type)',
-          }}>
-            {result.clabe}
-          </p>
-        </div>
-      )}
+      {result.clabe && <ClabeCopy clabe={result.clabe} />}
       {result.link && (
         <a
           href={result.link.href} target="_blank" rel="noopener noreferrer"
@@ -534,8 +650,8 @@ function ResultBox({ result }) {
 
 // ── Estilos compartidos ────────────────────────────────────────────────────
 const eyebrowStyle = {
-  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em',
-  textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 14px',
+  fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.22em',
+  textTransform: 'uppercase', color: 'var(--type-soft)', margin: '0 0 14px',
 };
 
 const labelStyle = {
@@ -547,7 +663,7 @@ const labelStyle = {
 const inputStyle = {
   width: '100%', padding: '12px 14px',
   background: 'var(--bg)', border: '1px solid var(--line)',
-  borderRadius: 'var(--radius)', fontFamily: 'var(--body)', fontSize: 14,
+  fontFamily: 'var(--body)', fontSize: 14,
   color: 'var(--type)', outline: 'none', boxSizing: 'border-box',
   transition: 'border-color 0.2s', appearance: 'none',
 };

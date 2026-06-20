@@ -36,6 +36,10 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGoogleSignIn = async () => {
+    if (!auth) {
+      setError('Inicio de sesión con Google no está configurado.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {

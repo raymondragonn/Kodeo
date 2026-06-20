@@ -14,7 +14,7 @@ const PDF_MAP        = {
 
 gsap.registerPlugin(ScrollTrigger);
 
-export default function Services({ copy, motionSpeed = 1, onServiceClick, onExtrasClick }) {
+export default function Services({ copy, motionSpeed = 1, onServiceClick }) {
   const [hoverIdx, setHoverIdx]   = useState(null);
   const [autoIdx,  setAutoIdx]    = useState(0);
   const [fade,     setFade]       = useState(true);
@@ -206,49 +206,6 @@ export default function Services({ copy, motionSpeed = 1, onServiceClick, onExtr
               </span>
             </div>
           ))}
-
-          {/* Mantenimiento — secondary row */}
-          {onExtrasClick && (
-            <div
-              onClick={onExtrasClick}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '36px 1fr 24px' : '44px 1fr auto 30px',
-                alignItems: 'center',
-                padding: isMobile ? '16px 0' : '16px 0',
-                borderTop: '1px solid var(--line)',
-                borderBottom: '1px solid var(--line)',
-                cursor: 'pointer',
-                color: 'var(--type-soft)',
-                transition: `color ${slow}`,
-                fontFamily: 'var(--ui)',
-                fontSize: 10,
-                letterSpacing: '.16em',
-                textTransform: 'uppercase',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--type-soft)'}
-            >
-              <span>+</span>
-              <span style={{
-                fontFamily: 'var(--display)',
-                fontSize: isMobile ? 'clamp(18px, 5vw, 26px)' : 'clamp(18px, 2vw, 26px)',
-                textTransform: 'none',
-                letterSpacing: '-0.015em',
-                fontWeight: 400,
-                lineHeight: 1.2,
-                paddingBottom: '0.04em',
-              }}>
-                {copy.extrasPage?.eyebrow ?? 'Mantenimiento'}
-              </span>
-              {!isMobile && (
-                <span style={{ fontSize: 10, letterSpacing: '.14em', opacity: 0.6 }}>
-                  {copy.extrasPage?.plans?.[0]?.price ?? ''} — {copy.extrasPage?.plans?.[2]?.price ?? ''}
-                </span>
-              )}
-              <span style={{ textAlign: 'right', opacity: 0.5 }}>→</span>
-            </div>
-          )}
         </div>
       </div>
 

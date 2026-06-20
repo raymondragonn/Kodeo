@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/auth.php';
 
 setCorsHeaders();
 
@@ -14,11 +15,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonError('Método no permitido', 405);
 }
 
+$auth = getAuthUser();
+
 $body = json_decode(file_get_contents('php://input'), true);
 
-$amount = $body['amount'] ?? null;   // Centavos MXN
-$name   = trim($body['name'] ?? '');
-$email  = trim($body['email'] ?? '');
+$amount  = $body['amount'] ?? null;   // Centavos MXN
+$name    = trim($body['name'] ?? '');
+$email   = trim($body['email'] ?? '');
+$service = trim($body['service'] ?? 'Servicio Kodeo');
+$code    = trim($body['code'] ?? '');
 
 if (!$amount || !is_numeric($amount) || $amount < 1000) {
     jsonError('Monto inválido. Mínimo 1000 centavos ($10 MXN).');
@@ -65,6 +70,11 @@ try {
             ],
         ],
         'confirm' => true,
+        'metadata' => [
+            'user_id'      => $auth['sub'],
+            'service'      => $service,
+            'service_code' => $code,
+        ],
     ]);
 
     $bankTransfer = $paymentIntent->next_action->display_bank_transfer_instructions ?? null;

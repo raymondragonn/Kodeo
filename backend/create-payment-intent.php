@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/auth.php';
 
 setCorsHeaders();
 
@@ -13,10 +14,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonError('Método no permitido', 405);
 }
 
+$auth = getAuthUser();
+
 $body = json_decode(file_get_contents('php://input'), true);
 
 $amount      = $body['amount'] ?? null;       // Monto en centavos (ej. 150000 = $1,500 MXN)
 $currency    = $body['currency'] ?? 'mxn';
+$service     = trim($body['service'] ?? 'Servicio Kodeo');
+$code        = trim($body['code'] ?? '');
 $installments = (int)($body['installments'] ?? 0); // 0 = sin MSI, 3, 6, 9, 12, 18, 24
 
 if (!$amount || !is_numeric($amount) || $amount < 1000) {
@@ -38,7 +43,10 @@ try {
             ],
         ],
         'metadata' => [
-            'installments_plan' => $installments > 0 ? "{$installments}_months" : 'none',
+            'user_id'            => $auth['sub'],
+            'service'            => $service,
+            'service_code'       => $code,
+            'installments_plan'  => $installments > 0 ? "{$installments}_months" : 'none',
         ],
     ];
 

@@ -174,7 +174,7 @@ function AccordionItem({ title, content, motionSpeed = 1 }) {
   );
 }
 
-export default function AboutPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onServiceClick, onExtrasClick, onAuthClick }) {
+export default function AboutPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onServiceClick, onAuthClick }) {
   const wrapRef      = useRef(null);
   const heroRef      = useRef(null);
   const moreRef      = useRef(null);
@@ -202,7 +202,6 @@ export default function AboutPage({ copy, motionSpeed = 1, onBack, onNavItemClic
         onNavItemClick={onNavItemClick}
         onContact={onContact}
         onServiceClick={onServiceClick}
-        onExtrasClick={onExtrasClick}
         onAuthClick={onAuthClick}
       />
 

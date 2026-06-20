@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const PHASES = [
   { label: 'Diagnóstico', color: 'var(--accent-yellow)' },
@@ -7,8 +7,19 @@ const PHASES = [
   { label: 'Despliegue',  color: 'var(--accent-blue)'   },
 ];
 
+const CYCLE_MS = 2000;
+
 export default function Marquee({ motionSpeed = 1 }) {
-  const [active, setActive] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveIndex((i) => (i + 1) % PHASES.length);
+    }, CYCLE_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  const active = PHASES[activeIndex].label;
 
   return (
     <div style={{
@@ -29,8 +40,6 @@ export default function Marquee({ motionSpeed = 1 }) {
           PHASES.map(({ label, color }) => (
             <span key={`${rep}-${label}`} style={{ display: 'inline-flex', alignItems: 'center' }}>
               <span
-                onMouseEnter={() => setActive(label)}
-                onMouseLeave={() => setActive(null)}
                 style={{
                   color: active === label ? color : 'var(--type-soft)',
                   transition: 'color 0.3s ease',

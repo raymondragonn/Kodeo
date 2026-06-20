@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node *)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(grep -E \"\\\\.\\(vue|js|ts|json\\)$\")",
+      "Bash(file /Users/raymondragonn/Documents/ProyectosWeb/kodeo-editorial/src/assets/projects/*/\\\\*-1.png)",
+      "Bash(npm outdated *)",
+      "Bash(npm update *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5000)",
+      "Bash(pkill -f \"node.*vite\")",
+      "Bash(pkill -f \"npm run dev\")"
+    ]
+  }
+}

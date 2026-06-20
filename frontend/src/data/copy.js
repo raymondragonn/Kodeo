@@ -174,6 +174,12 @@ export const COPY = {
         { label: "Pagos",     items: ["Stripe", "MercadoPago", "PayPal", "Oxxo"] },
       ],
     },
+    selectProduct: {
+      eyebrow: "Elige tu proyecto",
+      title: "¿Qué quieres construir?",
+      sub: "Selecciona el producto que quieres comprar para continuar con el pago.",
+      cta: "Comprar",
+    },
     servicePage: {
       breadcrumb: "Servicios",
       problem: { label: "El problema", heading: "Estás invisible online." },
@@ -275,34 +281,6 @@ export const COPY = {
         accept: "Aceptar",
         decline: "Rechazar",
       },
-    },
-    extrasPage: {
-      eyebrow: "Servicio adicional",
-      title: "Mantenimiento\nweb.",
-      intro: "Un sitio sin mantenimiento es un sitio que envejece. Actualizaciones, seguridad, velocidad y soporte continuo para que tú te enfoques en tu negocio.",
-      plans: [
-        { name: "Básico",    price: "MX$ 800",   period: "/ mes", includes: [
-          "Actualizaciones de plataforma y plugins",
-          "Monitoreo de disponibilidad 24/7",
-          "Respaldo mensual del sitio",
-          "1 modificación de contenido al mes",
-        ]},
-        { name: "Estándar",  price: "MX$ 1,500", period: "/ mes", includes: [
-          "Todo lo del plan Básico",
-          "Correcciones de bugs sin costo adicional",
-          "Optimización mensual de velocidad",
-          "3 modificaciones de contenido al mes",
-          "Reporte mensual de rendimiento",
-        ]},
-        { name: "Pro",       price: "MX$ 2,800", period: "/ mes", includes: [
-          "Todo lo del plan Estándar",
-          "Soporte prioritario por WhatsApp",
-          "Modificaciones ilimitadas de contenido",
-          "Actualizaciones de diseño menores",
-          "Auditoría SEO trimestral",
-        ]},
-      ],
-      ctaLabel: "Contratar",
     },
   },
 
@@ -481,6 +459,12 @@ export const COPY = {
         { label: "Payments",  items: ["Stripe", "MercadoPago", "PayPal", "Oxxo"] },
       ],
     },
+    selectProduct: {
+      eyebrow: "Choose your project",
+      title: "What do you want to build?",
+      sub: "Pick the product you want to purchase to continue with checkout.",
+      cta: "Buy now",
+    },
     servicePage: {
       breadcrumb: "Services",
       problem: { label: "The problem", heading: "You're invisible online." },
@@ -582,34 +566,6 @@ export const COPY = {
         accept: "Accept",
         decline: "Decline",
       },
-    },
-    extrasPage: {
-      eyebrow: "Additional service",
-      title: "Web\nMaintenance.",
-      intro: "A site without maintenance is a site that ages. Updates, security, speed and ongoing support so you can focus on your business.",
-      plans: [
-        { name: "Basic",    price: "MX$ 800",   period: "/ mo", includes: [
-          "Platform and plugin updates",
-          "24/7 uptime monitoring",
-          "Monthly site backup",
-          "1 content edit per month",
-        ]},
-        { name: "Standard", price: "MX$ 1,500", period: "/ mo", includes: [
-          "Everything in Basic",
-          "Bug fixes at no extra cost",
-          "Monthly speed optimization",
-          "3 content edits per month",
-          "Monthly performance report",
-        ]},
-        { name: "Pro",      price: "MX$ 2,800", period: "/ mo", includes: [
-          "Everything in Standard",
-          "Priority WhatsApp support",
-          "Unlimited content edits",
-          "Minor design updates",
-          "Quarterly SEO audit",
-        ]},
-      ],
-      ctaLabel: "Get started",
     },
   },
 };

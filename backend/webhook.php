@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/vendor/autoload.php';
 
 \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
@@ -59,9 +60,28 @@ function handlePaymentSucceeded(\Stripe\PaymentIntent $pi): void {
     $currency    = strtoupper($pi->currency);
     $installments = $pi->metadata['installments_plan'] ?? 'none';
 
-    // Aquí conecta con tu base de datos o envía un email de confirmación.
-    // Ejemplo de log:
     error_log("[STRIPE] Pago exitoso | ID: {$pi->id} | Método: {$method} | Monto: {$amount} {$currency} | MSI: {$installments}");
+
+    $userId  = $pi->metadata['user_id']  ?? null;
+    $service = $pi->metadata['service']  ?? null;
+    if (!$userId || !$service) {
+        error_log("[STRIPE] Pago sin metadata de user_id/service, no se crea pedido | ID: {$pi->id}");
+        return;
+    }
+
+    $code      = $pi->metadata['service_code'] ?? null;
+    $devDays   = SERVICE_DEV_DAYS[$code] ?? DEFAULT_DEV_DAYS;
+    $startDate = date('Y-m-d');
+    $delivery  = addBusinessDays($startDate, $devDays);
+
+    try {
+        getDb()->prepare('
+            INSERT INTO orders (user_id, service, amount, status, start_date, delivery_date, stripe_payment_intent_id)
+            VALUES (?, ?, ?, \'pendiente\', ?, ?, ?)
+        ')->execute([(int)$userId, $service, $amount, $startDate, $delivery, $pi->id]);
+    } catch (\PDOException $e) {
+        if ($e->getCode() !== '23000') throw $e; // duplicado (reintento de webhook) — ignorar
+    }
 }
 
 function handlePaymentFailed(\Stripe\PaymentIntent $pi): void {

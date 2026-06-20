@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 
@@ -9,6 +10,7 @@ export default function Hero({ copy, motionSpeed = 1 }) {
   const eyebrowRef  = useRef(null);
   const sectionRef  = useRef(null);
   const { isMobile } = useBreakpoint();
+  const navigate      = useNavigate();
 
   const dur     = 0.9 / motionSpeed;
   const stagger = 0.12 / motionSpeed;
@@ -111,10 +113,8 @@ export default function Hero({ copy, motionSpeed = 1 }) {
         </p>
 
         <div ref={ctaRef} style={{ display: 'flex', gap: 12, alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
-          <a
-            href={`https://wa.me/522298483706?text=${encodeURIComponent(copy.cta.waMsg)}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => navigate('/comprar')}
             style={{
               background: 'var(--type)',
               color: 'var(--bg)',
@@ -124,10 +124,10 @@ export default function Hero({ copy, motionSpeed = 1 }) {
               letterSpacing: '.16em',
               textTransform: 'uppercase',
               borderRadius: 'var(--radius-pill)',
+              border: 0,
               cursor: 'pointer',
               transition: 'transform 0.25s ease, opacity 0.25s',
               flex: isMobile ? 1 : 'none',
-              textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -136,7 +136,7 @@ export default function Hero({ copy, motionSpeed = 1 }) {
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
           >
             {copy.hero.ctaA}
-          </a>
+          </button>
           <a
             href="#work"
             style={{

@@ -44,6 +44,10 @@ export default function RegisterPage({ copy, onNavigate }) {
   };
 
   const handleGoogleRegister = async () => {
+    if (!auth) {
+      setError('Registro con Google no está configurado.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {

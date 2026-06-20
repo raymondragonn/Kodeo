@@ -66,7 +66,7 @@ function ProfileIcon() {
   );
 }
 
-export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onServiceClick, onExtrasClick, onAuthClick, onLogout, user, theme, onThemeToggle }) {
+export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onServiceClick, onAuthClick, onLogout, user, theme, onThemeToggle }) {
   const [pinnedItem,  setPinnedItem]    = useState(null);
   const [menuOpen,    setMenuOpen]      = useState(false);
   const [profileOpen, setProfileOpen]   = useState(false);
@@ -489,41 +489,6 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                       <span style={{ color: 'var(--type-soft)', fontSize: 13, flexShrink: 0 }}>↗</span>
                     </button>
                   ))}
-
-                  {onExtrasClick && (
-                    <button
-                      onClick={() => {
-                        setPinnedItem(null);
-                        onExtrasClick();
-                      }}
-                      style={{
-                        display: 'flex',
-                        width: '100%',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '11px 18px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        gap: 10,
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-3)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <div style={{
-                        fontFamily: 'var(--ui)',
-                        fontSize: 10,
-                        letterSpacing: '.14em',
-                        textTransform: 'uppercase',
-                        color: 'var(--type-soft)',
-                      }}>
-                        {copy.extrasPage?.eyebrow ?? 'Mantenimiento'}
-                      </div>
-                      <span style={{ color: 'var(--type-muted)', fontSize: 11, flexShrink: 0 }}>↗</span>
-                    </button>
-                  )}
                 </div>
               )}
             </div>

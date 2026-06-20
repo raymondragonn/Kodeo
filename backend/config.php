@@ -39,6 +39,27 @@ function setCorsHeaders(): void {
     }
 }
 
+// Días hábiles de desarrollo por servicio (debe coincidir con frontend/src/data/copy.js)
+const SERVICE_DEV_DAYS = [
+    '01' => 8,  // Landing Page
+    '02' => 16, // Sitio Web
+    '03' => 20, // Tienda Online
+];
+const DEFAULT_DEV_DAYS = 8;
+
+/**
+ * Suma días hábiles (lunes a viernes) a una fecha, saltando fines de semana.
+ */
+function addBusinessDays(string $fromDate, int $days): string {
+    $date  = new DateTime($fromDate);
+    $added = 0;
+    while ($added < $days) {
+        $date->modify('+1 day');
+        if ((int)$date->format('N') < 6) $added++; // 1=lunes ... 5=viernes
+    }
+    return $date->format('Y-m-d');
+}
+
 function jsonError(string $message, int $code = 400): never {
     http_response_code($code);
     echo json_encode(['error' => $message], JSON_UNESCAPED_UNICODE);

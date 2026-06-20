@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Footer from './Footer';
@@ -54,11 +55,17 @@ function LineBlock({ lines = 3, opacity = 0.4, height = 5 }) {
   );
 }
 
-export default function ServicePage({ copy, service, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onExtrasClick, onAuthClick }) {
+export default function ServicePage({ copy, service, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick }) {
   const accent       = ACCENT[service.code] || 'var(--accent-green)';
   const heroRef      = useRef(null);
   const sp           = copy.servicePage;
   const { isMobile } = useBreakpoint();
+  const navigate     = useNavigate();
+
+  const handleCheckout = () => {
+    const amount = Number(service.price.replace(/[^\d]/g, '')) * 100;
+    navigate('/pago', { state: { amount, service: service.name, code: service.code } });
+  };
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -88,7 +95,6 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
         onNavItemClick={onNavItemClick}
         onContact={onContact}
         onServiceClick={onServiceClick}
-        onExtrasClick={onExtrasClick}
         onAuthClick={onAuthClick}
       />
 
@@ -500,10 +506,8 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
             >
               {copy.cta.email}
             </a>
-            <a
-              href={`https://wa.me/522298483706?text=${encodeURIComponent(sp.waMsgs?.[service.code] ?? copy.cta.waMsg)}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={handleCheckout}
               style={{
                 background: 'var(--type)',
                 color: 'var(--bg)',
@@ -516,7 +520,7 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
                 cursor: 'pointer',
                 transition: 'transform 0.2s ease',
                 flex: isMobile ? 1 : 'none',
-                textDecoration: 'none',
+                border: 0,
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -525,7 +529,7 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
               onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
               {sp.ctaStart} →
-            </a>
+            </button>
           </div>
         </div>
       </section>

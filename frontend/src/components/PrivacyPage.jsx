@@ -25,7 +25,7 @@ const Section = ({ title, children, isMobile }) => (
   </div>
 );
 
-export default function PrivacyPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onExtrasClick, onAuthClick }) {
+export default function PrivacyPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick }) {
   const p = copy.legal.privacy;
   const { isMobile } = useBreakpoint();
 
@@ -37,7 +37,6 @@ export default function PrivacyPage({ copy, motionSpeed = 1, onBack, onNavItemCl
         onNavItemClick={onNavItemClick}
         onContact={onContact}
         onServiceClick={onServiceClick}
-        onExtrasClick={onExtrasClick}
         onAuthClick={onAuthClick}
       />
 

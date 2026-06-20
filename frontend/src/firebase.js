@@ -15,7 +15,8 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Authentication
-export const auth = getAuth(app);
+// Initialize Firebase Authentication (solo si hay configuración válida,
+// para no romper la app cuando faltan las variables VITE_FIREBASE_*)
+export const auth = firebaseConfig.apiKey ? getAuth(app) : null;
 
 export default app;

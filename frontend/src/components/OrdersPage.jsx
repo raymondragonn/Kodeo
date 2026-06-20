@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Nav from './Nav';
+import { formatDMY } from '../utils/deliveryDate';
 
 const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
 
@@ -277,8 +278,8 @@ function AdminRow({ order, onSave }) {
       )}
       {!editing && (order.start_date || order.delivery_date) && (
         <div style={{ padding: '10px 20px', borderTop: '1px solid var(--line)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          {order.start_date && <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Inicio: <strong style={{ color: 'var(--type-soft)' }}>{order.start_date}</strong></span>}
-          {order.delivery_date && <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Entrega: <strong style={{ color: 'var(--type-soft)' }}>{order.delivery_date}</strong></span>}
+          {order.start_date && <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Inicio: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.start_date)}</strong></span>}
+          {order.delivery_date && <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Entrega: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.delivery_date)}</strong></span>}
         </div>
       )}
     </div>
@@ -295,15 +296,15 @@ function ClientCard({ order }) {
             <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--type)' }}>{order.service}</span>
             <StatusBadge status={order.status}/>
           </div>
-          <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Pedido #{order.id} · {order.created_at?.slice(0, 10)}</span>
+          <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Pedido #{order.id} · {formatDMY(order.created_at)}</span>
         </div>
         <span style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', flexShrink: 0 }}>MX${parseFloat(order.amount).toLocaleString('es-MX')}</span>
       </div>
       <ProgressBar status={order.status}/>
       {(order.start_date || order.delivery_date) && (
         <div style={{ marginTop: 14, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          {order.start_date && <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Inicio: <strong style={{ color: 'var(--type)' }}>{order.start_date}</strong></span>}
-          {order.delivery_date && <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Entrega: <strong style={{ color: 'var(--type)' }}>{order.delivery_date}</strong></span>}
+          {order.start_date && <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Inicio: <strong style={{ color: 'var(--type)' }}>{formatDMY(order.start_date)}</strong></span>}
+          {order.delivery_date && <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Entrega: <strong style={{ color: 'var(--type)' }}>{formatDMY(order.delivery_date)}</strong></span>}
         </div>
       )}
       {order.notes && (
@@ -367,7 +368,7 @@ function KanbanCard({ order, isAdmin, onSave, onPointerDown, dragging, justDropp
       }
       {order.delivery_date && (
         <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: 'var(--type-muted)' }}>
-          Entrega: <strong style={{ color: 'var(--type-soft)' }}>{order.delivery_date}</strong>
+          Entrega: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.delivery_date)}</strong>
         </span>
       )}
       {order.notes && !editing && (

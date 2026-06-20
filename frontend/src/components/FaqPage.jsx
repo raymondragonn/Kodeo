@@ -81,7 +81,7 @@ function AccordionItem({ question, answer, motionSpeed = 1 }) {
   );
 }
 
-export default function FaqPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onExtrasClick, onAuthClick }) {
+export default function FaqPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick }) {
   const wrapRef      = useRef(null);
   const headRef      = useRef(null);
   const listRef      = useRef(null);
@@ -118,7 +118,6 @@ export default function FaqPage({ copy, motionSpeed = 1, onBack, onNavItemClick,
         onNavItemClick={onNavItemClick}
         onContact={onContact}
         onServiceClick={onServiceClick}
-        onExtrasClick={onExtrasClick}
         onAuthClick={onAuthClick}
       />
 

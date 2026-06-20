@@ -25,7 +25,7 @@ const Section = ({ title, children, isMobile }) => (
   </div>
 );
 
-export default function TermsPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onExtrasClick, onAuthClick }) {
+export default function TermsPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick }) {
   const t = copy.legal.terms;
   const { isMobile } = useBreakpoint();
 
@@ -37,7 +37,6 @@ export default function TermsPage({ copy, motionSpeed = 1, onBack, onNavItemClic
         onNavItemClick={onNavItemClick}
         onContact={onContact}
         onServiceClick={onServiceClick}
-        onExtrasClick={onExtrasClick}
         onAuthClick={onAuthClick}
       />
 

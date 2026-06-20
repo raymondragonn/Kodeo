@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useMagneticCursor } from '../hooks/useMagneticCursor';
@@ -10,6 +11,7 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
   const sectionRef   = useRef(null);
   const emailRef     = useMagneticCursor(80, 0.4);
   const { isMobile } = useBreakpoint();
+  const navigate      = useNavigate();
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -121,10 +123,8 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
             </span>
           </a>
 
-          <a
-            href={`https://wa.me/522298483706?text=${encodeURIComponent(copy.cta.waMsg)}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => navigate('/comprar')}
             style={{
               background: 'var(--type)',
               color: 'var(--bg)',
@@ -134,10 +134,10 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
               fontSize: 12,
               letterSpacing: '.2em',
               textTransform: 'uppercase',
+              border: 0,
               cursor: 'pointer',
               transition: 'transform 0.25s ease, opacity 0.25s',
               width: isMobile ? '100%' : 'auto',
-              textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -146,7 +146,7 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
             onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
           >
             {copy.cta.btn} →
-          </a>
+          </button>
         </div>
       </div>
     </section>
