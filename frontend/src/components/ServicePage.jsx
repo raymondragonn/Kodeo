@@ -55,7 +55,7 @@ function LineBlock({ lines = 3, opacity = 0.4, height = 5 }) {
   );
 }
 
-export default function ServicePage({ copy, service, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick }) {
+export default function ServicePage({ copy, service, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick, onLogout, user, theme, onThemeToggle }) {
   const accent       = ACCENT[service.code] || 'var(--accent-green)';
   const heroRef      = useRef(null);
   const sp           = copy.servicePage;
@@ -96,6 +96,10 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
         onContact={onContact}
         onServiceClick={onServiceClick}
         onAuthClick={onAuthClick}
+        onLogout={onLogout}
+        user={user}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
       />
 
       {/* HERO */}

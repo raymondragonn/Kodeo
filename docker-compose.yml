@@ -25,7 +25,7 @@ services:
     build:
       context: ./backend
     ports:
-      - "8080:80"
+      - "8000:80"
     env_file:
       - ./backend/.env
     depends_on:

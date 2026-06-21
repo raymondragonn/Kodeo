@@ -4,7 +4,7 @@ import Nav from './Nav';
 import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 
-export default function StackPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick }) {
+export default function StackPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick, onLogout, user, theme, onThemeToggle }) {
   const heroRef  = useRef(null);
   const gridRef  = useRef(null);
   const sp       = copy.stackPricing;
@@ -43,6 +43,10 @@ export default function StackPage({ copy, motionSpeed = 1, onBack, onNavItemClic
         onContact={onContact}
         onServiceClick={onServiceClick}
         onAuthClick={onAuthClick}
+        onLogout={onLogout}
+        user={user}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
       />
 
       {/* HERO */}

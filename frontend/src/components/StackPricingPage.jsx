@@ -4,7 +4,8 @@ import StackPricing from './StackPricing';
 
 export default function StackPricingPage({
   copy, motionSpeed = 1,
-  onBack, onNavItemClick, onContact, onNavigate, onServiceClick,
+  onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick,
+  onLogout, user, theme, onThemeToggle,
 }) {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--type)' }}>
@@ -15,6 +16,10 @@ export default function StackPricingPage({
         onContact={onContact}
         onServiceClick={onServiceClick}
         onAuthClick={onAuthClick}
+        onLogout={onLogout}
+        user={user}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
       />
 
       <StackPricing copy={copy} motionSpeed={motionSpeed} onServiceClick={onServiceClick} />

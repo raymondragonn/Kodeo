@@ -3,8 +3,7 @@ import Nav from './Nav';
 import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { estimatedDeliveryDate, formatDateEs } from '../utils/deliveryDate';
-
-const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
+import { API_BASE_URL as API } from '../lib/api';
 
 const ACCENT = {
   '01': 'var(--accent-green)',

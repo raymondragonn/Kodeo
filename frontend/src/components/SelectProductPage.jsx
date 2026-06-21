@@ -18,6 +18,7 @@ function priceToCents(price) {
 
 export default function SelectProductPage({
   copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick,
+  onLogout, user, theme, onThemeToggle,
 }) {
   const navigate      = useNavigate();
   const sectionRef    = useRef(null);
@@ -51,6 +52,10 @@ export default function SelectProductPage({
         onContact={onContact}
         onServiceClick={onServiceClick}
         onAuthClick={onAuthClick}
+        onLogout={onLogout}
+        user={user}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
       />
 
       <section ref={sectionRef} style={{ padding: isMobile ? '50px 20px 70px' : '80px 36px 110px' }}>

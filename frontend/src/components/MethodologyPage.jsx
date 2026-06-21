@@ -6,7 +6,7 @@ import { useBreakpoint } from '../hooks/useBreakpoint';
 
 const STEP_COLORS = ['#FFDE59', '#63C44D', '#FF3131', '#5170FF'];
 
-export default function MethodologyPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick }) {
+export default function MethodologyPage({ copy, motionSpeed = 1, onBack, onNavItemClick, onContact, onNavigate, onServiceClick, onAuthClick, onLogout, user, theme, onThemeToggle }) {
   const heroRef   = useRef(null);
   const stepsRef  = useRef([]);
   const m         = copy.methodology;
@@ -43,6 +43,10 @@ export default function MethodologyPage({ copy, motionSpeed = 1, onBack, onNavIt
         onContact={onContact}
         onServiceClick={onServiceClick}
         onAuthClick={onAuthClick}
+        onLogout={onLogout}
+        user={user}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
       />
 
       {/* HERO */}

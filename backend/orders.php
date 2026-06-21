@@ -3,8 +3,40 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
 setCorsHeaders();
+
+const ORDER_STATUS_LABELS = [
+    'pendiente'  => 'Pendiente',
+    'en_proceso' => 'En proceso',
+    'completado' => 'Completado',
+    'cancelado'  => 'Cancelado',
+];
+
+/**
+ * Avisa por correo al cliente dueño del pedido que su estado cambió.
+ * Nunca lanza: un fallo de envío no debe tumbar la respuesta del PATCH.
+ */
+function notifyOrderStatusChange(array $order): void {
+    $label  = ORDER_STATUS_LABELS[$order['status']] ?? $order['status'];
+    $accent = SERVICE_ACCENTS[$order['service']] ?? DEFAULT_EMAIL_ACCENT;
+
+    $body = '
+        <p style="margin: 0 0 14px;">Hola ' . htmlspecialchars($order['user_name']) . ',</p>
+        <p style="margin: 0 0 18px;">El estado de tu pedido <strong style="color: #ffffff;">' . htmlspecialchars($order['service']) . '</strong> (#' . (int) $order['id'] . ') cambió a:</p>
+        <p style="margin: 0 0 4px; font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; color: ' . htmlspecialchars($accent) . ';">' . htmlspecialchars($label) . '</p>
+    ';
+
+    $html = renderEmailLayout(
+        'Actualización de tu pedido',
+        $body,
+        ['label' => 'Ver mis pedidos', 'url' => ALLOWED_ORIGIN . '/pedidos'],
+        $accent
+    );
+
+    sendMail($order['user_email'], 'Actualización de tu pedido — Kodeo', $html);
+}
 
 $auth   = getAuthUser();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -53,6 +85,10 @@ if ($method === 'PATCH') {
 
     if (empty($sets)) jsonError('Nada que actualizar');
 
+    $previousStatus = $db->prepare('SELECT status FROM orders WHERE id = ?');
+    $previousStatus->execute([$id]);
+    $previousStatus = $previousStatus->fetchColumn();
+
     $values[] = $id;
     $db->prepare('UPDATE orders SET ' . implode(', ', $sets) . ' WHERE id = ?')
        ->execute($values);
@@ -63,7 +99,13 @@ if ($method === 'PATCH') {
         WHERE o.id = ?
     ');
     $stmt->execute([$id]);
-    jsonSuccess(['order' => $stmt->fetch()]);
+    $order = $stmt->fetch();
+
+    if ($order && array_key_exists('status', $body) && $body['status'] !== $previousStatus) {
+        notifyOrderStatusChange($order);
+    }
+
+    jsonSuccess(['order' => $order]);
 }
 
 jsonError('Método no permitido', 405);

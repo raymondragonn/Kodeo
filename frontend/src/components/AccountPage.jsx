@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Nav from './Nav';
+import { API_BASE_URL as API } from '../lib/api';
 
 function Field({ label, value, type = 'text', editing, onChange }) {
   const base = {
@@ -31,19 +32,39 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
   const [username, setUsername] = useState(user?.username ?? '');
   const [email, setEmail]       = useState(user?.email    ?? '');
   const [saved, setSaved]       = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
 
-  const handleSave = () => {
-    // Aquí irá el endpoint PATCH /account.php cuando se implemente
-    onUserUpdate?.({ ...user, name, username, email });
-    setSaved(true);
-    setEditing(false);
-    setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/account.php`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, username, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? 'Error al guardar los cambios'); return; }
+
+      localStorage.setItem('token', data.token);
+      onUserUpdate?.(data.user);
+      setSaved(true);
+      setEditing(false);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {
+      setError('No se pudo conectar con el servidor');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
     setName(user?.name ?? '');
     setUsername(user?.username ?? '');
     setEmail(user?.email ?? '');
+    setError('');
     setEditing(false);
   };
 
@@ -106,6 +127,11 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
             <Field label="Nombre completo" value={name}     editing={editing} onChange={setName} />
             <Field label="Usuario"         value={username} editing={editing} onChange={v => setUsername(v.toLowerCase().replace(/[^a-z0-9_]/g, ''))} />
             <Field label="Correo"          value={email}    editing={editing} onChange={setEmail} type="email" />
+            {editing && error && (
+              <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: '#e05050', margin: 0 }}>
+                {error}
+              </p>
+            )}
           </div>
 
           {/* Actions */}
@@ -115,19 +141,20 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
               borderTop: '1px solid var(--line)',
               display: 'flex', gap: 10, justifyContent: 'flex-end',
             }}>
-              <button onClick={handleCancel} style={{
+              <button onClick={handleCancel} disabled={loading} style={{
                 fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
                 background: 'transparent', border: '1px solid var(--line)', color: 'var(--type-soft)',
-                padding: '10px 18px', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+                padding: '10px 18px', borderRadius: 'var(--radius-pill)', cursor: loading ? 'not-allowed' : 'pointer',
               }}>
                 Cancelar
               </button>
-              <button onClick={handleSave} style={{
+              <button onClick={handleSave} disabled={loading} style={{
                 fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
                 background: 'var(--type)', color: 'var(--bg)', border: 0,
-                padding: '10px 22px', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+                padding: '10px 22px', borderRadius: 'var(--radius-pill)', cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
               }}>
-                Guardar →
+                {loading ? 'Guardando...' : 'Guardar →'}
               </button>
             </div>
           )}

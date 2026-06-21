@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import logoSvg from '../assets/logo_black_transparent.svg';
 import { auth } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { API_BASE_URL as API } from '../lib/api';
 
-const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('profile');
 googleProvider.addScope('email');
@@ -268,13 +268,16 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <a href="#" style={{
-                fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em',
-                textTransform: 'uppercase', color: 'var(--type-soft)',
-                textDecoration: 'none', transition: 'color 0.2s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--type-soft)'}
+              <a
+                href="/recuperar"
+                onClick={e => { e.preventDefault(); onNavigate?.('/recuperar'); }}
+                style={{
+                  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em',
+                  textTransform: 'uppercase', color: 'var(--type-soft)',
+                  textDecoration: 'none', transition: 'color 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--type-soft)'}
               >
                 ¿Olvidaste tu contraseña?
               </a>

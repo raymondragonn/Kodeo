@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS users (
   oauth_provider VARCHAR(20)     NULL,
   oauth_id      VARCHAR(255)     NULL,
   verified_at   TIMESTAMP        NULL DEFAULT NULL,
+  reset_token_hash    VARCHAR(255) NULL,
+  reset_token_expires DATETIME     NULL,
   created_at    TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 

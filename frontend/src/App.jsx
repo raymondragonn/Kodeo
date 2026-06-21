@@ -27,6 +27,8 @@ const MethodologyPage  = lazy(() => import('./components/MethodologyPage'));
 const StackPage        = lazy(() => import('./components/StackPage'));
 const LoginPage        = lazy(() => import('./components/LoginPage'));
 const RegisterPage     = lazy(() => import('./components/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./components/ForgotPasswordPage'));
+const ResetPasswordPage  = lazy(() => import('./components/ResetPasswordPage'));
 const SelectProductPage = lazy(() => import('./components/SelectProductPage'));
 const OrdersPage       = lazy(() => import('./components/OrdersPage'));
 const AccountPage      = lazy(() => import('./components/AccountPage'));
@@ -277,15 +279,7 @@ export default function App() {
 
         {/* ── Servicios ── */}
         <Route path="/:slug" element={
-          <ServicePageRoute
-            copy={copy}
-            motionSpeed={motionSpeed}
-            onBack={handleBack}
-            onNavItemClick={handleNavItemClick}
-            onContact={() => goToSection('contact')}
-            onNavigate={handleFooterNavigate}
-            onServiceClick={handleServiceClick}
-          />
+          <ServicePageRoute {...sharedNavProps} onBack={handleBack} />
         } />
 
         {/* ── Mis pedidos ── */}
@@ -317,6 +311,22 @@ export default function App() {
           <>
             <PageMeta title="Registrarme | Kodeo" description="Crea tu cuenta en Kodeo." path="/register" />
             <RegisterPage copy={copy} onNavigate={navigate} />
+          </>
+        } />
+
+        {/* ── Recuperar contraseña ── */}
+        <Route path="/recuperar" element={
+          <>
+            <PageMeta title="Recuperar contraseña | Kodeo" description="Recupera el acceso a tu cuenta Kodeo." path="/recuperar" />
+            <ForgotPasswordPage copy={copy} onNavigate={navigate} />
+          </>
+        } />
+
+        {/* ── Restablecer contraseña ── */}
+        <Route path="/restablecer" element={
+          <>
+            <PageMeta title="Restablecer contraseña | Kodeo" description="Crea una nueva contraseña para tu cuenta Kodeo." path="/restablecer" />
+            <ResetPasswordPage copy={copy} onNavigate={navigate} />
           </>
         } />
 

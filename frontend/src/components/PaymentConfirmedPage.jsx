@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoSvg from '../assets/logo_black_transparent.svg';
-
-const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
+import { API_BASE_URL as API } from '../lib/api';
 
 const STATUS_COPY = {
   succeeded: {

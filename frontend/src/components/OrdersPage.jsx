@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Nav from './Nav';
 import { formatDMY } from '../utils/deliveryDate';
-
-const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080';
+import { API_BASE_URL as API } from '../lib/api';
 
 const STATUS_MAP = {
   pendiente:  { label: 'Pendiente',  bg: 'rgba(148,163,184,0.1)', color: '#64748b', border: 'rgba(148,163,184,0.3)' },
@@ -215,7 +214,12 @@ function AdminRow({ order, onSave }) {
   });
   const [saving, setSaving] = useState(false);
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const handleSave = async () => { setSaving(true); await onSave(order.id, form); setSaving(false); setEditing(false); };
+  const handleSave = async () => {
+    setSaving(true);
+    const ok = await onSave(order.id, form);
+    setSaving(false);
+    if (ok) setEditing(false);
+  };
   const inputStyle = {
     background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius)',
     color: 'var(--type)', fontFamily: 'var(--body)', fontSize: 13, padding: '8px 10px',
@@ -325,7 +329,12 @@ function KanbanCard({ order, isAdmin, onSave, onPointerDown, dragging, justDropp
   });
   const [saving, setSaving] = useState(false);
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const handleSave = async () => { setSaving(true); await onSave(order.id, form); setSaving(false); setEditing(false); };
+  const handleSave = async () => {
+    setSaving(true);
+    const ok = await onSave(order.id, form);
+    setSaving(false);
+    if (ok) setEditing(false);
+  };
   const inputStyle = {
     background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius)',
     color: 'var(--type)', fontFamily: 'var(--body)', fontSize: 13, padding: '8px 10px',
@@ -831,6 +840,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
   const [orders, setOrders]               = useState([]);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState('');
+  const [saveError, setSaveError]         = useState('');
   const [view, setView]                   = useState('list');
   const [search, setSearch]               = useState('');
   const [statusFilter, setStatusFilter]   = useState('todos');
@@ -871,13 +881,24 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
 
   const handleSave = async (id, form) => {
     const token = localStorage.getItem('token');
-    const res   = await fetch(`${API}/orders.php?id=${id}`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    if (data.order) setOrders(prev => prev.map(o => o.id === id ? data.order : o));
+    setSaveError('');
+    try {
+      const res  = await fetch(`${API}/orders.php?id=${id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (data.order) {
+        setOrders(prev => prev.map(o => o.id === id ? data.order : o));
+        return true;
+      }
+      setSaveError(data.error ?? 'Error al guardar el pedido');
+      return false;
+    } catch {
+      setSaveError('No se pudo conectar con el servidor');
+      return false;
+    }
   };
 
   const viewBtnStyle = (v) => ({
@@ -955,6 +976,12 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
             {error}
           </div>
         )}
+        {saveError && (
+          <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 'var(--radius)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#dc2626', fontFamily: 'var(--body)', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <span>{saveError}</span>
+            <button onClick={() => setSaveError('')} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+          </div>
+        )}
 
         {!loading && !error && orders.length === 0 && (
           <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '60px 24px', textAlign: 'center' }}>
@@ -963,7 +990,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
               {isAdmin ? 'No hay pedidos registrados.' : 'Cuando contrates un servicio aparecerá aquí.'}
             </p>
             {!isAdmin && (
-              <button className="kd-btn" onClick={() => onNavigate?.('/')} style={{
+              <button className="kd-btn" onClick={() => onNavigate?.('/comprar')} style={{
                 background: 'var(--type)', color: 'var(--bg)', border: 0,
                 padding: '11px 22px', borderRadius: 'var(--radius-pill)',
                 fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer',
