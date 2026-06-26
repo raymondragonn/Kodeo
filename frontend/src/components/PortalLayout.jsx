@@ -139,53 +139,100 @@ function PortalSidebar({ user, onNavigate, onLogout }) {
   );
 }
 
-function MobileTabs({ user, onNavigate }) {
+function IconOrders() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2"/>
+      <path d="M9 9h6M9 12h6M9 15h4"/>
+    </svg>
+  );
+}
+
+function IconChart() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 20h18M8 20V12M12 20V5M16 20v-8"/>
+    </svg>
+  );
+}
+
+function IconUsers() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  );
+}
+
+function IconPerson() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  );
+}
+
+const BOTTOM_NAV_H = 64;
+
+function MobileBottomNav({ user, onNavigate }) {
   const { pathname } = useLocation();
   const isAdmin = user?.role === 'administrador';
 
   const tabs = isAdmin ? [
-    { label: 'Pedidos',    href: '/pedidos'    },
-    { label: 'Analíticas', href: '/analiticas' },
-    { label: 'Usuarios',   href: '/usuarios'   },
-    { label: 'Cuenta',     href: '/cuenta'     },
+    { label: 'Pedidos',    href: '/pedidos',    Icon: IconOrders },
+    { label: 'Analíticas', href: '/analiticas', Icon: IconChart  },
+    { label: 'Usuarios',   href: '/usuarios',   Icon: IconUsers  },
+    { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson },
   ] : [
-    { label: 'Mis pedidos', href: '/pedidos' },
-    { label: 'Cuenta',      href: '/cuenta'  },
+    { label: 'Pedidos',    href: '/pedidos',    Icon: IconOrders },
+    { label: 'Analíticas', href: '/analiticas', Icon: IconChart  },
+    { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson },
   ];
 
   return (
-    <div style={{
-      display: 'flex', gap: 6, padding: '10px 16px',
-      borderBottom: '1px solid var(--line)', background: 'var(--bg)',
-      position: 'sticky', top: MOBILE_NAV_H, zIndex: 20,
-      overflowX: 'auto', scrollbarWidth: 'none',
-      WebkitOverflowScrolling: 'touch',
+    <nav style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+      background: 'var(--bg)', borderTop: '1px solid var(--line)',
+      display: 'flex', height: `calc(${BOTTOM_NAV_H}px + env(safe-area-inset-bottom, 0px))`,
+      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     }}>
-      {tabs.map(({ label, href }) => {
+      {tabs.map(({ label, href, Icon }) => {
         const active = pathname === href;
         return (
           <button
             key={href}
             onClick={() => onNavigate(href)}
             style={{
-              flexShrink: 0,
-              padding: '7px 14px',
-              background: active ? 'var(--type)' : 'transparent',
-              color: active ? 'var(--bg)' : 'var(--type-muted)',
-              border: active ? 'none' : '1px solid var(--line)',
-              borderRadius: 'var(--radius-pill)',
-              cursor: 'pointer',
-              fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em',
-              textTransform: 'uppercase',
-              transition: 'background 0.15s, color 0.15s',
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 5,
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: active ? 'var(--type)' : 'var(--type-muted)',
+              padding: '8px 4px',
               WebkitTapHighlightColor: 'transparent',
+              transition: 'color 0.15s',
+              position: 'relative',
             }}
           >
-            {label}
+            {active && (
+              <span style={{
+                position: 'absolute', top: 0, left: '20%', right: '20%',
+                height: 2, background: 'var(--type)', borderRadius: '0 0 2px 2px',
+              }} />
+            )}
+            <Icon />
+            <span style={{
+              fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.1em',
+              textTransform: 'uppercase', lineHeight: 1,
+            }}>
+              {label}
+            </span>
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
@@ -206,8 +253,10 @@ export default function PortalLayout({ user, onNavigate, onLogout, copy, theme, 
 
       {isMobile ? (
         <>
-          <MobileTabs user={user} onNavigate={onNavigate} />
-          {children}
+          <div style={{ paddingBottom: `calc(${BOTTOM_NAV_H}px + env(safe-area-inset-bottom, 0px))` }}>
+            {children}
+          </div>
+          <MobileBottomNav user={user} onNavigate={onNavigate} />
         </>
       ) : (
         <div style={{ display: 'flex', alignItems: 'flex-start' }}>

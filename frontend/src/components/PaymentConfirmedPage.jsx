@@ -35,22 +35,29 @@ export default function PaymentConfirmedPage() {
       status: params.get('redirect_status'),
     };
   });
+  const confirmToken = localStorage.getItem('token');
+  const [confirming, setConfirming] = useState(
+    info.status === 'succeeded' && !!info.paymentIntentId && !!confirmToken
+  );
 
   const status = STATUS_COPY[info.status] ?? STATUS_COPY.default;
 
   // ── Respaldo: asegura que el pedido quede creado aunque el webhook de Stripe
-  //    no haya llegado (o llegue tarde) al backend ──────────────────────────
+  //    no haya llegado (o llegue tarde) al backend.
+  //    Esperamos a que termine antes de habilitar "Ir a panel" para evitar
+  //    que el usuario llegue a /pedidos antes de que el pedido exista en BD.
   useEffect(() => {
-    if (info.status !== 'succeeded' || !info.paymentIntentId) return;
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!confirming || !confirmToken) return;
 
     fetch(`${API}/confirm-payment.php`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${confirmToken}` },
       body: JSON.stringify({ paymentIntentId: info.paymentIntentId }),
-    }).catch(() => { /* el webhook lo respaldará si esto falla */ });
-  }, [info.status, info.paymentIntentId]);
+    })
+      .then(r => r.json())
+      .catch(() => null)
+      .finally(() => setConfirming(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
@@ -109,7 +116,13 @@ export default function PaymentConfirmedPage() {
           )}
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
-            <button onClick={() => navigate('/pedidos')} style={primaryBtnStyle}>Ir a panel</button>
+            <button
+              onClick={() => navigate('/pedidos')}
+              disabled={confirming}
+              style={{ ...primaryBtnStyle, opacity: confirming ? 0.5 : 1, cursor: confirming ? 'default' : 'pointer' }}
+            >
+              {confirming ? 'Procesando...' : 'Ir a panel'}
+            </button>
             <button onClick={() => { window.location.href = 'https://kodeo.mx'; }} style={secondaryBtnStyle}>Ir a inicio</button>
           </div>
         </div>

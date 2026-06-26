@@ -306,6 +306,7 @@ export default function App() {
 
         {/* ── Mis pedidos ── */}
         <Route path="/pedidos" element={
+          !user ? <Navigate to="/login" replace /> :
           <>
             <PageMeta title="Mis pedidos | Kodeo" description="Revisa el estado de tus proyectos." path="/pedidos" />
             <OrdersPage user={user} onNavigate={navigate} onLogout={handleLogout} copy={copy} theme={theme} onThemeToggle={toggleTheme} />
@@ -314,6 +315,7 @@ export default function App() {
 
         {/* ── Cuenta ── */}
         <Route path="/cuenta" element={
+          !user ? <Navigate to="/login" replace /> :
           <>
             <PageMeta title="Mi cuenta | Kodeo" description="Administra tu información de cuenta." path="/cuenta" />
             <AccountPage user={user} onNavigate={navigate} onLogout={handleLogout} onUserUpdate={handleUserUpdate} copy={copy} theme={theme} onThemeToggle={toggleTheme} />

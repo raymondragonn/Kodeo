@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PortalLayout from './PortalLayout';
 import { API_BASE_URL as API } from '../lib/api';
+import { useBreakpoint } from '../hooks/useBreakpoint';
 
 function Field({ label, value, type = 'text', editing, onChange }) {
   const base = {
@@ -34,6 +35,7 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
   const [saved, setSaved]       = useState(false);
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
+  const { isMobile } = useBreakpoint();
 
   const handleSave = async () => {
     setError('');
@@ -70,14 +72,14 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
 
   return (
     <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
-      <div style={{ maxWidth: 600, width: '100%', margin: '0 auto', padding: '48px 24px' }}>
+      <div style={{ maxWidth: 600, width: '100%', margin: '0 auto', padding: isMobile ? '28px 16px 48px' : '48px 24px' }}>
 
         {/* Header */}
         <div style={{ marginBottom: 36 }}>
           <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 8px' }}>
             {user?.username}
           </p>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
             Mi cuenta
           </h1>
         </div>
@@ -163,7 +165,7 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
               Zona de peligro
             </span>
           </div>
-          <div style={{ padding: '20px 24px', background: 'var(--bg-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+          <div style={{ padding: '20px 24px', background: 'var(--bg-2)', display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexWrap: 'wrap', gap: 16 }}>
             <div>
               <p style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--type)', margin: '0 0 4px' }}>
                 Cerrar sesión

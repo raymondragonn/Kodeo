@@ -419,20 +419,15 @@ function Pending({ projectLabel }) {
         <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>En implementación</span>
       </div>
       <div style={{ background: 'var(--bg-2)', padding: '56px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, textAlign: 'center' }}>
-        <div style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid var(--line)', borderTopColor: '#5170ff', animation: 'kd-spin 1.2s linear infinite' }} />
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--line-2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+        </svg>
         <div>
           <p style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)', margin: '0 0 8px' }}>Estamos configurando tus analíticas</p>
           <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.7, maxWidth: 400 }}>
             El equipo de Kodeo está integrando las analíticas para tu <strong style={{ color: 'var(--type)', fontWeight: 500 }}>{projectLabel}</strong>. Podrás ver los datos aquí una vez que esté listo.
           </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-          {['Creando la propiedad GA4', 'Configurando la cuenta de servicio', 'Conectando el panel de analíticas'].map((step, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: 0.45 }}>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#5170ff', flexShrink: 0 }} />
-              <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)' }}>{step}</span>
-            </div>
-          ))}
         </div>
       </div>
     </div>
@@ -446,6 +441,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
   const [view,          setView]         = useState('grid');
   const [projects,      setProjects]     = useState([]);
   const [meta,          setMeta]         = useState({ labels: {}, configured: {} });
+  const [loadingMeta,   setLoadingMeta]  = useState(() => !!localStorage.getItem('token'));
   const [selectedId,    setSelectedId]   = useState(null);
   const [period,        setPeriod]       = useState('28daysAgo');
   const [analyticsData, setAnalytics]    = useState(null);
@@ -461,12 +457,16 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
     if (!token) return;
 
     Promise.all([
-      fetch(`${API_BASE_URL}/orders.php`,            { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      fetch(`${API_BASE_URL}/orders.php`,                { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch(`${API_BASE_URL}/analytics.php?action=meta`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
     ])
       .then(([ordersJson, metaJson]) => {
+        // orders.php ya filtra por user_id en el backend para clientes;
+        // para admins devuelve todos, por eso usamos user.id para quedarnos
+        // solo con los pedidos del propio usuario autenticado.
+        const userId = String(user?.id ?? '');
         const userOrders = (ordersJson.orders ?? []).filter(
-          o => o.status !== 'cancelado' && String(o.user_id) === String(user?.sub),
+          o => o.status !== 'cancelado' && (!userId || String(o.user_id) === userId),
         );
         const orderCards = userOrders.map(o => ({
           id:          String(o.id),
@@ -479,7 +479,8 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
         setProjects([...base, ...orderCards]);
         setMeta({ labels: metaJson.labels ?? {}, configured: metaJson.configured ?? {} });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingMeta(false));
   }, [user]);
 
   // Cargar datos de analíticas
@@ -584,9 +585,29 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
             </div>
 
             {/* Mosaico de tarjetas */}
-            {projects.length === 0 ? (
-              <div style={{ padding: '60px 0', textAlign: 'center' }}>
-                <span style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)' }}>Cargando proyectos...</span>
+            {loadingMeta ? (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 14 }}>
+                {[1, 2, 3].map(i => (
+                  <div key={i} style={{ height: 180, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', animation: 'kd-pulse 1.4s ease-in-out infinite' }} />
+                ))}
+              </div>
+            ) : projects.length === 0 ? (
+              <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '60px 24px', textAlign: 'center' }}>
+                <p style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--type)', margin: '0 0 8px' }}>Sin proyectos aún</p>
+                <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: '0 0 24px', lineHeight: 1.6 }}>
+                  Cuando contrates un servicio aparecerá aquí con sus analíticas.
+                </p>
+                <button
+                  onClick={() => onNavigate?.('/comprar')}
+                  style={{
+                    background: 'var(--type)', color: 'var(--bg)', border: 0,
+                    padding: '11px 22px', borderRadius: 'var(--radius-pill)',
+                    fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
+                    textTransform: 'uppercase', cursor: 'pointer',
+                  }}
+                >
+                  Ver servicios →
+                </button>
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 14 }}>
