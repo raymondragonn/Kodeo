@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import Nav from './Nav';
+import PortalLayout from './PortalLayout';
 import { formatDMY } from '../utils/deliveryDate';
 import { API_BASE_URL as API } from '../lib/api';
 
@@ -914,25 +914,9 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
   const maxW = view === 'kanban' ? 1100 : view === 'calendar' ? 860 : (isAdmin ? 900 : 760);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-      {/* Estilos globales */}
+    <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
       <style>{GLOBAL_CSS}</style>
-
-      {/* Header */}
-      <Nav
-        copy={copy}
-        user={user}
-        onLogout={onLogout}
-        theme={theme}
-        onThemeToggle={onThemeToggle}
-        onLogoClick={() => onNavigate?.('/')}
-        onAuthClick={(route) => onNavigate?.(`/${route}`)}
-        onNavItemClick={() => onNavigate?.('/')}
-        onContact={() => onNavigate?.('/')}
-      />
-
-      {/* Contenido */}
-      <div className="kd-page-body" style={{ flex: 1, maxWidth: maxW, width: '100%', margin: '0 auto', transition: 'max-width 0.3s' }}>
+      <div className="kd-page-body" style={{ maxWidth: maxW, width: '100%', margin: '0 auto', transition: 'max-width 0.3s' }}>
 
         {/* Page header */}
         <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -1077,6 +1061,6 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
           </>
         )}
       </div>
-    </div>
+    </PortalLayout>
   );
 }

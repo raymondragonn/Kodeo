@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'kodeo_cookies_consent';
 
-export default function CookiesBanner({ copy, onOpenPolicy }) {
+export default function CookiesBanner({ copy, onOpenPolicy, onAccept }) {
   const [visible, setVisible] = useState(false);
   const c = copy.legal.cookies;
 
@@ -16,6 +16,7 @@ export default function CookiesBanner({ copy, onOpenPolicy }) {
   const accept = () => {
     localStorage.setItem(STORAGE_KEY, 'accepted');
     setVisible(false);
+    onAccept?.();
   };
 
   const decline = () => {

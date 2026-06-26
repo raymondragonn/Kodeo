@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useMagneticCursor } from '../hooks/useMagneticCursor';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { trackCtaClick } from '../lib/analytics';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -91,6 +92,7 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
           <a
             ref={emailRef}
             href={`mailto:${copy.cta.email}`}
+            onClick={() => trackCtaClick({ cta_id: 'cta_email', cta_text: copy.cta.email, section: 'cta', destination: `mailto:${copy.cta.email}` })}
             style={{
               fontFamily: 'var(--display)',
               fontSize: isMobile ? 'clamp(22px, 6vw, 36px)' : 'clamp(32px, 4.5vw, 56px)',
@@ -124,7 +126,10 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
           </a>
 
           <button
-            onClick={() => navigate('/comprar')}
+            onClick={() => {
+              trackCtaClick({ cta_id: 'cta_contratar', cta_text: copy.cta.btn, section: 'cta', destination: '/comprar' });
+              navigate('/comprar');
+            }}
             style={{
               background: 'var(--type)',
               color: 'var(--bg)',

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { trackCtaClick } from '../lib/analytics';
 
 export default function Hero({ copy, motionSpeed = 1 }) {
   const linesRef    = useRef([]);
@@ -114,7 +115,10 @@ export default function Hero({ copy, motionSpeed = 1 }) {
 
         <div ref={ctaRef} style={{ display: 'flex', gap: 12, alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
           <button
-            onClick={() => navigate('/comprar')}
+            onClick={() => {
+              trackCtaClick({ cta_id: 'hero_comprar', cta_text: copy.hero.ctaA, section: 'hero', destination: '/comprar' });
+              navigate('/comprar');
+            }}
             style={{
               background: 'var(--type)',
               color: 'var(--bg)',
@@ -139,6 +143,7 @@ export default function Hero({ copy, motionSpeed = 1 }) {
           </button>
           <a
             href="#work"
+            onClick={() => trackCtaClick({ cta_id: 'hero_ver_trabajo', cta_text: copy.hero.ctaB, section: 'hero', destination: '#work' })}
             style={{
               fontFamily: 'var(--ui)',
               fontSize: 12,

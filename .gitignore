@@ -16,6 +16,10 @@ dist-ssr
 backend/.env
 frontend/.env
 backend/vendor/
+backend/ga4_credentials.json
+backend/ga4_credentials_*.json
+backend/ga4_projects.json
+backend/analytics_labels.json
 
 # Paquete de despliegue (contiene secretos generados localmente)
 deploy/

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Nav from './Nav';
+import PortalLayout from './PortalLayout';
 import { API_BASE_URL as API } from '../lib/api';
 
 function Field({ label, value, type = 'text', editing, onChange }) {
@@ -69,22 +69,8 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-
-      {/* Top bar */}
-      <Nav
-        copy={copy}
-        user={user}
-        onLogout={onLogout}
-        theme={theme}
-        onThemeToggle={onThemeToggle}
-        onLogoClick={() => onNavigate?.('/')}
-        onAuthClick={(route) => onNavigate?.(`/${route}`)}
-        onNavItemClick={() => onNavigate?.('/')}
-        onContact={() => onNavigate?.('/')}
-      />
-
-      <div style={{ flex: 1, maxWidth: 600, width: '100%', margin: '0 auto', padding: '48px 24px' }}>
+    <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
+      <div style={{ maxWidth: 600, width: '100%', margin: '0 auto', padding: '48px 24px' }}>
 
         {/* Header */}
         <div style={{ marginBottom: 36 }}>
@@ -201,6 +187,6 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
         </div>
 
       </div>
-    </div>
+    </PortalLayout>
   );
 }

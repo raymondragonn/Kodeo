@@ -27,28 +27,6 @@ define('SMTP_PASSWORD',   getenv('SMTP_PASSWORD')   ?: '');
 define('SMTP_FROM_EMAIL', getenv('SMTP_FROM_EMAIL') ?: SMTP_USER);
 define('SMTP_FROM_NAME',  getenv('SMTP_FROM_NAME')  ?: 'Kodeo');
 
-const ADMIN_EMAIL_DOMAIN = 'kodeo.mx';
-
-/**
- * Los correos @kodeo.mx son del equipo interno: entran como administrador
- * por default. Cualquier otro dominio entra como cliente.
- */
-function defaultRoleForEmail(string $email): string {
-    return str_ends_with(strtolower(trim($email)), '@' . ADMIN_EMAIL_DOMAIN) ? 'administrador' : 'cliente';
-}
-
-/**
- * Si el correo es del dominio interno y el usuario aún no es administrador,
- * lo asciende en la base de datos. Nunca degrada a alguien ya administrador.
- */
-function ensureAdminRole(PDO $db, array &$user): void {
-    if ($user['role'] === 'administrador') return;
-    if (defaultRoleForEmail($user['email']) !== 'administrador') return;
-
-    $db->prepare('UPDATE users SET role = ? WHERE id = ?')->execute(['administrador', $user['id']]);
-    $user['role'] = 'administrador';
-}
-
 /**
  * Envía un correo HTML vía SMTP (PHPMailer). Devuelve true/false; nunca lanza
  * para no filtrar al cliente si el envío falla (ver forgot-password.php).

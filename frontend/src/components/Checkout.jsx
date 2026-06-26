@@ -4,6 +4,7 @@ import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { estimatedDeliveryDate, formatDateEs } from '../utils/deliveryDate';
 import { API_BASE_URL as API } from '../lib/api';
+import { trackFormStart, trackFormSubmit } from '../lib/analytics';
 
 const ACCENT = {
   '01': 'var(--accent-green)',
@@ -84,6 +85,13 @@ export default function Checkout({
   const stripeRef    = useRef(null);
   const cardRef      = useRef(null);
   const cardMountRef = useRef(null);
+  const formsStarted = useRef(new Set());
+
+  const handleFormFocus = (formId) => {
+    if (formsStarted.current.has(formId)) return;
+    formsStarted.current.add(formId);
+    trackFormStart({ form_id: `checkout_${formId}`, form_location: 'checkout' });
+  };
   const token        = localStorage.getItem('token');
   const { isMobile } = useBreakpoint();
   const accent        = ACCENT[code] || ACCENT['01'];
@@ -191,6 +199,7 @@ export default function Checkout({
         try {
           await postAPI('confirm-payment.php', { paymentIntentId: paymentIntent.id });
         } catch { /* el webhook lo respaldará si esto falla */ }
+        trackFormSubmit({ form_id: 'checkout_card', form_location: 'checkout' });
         onNavigate?.(`/pago-confirmado?payment_intent=${paymentIntent.id}&redirect_status=succeeded`);
         return;
       }
@@ -206,6 +215,7 @@ export default function Checkout({
     setLoading(true); clearResult();
     try {
       const data = await postAPI('create-oxxo.php', { amount, name, email });
+      trackFormSubmit({ form_id: 'checkout_oxxo', form_location: 'checkout' });
       setResult({
         type: 'info',
         title: 'Voucher OXXO generado',
@@ -226,6 +236,7 @@ export default function Checkout({
     setLoading(true); clearResult();
     try {
       const data = await postAPI('create-spei.php', { amount, name, email });
+      trackFormSubmit({ form_id: 'checkout_spei', form_location: 'checkout' });
       const bd   = data.bankDetails;
       setResult({
         type: 'info',
@@ -408,7 +419,7 @@ export default function Checkout({
 
               {/* ── TARJETA ── */}
               {method === 'card' && (
-                <form onSubmit={handleCard} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <form onSubmit={handleCard} onFocusCapture={() => handleFormFocus('card')} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
                     <label style={labelStyle}>Datos de la tarjeta</label>
                     <div
@@ -441,7 +452,7 @@ export default function Checkout({
 
               {/* ── OXXO ── */}
               {method === 'oxxo' && (
-                <form onSubmit={handleOxxo} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <form onSubmit={handleOxxo} onFocusCapture={() => handleFormFocus('oxxo')} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--line)' }}>
                     <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
                       Generamos un voucher con número de referencia. Paga en cualquier tienda OXXO. La confirmación llega en ~1 hora.
@@ -462,7 +473,7 @@ export default function Checkout({
 
               {/* ── SPEI ── */}
               {method === 'spei' && (
-                <form onSubmit={handleSpei} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <form onSubmit={handleSpei} onFocusCapture={() => handleFormFocus('spei')} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--line)' }}>
                     <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
                       Generamos una CLABE interbancaria única para tu pago. Realiza la transferencia desde tu banca en línea o app.

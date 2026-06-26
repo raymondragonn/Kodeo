@@ -1,6 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { useContentProtection } from './hooks/useContentProtection';
+import { useScrollDepth } from './hooks/useScrollDepth';
+import { initAnalytics, trackPageView, trackCtaClick } from './lib/analytics';
 import { COPY } from './data/copy';
 
 // Critical path — loaded eagerly (above the fold)
@@ -34,6 +36,8 @@ const OrdersPage       = lazy(() => import('./components/OrdersPage'));
 const AccountPage      = lazy(() => import('./components/AccountPage'));
 const Checkout         = lazy(() => import('./components/Checkout'));
 const PaymentConfirmedPage = lazy(() => import('./components/PaymentConfirmedPage'));
+const AnalyticsPage    = lazy(() => import('./components/AnalyticsPage'));
+const UsersPage        = lazy(() => import('./components/UsersPage'));
 
 const NAV_SECTION_MAP = {
   'Servicios': 'services', 'Services': 'services',
@@ -79,6 +83,15 @@ export default function App() {
   const [theme, setTheme] = useState(getInitialTheme);
   const [user, setUser]   = useState(getStoredUser);
   useContentProtection();
+  useScrollDepth();
+
+  useEffect(() => {
+    if (localStorage.getItem('kodeo_cookies_consent') === 'accepted') initAnalytics();
+  }, []);
+
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -111,12 +124,21 @@ export default function App() {
   };
 
   const handleNavItemClick = (item) => {
+    trackCtaClick({ cta_id: `nav_${item}`, section: 'nav', destination: FAQ_ITEMS.has(item) ? '/preguntas' : `#${NAV_SECTION_MAP[item] || ''}` });
     if (FAQ_ITEMS.has(item)) { navigate('/preguntas'); return; }
     const id = NAV_SECTION_MAP[item];
     if (id) goToSection(id);
   };
 
-  const handleServiceClick = (code) => navigate(`/${SERVICE_SLUGS[code]}`);
+  const handleContactClick = () => {
+    trackCtaClick({ cta_id: 'nav_contacto', section: 'nav', destination: '#contact' });
+    goToSection('contact');
+  };
+
+  const handleServiceClick = (code) => {
+    trackCtaClick({ cta_id: 'service_row', section: 'services', destination: `/${SERVICE_SLUGS[code]}` });
+    navigate(`/${SERVICE_SLUGS[code]}`);
+  };
   const handleBack         = () => navigate('/');
   const handleAuthClick    = (route) => navigate(`/${route}`);
   const handleLogout       = () => {
@@ -145,7 +167,7 @@ export default function App() {
     copy,
     motionSpeed,
     onNavItemClick: handleNavItemClick,
-    onContact: () => goToSection('contact'),
+    onContact: handleContactClick,
     onServiceClick: handleServiceClick,
     onAuthClick: handleAuthClick,
     onLogout: handleLogout,
@@ -173,7 +195,7 @@ export default function App() {
                 copy={copy}
                 onLogoClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                 onNavItemClick={handleNavItemClick}
-                onContact={() => goToSection('contact')}
+                onContact={handleContactClick}
                 onServiceClick={handleServiceClick}
                 onAuthClick={handleAuthClick}
                 onLogout={handleLogout}
@@ -298,6 +320,25 @@ export default function App() {
           </>
         } />
 
+        {/* ── Analíticas ── */}
+        <Route path="/analiticas" element={
+          !user ? <Navigate to="/login" replace /> :
+          <>
+            <PageMeta title="Analíticas | Kodeo" description="Panel de analítica de la landing." path="/analiticas" />
+            <AnalyticsPage user={user} onNavigate={navigate} onLogout={handleLogout} copy={copy} theme={theme} onThemeToggle={toggleTheme} />
+          </>
+        } />
+
+        {/* ── Usuarios (solo administrador) ── */}
+        <Route path="/usuarios" element={
+          !user ? <Navigate to="/login" replace /> :
+          user.role !== 'administrador' ? <Navigate to="/cuenta" replace /> :
+          <>
+            <PageMeta title="Usuarios | Kodeo" description="Gestión de usuarios y roles." path="/usuarios" />
+            <UsersPage user={user} onNavigate={navigate} onLogout={handleLogout} copy={copy} theme={theme} onThemeToggle={toggleTheme} />
+          </>
+        } />
+
         {/* ── Login ── */}
         <Route path="/login" element={
           <>
@@ -370,6 +411,7 @@ export default function App() {
       <CookiesBanner
         copy={copy}
         onOpenPolicy={() => navigate('/privacidad')}
+        onAccept={initAnalytics}
       />
     </>
   );

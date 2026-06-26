@@ -5,6 +5,7 @@ import Nav from './Nav';
 import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { estimatedDeliveryDate, formatDateEs } from '../utils/deliveryDate';
+import { trackCtaClick } from '../lib/analytics';
 
 const ACCENT = {
   '01': 'var(--accent-green)',
@@ -40,6 +41,7 @@ export default function SelectProductPage({
   }, [motionSpeed]);
 
   const handleSelect = (svc) => {
+    trackCtaClick({ cta_id: `select_product_${svc.code}`, cta_text: svc.name, section: 'select_product', destination: '/pago' });
     navigate('/pago', { state: { amount: priceToCents(svc.price), service: svc.name, code: svc.code } });
   };
 

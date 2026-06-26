@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { trackDownload } from '../lib/analytics';
 const landingCover = '/assets/projects/landingpage-cover.png';
 const websiteCover = '/assets/projects/website-cover.png';
 const tiendaCover  = '/assets/projects/tiendaenlinea-cover.png';
@@ -157,7 +158,10 @@ export default function Services({ copy, motionSpeed = 1, onServiceClick }) {
                     <a
                       href={PDF_MAP[s.code]}
                       download
-                      onClick={e => e.stopPropagation()}
+                      onClick={e => {
+                        e.stopPropagation();
+                        trackDownload({ resource_name: s.code, resource_url: PDF_MAP[s.code], section: 'services' });
+                      }}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',

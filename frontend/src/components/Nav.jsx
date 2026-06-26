@@ -220,8 +220,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                 <nav style={{ flex: 1, padding: '0 20px' }}>
                   {[
                     { label: 'Inicio',    href: '/',        action: () => onLogoClick?.() },
-                    { label: user.role === 'administrador' ? 'Pedidos' : 'Mis pedidos', href: '/pedidos', action: () => onAuthClick?.('pedidos') },
-                    { label: 'Mi cuenta', href: '/cuenta',  action: () => onAuthClick?.('cuenta') },
+                    { label: user.role === 'administrador' ? 'Portal de clientes' : 'Mis pedidos', href: '/pedidos', action: () => onAuthClick?.('pedidos') },
                   ].map(({ label, href, action }) => (
                     <a
                       key={href}
@@ -580,8 +579,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                 </div>
 
                 {[
-                  { label: user?.role === 'administrador' ? 'Pedidos' : 'Mis pedidos', route: '/pedidos' },
-                  { label: 'Cuenta',      route: '/cuenta'  },
+                  { label: user?.role === 'administrador' ? 'Portal de clientes' : 'Mis pedidos', route: '/pedidos' },
                 ].map(({ label, route }) => (
                   <button
                     key={route}

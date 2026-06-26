@@ -33,7 +33,7 @@ try {
     }
 
     $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
-    $role = defaultRoleForEmail($email);
+    $role = 'cliente';
 
     $stmt = $db->prepare('INSERT INTO users (name, username, email, password_hash, role) VALUES (?, ?, ?, ?, ?)');
     $stmt->execute([$name, $username, $email, $hash, $role]);
