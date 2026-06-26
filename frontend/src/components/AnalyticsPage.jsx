@@ -299,6 +299,94 @@ function DonutChart({ sources, total }) {
   );
 }
 
+// ── Realtime Card ─────────────────────────────────────────────────────────────
+
+function RealtimeCard({ realtime, isMobile }) {
+  const { activeUsers, pages = [], events = [] } = realtime;
+  const maxUsers  = pages[0]?.users  || 1;
+  const maxEvents = events[0]?.count || 1;
+
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{
+        padding: '12px 20px', borderBottom: '1px solid var(--line)',
+        background: 'var(--bg-2)', display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', animation: 'kd-pulse 2s ease-in-out infinite', flexShrink: 0 }} />
+        <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', flex: 1 }}>
+          Ahora mismo
+        </span>
+        <span style={{ fontFamily: 'var(--ui)', fontSize: 10, color: 'var(--type-muted)', letterSpacing: '.06em' }}>
+          Últimos 30 min
+        </span>
+      </div>
+
+      <div style={{
+        background: 'var(--bg-2)',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr',
+        gap: 0,
+      }}>
+        {/* Usuarios activos */}
+        <div style={{ padding: '20px 24px', borderRight: isMobile ? 'none' : '1px solid var(--line)', borderBottom: isMobile ? '1px solid var(--line)' : 'none' }}>
+          <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', marginBottom: 6 }}>
+            Usuarios activos
+          </span>
+          <span style={{ fontFamily: 'var(--display)', fontSize: 42, letterSpacing: '-0.03em', color: activeUsers > 0 ? '#16a34a' : 'var(--type)', lineHeight: 1 }}>
+            {activeUsers}
+          </span>
+          <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', display: 'block', marginTop: 4 }}>
+            {activeUsers === 1 ? 'persona en el sitio' : 'personas en el sitio'}
+          </span>
+        </div>
+
+        {/* Páginas activas */}
+        <div style={{ padding: '20px 0', borderRight: isMobile ? 'none' : '1px solid var(--line)', borderBottom: isMobile ? '1px solid var(--line)' : 'none' }}>
+          <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', padding: '0 24px', marginBottom: 10 }}>
+            Páginas activas
+          </span>
+          {pages.length === 0
+            ? <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', padding: '0 24px' }}>Sin actividad</span>
+            : pages.map((p, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 24px' }}>
+                  <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.path}>
+                    {p.path}
+                  </span>
+                  <div style={{ width: 40, height: 2, background: 'var(--line)', borderRadius: 1, flexShrink: 0 }}>
+                    <div style={{ width: `${(p.users / maxUsers) * 100}%`, height: '100%', background: '#16a34a', borderRadius: 1 }} />
+                  </div>
+                  <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: 'var(--type)', width: 16, textAlign: 'right', flexShrink: 0 }}>{p.users}</span>
+                </div>
+              ))
+          }
+        </div>
+
+        {/* Eventos recientes */}
+        <div style={{ padding: '20px 0' }}>
+          <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', padding: '0 24px', marginBottom: 10 }}>
+            Eventos recientes
+          </span>
+          {events.length === 0
+            ? <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', padding: '0 24px' }}>Sin eventos</span>
+            : events.map((e, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 24px' }}>
+                  <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.name}>
+                    {e.name}
+                  </span>
+                  <div style={{ width: 40, height: 2, background: 'var(--line)', borderRadius: 1, flexShrink: 0 }}>
+                    <div style={{ width: `${(e.count / maxEvents) * 100}%`, height: '100%', background: '#5170ff', borderRadius: 1 }} />
+                  </div>
+                  <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: 'var(--type)', width: 16, textAlign: 'right', flexShrink: 0 }}>{e.count}</span>
+                </div>
+              ))
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, previous, suffix = '', format = fmt }) {
@@ -366,6 +454,111 @@ function Skeleton({ isMobile }) {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>{[1,2].map(i => <div key={i}>{box(220)}</div>)}</div>
       {box(200)}
       {box(200)}
+    </div>
+  );
+}
+
+// ── Modal de exportación ──────────────────────────────────────────────────────
+
+function ExportModal({ defaultPeriod, onClose, onExport, loading }) {
+  const days     = parseInt(defaultPeriod) || 7;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const defStart = (() => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); })();
+
+  const [start,  setStart]  = useState(defStart);
+  const [end,    setEnd]    = useState(todayStr);
+  const [format, setFormat] = useState('xls');
+
+  const valid = start && end && start <= end;
+
+  const inputStyle = {
+    width: '100%', boxSizing: 'border-box',
+    fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)',
+    background: 'var(--bg-2)', border: '1px solid var(--line)',
+    borderRadius: 'var(--radius)', padding: '8px 10px', outline: 'none',
+    colorScheme: 'light dark',
+  };
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '28px 28px 24px', width: '100%', maxWidth: 400 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', margin: '0 0 20px' }}>
+          Exportar analíticas
+        </h2>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+          {[
+            { label: 'Desde', value: start, onChange: setStart, max: end },
+            { label: 'Hasta', value: end,   onChange: setEnd,   min: start, max: todayStr },
+          ].map(({ label, value, onChange, min, max }) => (
+            <div key={label}>
+              <label style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', marginBottom: 6 }}>
+                {label}
+              </label>
+              <input type="date" value={value} min={min} max={max} onChange={e => onChange(e.target.value)} style={inputStyle} />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', marginBottom: 8 }}>
+            Formato
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ value: 'xls', label: 'Excel (.csv)' }, { value: 'pdf', label: 'PDF' }].map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setFormat(opt.value)}
+                style={{
+                  flex: 1, padding: '9px 0',
+                  border: `1px solid ${format === opt.value ? 'var(--type)' : 'var(--line)'}`,
+                  borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+                  fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
+                  background: format === opt.value ? 'var(--type)' : 'transparent',
+                  color:      format === opt.value ? 'var(--bg)'   : 'var(--type-soft)',
+                  transition: 'all .15s',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            style={{
+              fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
+              padding: '10px 20px', borderRadius: 'var(--radius-pill)',
+              border: '1px solid var(--line)', background: 'transparent',
+              color: 'var(--type-soft)', cursor: 'pointer',
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => valid && !loading && onExport({ startDate: start, endDate: end, format })}
+            disabled={!valid || loading}
+            style={{
+              fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
+              padding: '10px 20px', borderRadius: 'var(--radius-pill)', border: 0,
+              background: valid && !loading ? 'var(--type)' : 'var(--line)',
+              color:      valid && !loading ? 'var(--bg)'   : 'var(--type-muted)',
+              cursor:     valid && !loading ? 'pointer'     : 'not-allowed',
+              transition: 'all .15s',
+            }}
+          >
+            {loading ? 'Exportando...' : 'Exportar'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -443,12 +636,14 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
   const [meta,          setMeta]         = useState({ labels: {}, configured: {} });
   const [loadingMeta,   setLoadingMeta]  = useState(() => !!localStorage.getItem('token'));
   const [selectedId,    setSelectedId]   = useState(null);
-  const [period,        setPeriod]       = useState('28daysAgo');
+  const [period,        setPeriod]       = useState('7daysAgo');
   const [analyticsData, setAnalytics]    = useState(null);
   const [loading,       setLoading]      = useState(false);
   const [refreshing,    setRefreshing]   = useState(false);
   const [error,         setError]        = useState(null);
   const [lastUpdate,    setLastUpdate]   = useState(null);
+  const [exportOpen,    setExportOpen]   = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const { isMobile } = useBreakpoint();
 
   // Cargar proyectos + etiquetas al montar
@@ -520,6 +715,111 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
     });
     if (res.ok) {
       setMeta(prev => ({ ...prev, labels: { ...prev.labels, [id]: label } }));
+    }
+  };
+
+  // Exportar analíticas
+  const generateCSV = (data, label, startDate, endDate) => {
+    const cur = data.overview.current;
+    const prv = data.overview.previous;
+    const rows = [
+      [`ANALITICAS — ${label}`],
+      ['Periodo', `${startDate} — ${endDate}`],
+      ['Exportado', new Date().toLocaleString('es-MX')],
+      [],
+      ['RESUMEN'],
+      ['Metrica', 'Valor', 'Periodo anterior'],
+      ['Usuarios activos', cur.users,      prv.users],
+      ['Sesiones',         cur.sessions,   prv.sessions],
+      ['Vistas de pagina', cur.pageViews,  prv.pageViews],
+      ['Tasa de rebote %', cur.bounceRate, prv.bounceRate],
+      [],
+      ['PAGINAS MAS VISITADAS'],
+      ['Pagina', 'Vistas'],
+      ...data.pages.map(p => [p.path, p.views]),
+      [],
+      ['FUENTES DE TRAFICO'],
+      ['Canal', 'Sesiones'],
+      ...data.sources.map(s => [CHANNEL_ES[s.channel] || s.channel, s.sessions]),
+      [],
+      ['EVENTOS'],
+      ['Evento', 'Conteo'],
+      ...data.events.map(e => [e.name, e.count]),
+      [],
+      ['DATOS DIARIOS'],
+      ['Fecha', 'Usuarios', 'Sesiones'],
+      ...data.daily.map(d => [d.date, d.users, d.sessions]),
+    ];
+    const esc = c => { const s = String(c ?? ''); return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s; };
+    const csv = rows.map(r => r.map(esc).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `analiticas-${label.toLowerCase().replace(/\s+/g, '-')}-${startDate}-${endDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const generatePDF = (data, label, startDate, endDate) => {
+    const cur = data.overview.current;
+    const prv = data.overview.previous;
+    const now = new Date().toLocaleString('es-MX');
+    const th  = `padding:8px 12px;background:#f5f5f5;border:1px solid #ddd;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#666;text-align:left;`;
+    const td  = `padding:8px 12px;border:1px solid #ddd;font-size:12px;color:#333;`;
+    const tbl = (headers, rows) =>
+      `<table style="border-collapse:collapse;width:100%;margin-bottom:28px">
+        <thead><tr>${headers.map(h => `<th style="${th}">${h}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(r => `<tr>${r.map(c => `<td style="${td}">${c ?? 0}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>`;
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+      <title>Analiticas — ${label}</title>
+      <style>body{font-family:sans-serif;color:#333;margin:40px;font-size:13px}h1{font-size:22px;margin:0 0 4px}
+      h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#666;margin:24px 0 8px}
+      .meta{color:#666;font-size:12px;margin-bottom:28px}@media print{body{margin:20px}}</style>
+    </head><body>
+      <h1>Analiticas — ${label}</h1>
+      <p class="meta">Periodo: ${startDate} — ${endDate} &nbsp;·&nbsp; Exportado: ${now}</p>
+      <h2>Resumen</h2>
+      ${tbl(['Metrica','Valor','Periodo anterior'],[
+        ['Usuarios activos',cur.users,prv.users],
+        ['Sesiones',cur.sessions,prv.sessions],
+        ['Vistas de pagina',cur.pageViews,prv.pageViews],
+        ['Tasa de rebote',cur.bounceRate+'%',prv.bounceRate+'%'],
+      ])}
+      <h2>Paginas mas visitadas</h2>
+      ${tbl(['Pagina','Vistas'],data.pages.map(p=>[p.path,p.views]))}
+      <h2>Fuentes de trafico</h2>
+      ${tbl(['Canal','Sesiones'],data.sources.map(s=>[CHANNEL_ES[s.channel]||s.channel,s.sessions]))}
+      <h2>Eventos</h2>
+      ${tbl(['Evento','Conteo'],data.events.map(e=>[e.name,e.count]))}
+      <h2>Datos diarios</h2>
+      ${tbl(['Fecha','Usuarios','Sesiones'],data.daily.map(d=>[d.date,d.users,d.sessions]))}
+      <script>window.onload=()=>window.print()</script>
+    </body></html>`;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+  };
+
+  const handleExport = async ({ startDate, endDate, format }) => {
+    setExportLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res   = await fetch(
+        `${API_BASE_URL}/analytics.php?project=${selectedId}&startDate=${startDate}&endDate=${endDate}&export=1`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.configured) throw new Error(data.error || 'Error al exportar');
+      const label = selectedProject ? getLabel(selectedProject) : 'analytics';
+      if (format === 'xls') generateCSV(data, label, startDate, endDate);
+      else                   generatePDF(data, label, startDate, endDate);
+      setExportOpen(false);
+    } catch (e) {
+      alert('Error al exportar: ' + e.message);
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -669,6 +969,31 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
               </div>
 
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Botón exportar */}
+                {analyticsData?.configured && (
+                  <button
+                    onClick={() => setExportOpen(true)}
+                    disabled={loading || refreshing}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
+                      padding: '8px 16px', borderRadius: 'var(--radius-pill)',
+                      border: '1px solid var(--line)', background: 'var(--bg-2)',
+                      color: 'var(--type-soft)', cursor: loading || refreshing ? 'not-allowed' : 'pointer',
+                      opacity: loading ? 0.5 : 1, transition: 'border-color .2s, color .2s',
+                    }}
+                    onMouseEnter={e => { if (!loading && !refreshing) { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Exportar
+                  </button>
+                )}
+
                 {/* Botón actualizar */}
                 <button
                   onClick={() => { if (!refreshing && !loading) loadAnalytics(selectedId, period, true); }}
@@ -731,9 +1056,23 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
             {/* No configurado (kodeo.mx sin creds) */}
             {!loading && !error && analyticsData && !analyticsData.configured && !analyticsData.pending && <NotConfigured />}
 
+            {/* Modal exportar */}
+            {exportOpen && (
+              <ExportModal
+                defaultPeriod={period}
+                onClose={() => setExportOpen(false)}
+                onExport={handleExport}
+                loading={exportLoading}
+              />
+            )}
+
             {/* Dashboard */}
             {!loading && !error && analyticsData?.configured && (
               <>
+                {analyticsData.realtime && (
+                  <RealtimeCard realtime={analyticsData.realtime} isMobile={isMobile} />
+                )}
+
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 4}, 1fr)`, gap: 12 }}>
                   <KpiCard label="Usuarios activos" value={cur.users}      previous={prv.users}     />
                   <KpiCard label="Sesiones"          value={cur.sessions}   previous={prv.sessions}  />

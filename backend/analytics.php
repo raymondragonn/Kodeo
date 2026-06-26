@@ -71,11 +71,29 @@ if (($_GET['action'] ?? '') === 'meta') {
 
 // ── GET ?project=X&period=Y: datos de analíticas ──────────────────────────────
 
-$period = $_GET['period'] ?? '28daysAgo';
-if (!in_array($period, ['7daysAgo', '28daysAgo', '90daysAgo'], true)) $period = '28daysAgo';
-$days      = (int) filter_var($period, FILTER_SANITIZE_NUMBER_INT);
-$prevStart = ($days * 2) . 'daysAgo';
-$prevEnd   = ($days + 1) . 'daysAgo';
+$customStart = trim($_GET['startDate'] ?? '');
+$customEnd   = trim($_GET['endDate']   ?? '');
+$dateRx      = '/^\d{4}-\d{2}-\d{2}$/';
+$isCustom    = $customStart && $customEnd
+               && preg_match($dateRx, $customStart)
+               && preg_match($dateRx, $customEnd)
+               && $customStart <= $customEnd;
+
+if ($isCustom) {
+    $startDate = $customStart;
+    $endDate   = $customEnd;
+    $prevStart = null;
+    $prevEnd   = null;
+} else {
+    $period    = $_GET['period'] ?? '7daysAgo';
+    if (!in_array($period, ['7daysAgo', '28daysAgo', '90daysAgo'], true)) $period = '7daysAgo';
+    $days      = (int) filter_var($period, FILTER_SANITIZE_NUMBER_INT);
+    $startDate = $period;
+    $endDate   = 'today';
+    $prevStart = ($days * 2) . 'daysAgo';
+    $prevEnd   = ($days + 1) . 'daysAgo';
+}
+$isExport = !empty($_GET['export']);
 
 $project = trim($_GET['project'] ?? 'kodeo');
 
@@ -157,9 +175,8 @@ function getServiceAccountToken(array $creds): string {
 
 // ── Llamada a GA4 Data API (REST) ────────────────────────────────────────────
 
-function ga4Report(string $token, string $propertyId, array $body): array {
-    $url = "https://analyticsdata.googleapis.com/v1beta/properties/{$propertyId}:runReport";
-    $ch  = curl_init($url);
+function ga4ApiCall(string $url, string $token, array $body): array {
+    $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode($body),
@@ -180,6 +197,20 @@ function ga4Report(string $token, string $propertyId, array $body): array {
     if (!empty($data['error'])) throw new \RuntimeException($data['error']['message'] ?? 'Error GA4');
 
     return $data;
+}
+
+function ga4Report(string $token, string $propertyId, array $body): array {
+    return ga4ApiCall(
+        "https://analyticsdata.googleapis.com/v1beta/properties/{$propertyId}:runReport",
+        $token, $body
+    );
+}
+
+function ga4Realtime(string $token, string $propertyId, array $body): array {
+    return ga4ApiCall(
+        "https://analyticsdata.googleapis.com/v1beta/properties/{$propertyId}:runRealtimeReport",
+        $token, $body
+    );
 }
 
 function parseOverviewRow(array $row): array {
@@ -208,12 +239,16 @@ try {
         ['name' => 'bounceRate'],
     ];
 
-    $overviewData = ga4Report($token, $propertyId, [
-        'dateRanges' => [
-            ['startDate' => $period,    'endDate' => 'today'],
+    $overviewRanges = $prevStart
+        ? [
+            ['startDate' => $startDate, 'endDate' => $endDate],
             ['startDate' => $prevStart, 'endDate' => $prevEnd],
-        ],
-        'metrics' => $metrics,
+        ]
+        : [['startDate' => $startDate, 'endDate' => $endDate]];
+
+    $overviewData = ga4Report($token, $propertyId, [
+        'dateRanges' => $overviewRanges,
+        'metrics'    => $metrics,
     ]);
 
     $overview = ['current' => $empty, 'previous' => $empty];
@@ -224,7 +259,7 @@ try {
     }
 
     $pagesData = ga4Report($token, $propertyId, [
-        'dateRanges' => [['startDate' => $period, 'endDate' => 'today']],
+        'dateRanges' => [['startDate' => $startDate, 'endDate' => $endDate]],
         'dimensions' => [['name' => 'pagePath']],
         'metrics'    => [['name' => 'screenPageViews']],
         'orderBys'   => [['metric' => ['metricName' => 'screenPageViews'], 'desc' => true]],
@@ -239,7 +274,7 @@ try {
     }
 
     $sourcesData = ga4Report($token, $propertyId, [
-        'dateRanges' => [['startDate' => $period, 'endDate' => 'today']],
+        'dateRanges' => [['startDate' => $startDate, 'endDate' => $endDate]],
         'dimensions' => [['name' => 'sessionDefaultChannelGrouping']],
         'metrics'    => [['name' => 'sessions']],
         'orderBys'   => [['metric' => ['metricName' => 'sessions'], 'desc' => true]],
@@ -254,7 +289,7 @@ try {
     }
 
     $eventsData = ga4Report($token, $propertyId, [
-        'dateRanges' => [['startDate' => $period, 'endDate' => 'today']],
+        'dateRanges' => [['startDate' => $startDate, 'endDate' => $endDate]],
         'dimensions' => [['name' => 'eventName']],
         'metrics'    => [['name' => 'eventCount']],
         'orderBys'   => [['metric' => ['metricName' => 'eventCount'], 'desc' => true]],
@@ -269,7 +304,7 @@ try {
     }
 
     $dailyData = ga4Report($token, $propertyId, [
-        'dateRanges' => [['startDate' => $period, 'endDate' => 'today']],
+        'dateRanges' => [['startDate' => $startDate, 'endDate' => $endDate]],
         'dimensions' => [['name' => 'date']],
         'metrics'    => [
             ['name' => 'activeUsers'],
@@ -288,14 +323,66 @@ try {
         ];
     }
 
+    // ── Realtime (últimos 30 min, omitido en exports) ────────────────────────
+
+    if ($isExport) {
+        jsonSuccess([
+            'configured' => true,
+            'dateRange'  => ['start' => $startDate, 'end' => $endDate],
+            'overview'   => $overview,
+            'pages'      => $pages,
+            'sources'    => $sources,
+            'events'     => $events,
+            'daily'      => $daily,
+        ]);
+    }
+
+    $rtActiveData = ga4Realtime($token, $propertyId, [
+        'metrics' => [['name' => 'activeUsers']],
+    ]);
+    $activeNow = (int)(($rtActiveData['rows'][0]['metricValues'][0]['value'] ?? 0));
+
+    $rtPagesData = ga4Realtime($token, $propertyId, [
+        'dimensions' => [['name' => 'unifiedScreenName']],
+        'metrics'    => [['name' => 'activeUsers']],
+        'orderBys'   => [['metric' => ['metricName' => 'activeUsers'], 'desc' => true]],
+        'limit'      => 5,
+    ]);
+    $realtimePages = [];
+    foreach ($rtPagesData['rows'] ?? [] as $row) {
+        $realtimePages[] = [
+            'path'  => $row['dimensionValues'][0]['value'] ?? '/',
+            'users' => (int)($row['metricValues'][0]['value'] ?? 0),
+        ];
+    }
+
+    $rtEventsData = ga4Realtime($token, $propertyId, [
+        'dimensions' => [['name' => 'eventName']],
+        'metrics'    => [['name' => 'eventCount']],
+        'orderBys'   => [['metric' => ['metricName' => 'eventCount'], 'desc' => true]],
+        'limit'      => 8,
+    ]);
+    $realtimeEvents = [];
+    foreach ($rtEventsData['rows'] ?? [] as $row) {
+        $realtimeEvents[] = [
+            'name'  => $row['dimensionValues'][0]['value'] ?? '',
+            'count' => (int)($row['metricValues'][0]['value'] ?? 0),
+        ];
+    }
+
     jsonSuccess([
         'configured' => true,
-        'period'     => $period,
+        'dateRange'  => ['start' => $startDate, 'end' => $endDate],
         'overview'   => $overview,
         'pages'      => $pages,
         'sources'    => $sources,
         'events'     => $events,
         'daily'      => $daily,
+        'realtime'   => [
+            'activeUsers' => $activeNow,
+            'pages'       => $realtimePages,
+            'events'      => $realtimeEvents,
+        ],
     ]);
 
 } catch (\Throwable $e) {
