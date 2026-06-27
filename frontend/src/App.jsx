@@ -34,6 +34,8 @@ const OrdersPage       = lazy(() => import('./components/OrdersPage'));
 const AccountPage      = lazy(() => import('./components/AccountPage'));
 const Checkout         = lazy(() => import('./components/Checkout'));
 const PaymentConfirmedPage = lazy(() => import('./components/PaymentConfirmedPage'));
+const AppointmentPage  = lazy(() => import('./components/AppointmentPage'));
+const ClientDashboard  = lazy(() => import('./components/ClientDashboard'));
 
 const NAV_SECTION_MAP = {
   'Servicios': 'services', 'Services': 'services',
@@ -328,6 +330,16 @@ export default function App() {
             <PageMeta title="Restablecer contraseña | Kodeo" description="Crea una nueva contraseña para tu cuenta Kodeo." path="/restablecer" />
             <ResetPasswordPage copy={copy} onNavigate={navigate} />
           </>
+        } />
+
+        {/* ── Agendar cita (Cal.com embed) ── */}
+        <Route path="/agendar" element={
+          <AppointmentPage {...sharedNavProps} onBack={handleBack} onNavigate={navigate} />
+        } />
+
+        {/* ── Panel del cliente / admin (citas) ── */}
+        <Route path="/panel" element={
+          <ClientDashboard {...sharedNavProps} onBack={handleBack} onNavigate={navigate} />
         } />
 
         {/* ── Selección de producto ── */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import logoSvg from '../assets/logo_black_transparent.svg';
 import { auth } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
@@ -15,6 +16,11 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
   const appleLoaded  = useRef(false);
+  const location     = useLocation();
+
+  // Si venimos de /agendar (o cualquier otra ruta protegida), volvemos ahí después del login
+  const redirectTo    = location.state?.from ?? '/panel';
+  const redirectState = location.state?.returnState ?? undefined;
 
   useEffect(() => {
     if (!appleLoaded.current) {
@@ -81,7 +87,7 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       onLoginSuccess?.(data.user);
-      onNavigate?.('/pedidos');
+      onNavigate?.(redirectTo, redirectState ? { state: redirectState } : undefined);
     } catch {
       setError('No se pudo conectar con el servidor');
     } finally {
@@ -210,7 +216,7 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
               localStorage.setItem('token', data.token);
               localStorage.setItem('user', JSON.stringify(data.user));
               onLoginSuccess?.(data.user);
-              onNavigate?.('/pedidos');
+              onNavigate?.(redirectTo, redirectState ? { state: redirectState } : undefined);
             } catch {
               setError('No se pudo conectar con el servidor');
             } finally {

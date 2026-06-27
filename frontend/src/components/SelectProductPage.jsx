@@ -40,7 +40,7 @@ export default function SelectProductPage({
   }, [motionSpeed]);
 
   const handleSelect = (svc) => {
-    navigate('/pago', { state: { amount: priceToCents(svc.price), service: svc.name, code: svc.code } });
+    navigate('/agendar', { state: { amount: priceToCents(svc.price), service: svc.name, code: svc.code } });
   };
 
   return (

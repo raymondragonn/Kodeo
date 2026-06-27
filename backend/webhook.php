@@ -74,11 +74,19 @@ function handlePaymentSucceeded(\Stripe\PaymentIntent $pi): void {
     $startDate = date('Y-m-d');
     $delivery  = addBusinessDays($startDate, $devDays);
 
+    $appointmentId = isset($pi->metadata['appointment_id']) ? (int)$pi->metadata['appointment_id'] : null;
+
     try {
-        getDb()->prepare('
+        $db = getDb();
+        $db->prepare('
             INSERT INTO orders (user_id, service, amount, status, start_date, delivery_date, stripe_payment_intent_id)
             VALUES (?, ?, ?, \'pendiente\', ?, ?, ?)
         ')->execute([(int)$userId, $service, $amount, $startDate, $delivery, $pi->id]);
+
+        if ($appointmentId) {
+            $db->prepare('UPDATE appointments SET stripe_payment_intent_id = ? WHERE id = ?')
+               ->execute([$pi->id, $appointmentId]);
+        }
     } catch (\PDOException $e) {
         if ($e->getCode() !== '23000') throw $e; // duplicado (reintento de webhook) — ignorar
     }

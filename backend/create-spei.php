@@ -8,6 +8,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/promo.php';
 
 setCorsHeaders();
 
@@ -19,11 +20,13 @@ $auth = getAuthUser();
 
 $body = json_decode(file_get_contents('php://input'), true);
 
-$amount  = $body['amount'] ?? null;   // Centavos MXN
-$name    = trim($body['name'] ?? '');
-$email   = trim($body['email'] ?? '');
-$service = trim($body['service'] ?? 'Servicio Kodeo');
-$code    = trim($body['code'] ?? '');
+$amount        = $body['amount'] ?? null;   // Centavos MXN
+$name          = trim($body['name'] ?? '');
+$email         = trim($body['email'] ?? '');
+$service       = trim($body['service'] ?? 'Servicio Kodeo');
+$code          = trim($body['code'] ?? '');
+$appointmentId = isset($body['appointment_id']) ? (int)$body['appointment_id'] : null;
+$promoCode     = trim($body['promo_code'] ?? '');
 
 if (!$amount || !is_numeric($amount) || $amount < 1000) {
     jsonError('Monto inválido. Mínimo 1000 centavos ($10 MXN).');
@@ -53,8 +56,11 @@ try {
         ]);
     }
 
+    $promo       = resolvePromoCode($promoCode ?: null, (int)$amount);
+    $finalAmount = $promo['final_amount'];
+
     $paymentIntent = \Stripe\PaymentIntent::create([
-        'amount'               => (int)$amount,
+        'amount'               => $finalAmount,
         'currency'             => 'mxn',
         'customer'             => $customer->id,
         'payment_method_types' => ['customer_balance'],
@@ -70,11 +76,14 @@ try {
             ],
         ],
         'confirm' => true,
-        'metadata' => [
-            'user_id'      => $auth['sub'],
-            'service'      => $service,
-            'service_code' => $code,
-        ],
+        'metadata' => array_filter([
+            'user_id'        => $auth['sub'],
+            'service'        => $service,
+            'service_code'   => $code,
+            'appointment_id' => $appointmentId ? (string)$appointmentId : null,
+            'promo_code'     => $promoCode ?: null,
+            'discount_cents' => $promo['discount'] > 0 ? (string)$promo['discount'] : null,
+        ]),
     ]);
 
     $bankTransfer = $paymentIntent->next_action->display_bank_transfer_instructions ?? null;

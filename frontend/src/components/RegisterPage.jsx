@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import logoSvg from '../assets/logo_black_transparent.svg';
 import { auth } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
@@ -9,6 +10,9 @@ googleProvider.addScope('profile');
 googleProvider.addScope('email');
 
 export default function RegisterPage({ copy, onNavigate }) {
+  const location      = useLocation();
+  const redirectTo    = location.state?.from ?? '/panel';
+  const redirectState = location.state?.returnState ?? undefined;
   const [name, setName]         = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
@@ -72,7 +76,8 @@ export default function RegisterPage({ copy, onNavigate }) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setSuccess(true);
-      setTimeout(() => window.location.href = '/pedidos', 1000);
+      // Reload completo para que App.jsx lea el usuario de localStorage, luego va al destino
+      setTimeout(() => { window.location.href = redirectTo; }, 1000);
     } catch (error) {
       if (error?.code !== 'auth/popup-closed-by-user') {
         setError('Error al registrarse con Google: ' + error?.message);
@@ -106,7 +111,7 @@ export default function RegisterPage({ copy, onNavigate }) {
         </a>
         <a
           href="/login"
-          onClick={e => { e.preventDefault(); onNavigate?.('/login'); }}
+          onClick={e => { e.preventDefault(); onNavigate?.('/login', { state: location.state }); }}
           style={{
             fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
             textTransform: 'uppercase', color: 'var(--type-soft)',
@@ -185,7 +190,7 @@ export default function RegisterPage({ copy, onNavigate }) {
               const data = await res.json();
               if (!res.ok) { setError(data.error ?? 'Error al registrar'); return; }
               setSuccess(true);
-              setTimeout(() => onNavigate?.('/login'), 1800);
+              setTimeout(() => onNavigate?.('/login', { state: location.state }), 1800);
             } catch {
               setError('No se pudo conectar con el servidor');
             } finally {
@@ -346,7 +351,7 @@ export default function RegisterPage({ copy, onNavigate }) {
             ¿Ya tienes cuenta?{' '}
             <a
               href="/login"
-              onClick={e => { e.preventDefault(); onNavigate?.('/login'); }}
+              onClick={e => { e.preventDefault(); onNavigate?.('/login', { state: location.state }); }}
               style={{ color: 'var(--type)', textDecoration: 'underline', cursor: 'pointer' }}
             >
               {copy?.authLogin ?? 'Iniciar sesión'}
