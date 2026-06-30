@@ -337,37 +337,48 @@ try {
         ]);
     }
 
-    $rtActiveData = ga4Realtime($token, $propertyId, [
-        'metrics' => [['name' => 'activeUsers']],
-    ]);
-    $activeNow = (int)(($rtActiveData['rows'][0]['metricValues'][0]['value'] ?? 0));
+    $realtimeResult = null;
+    try {
+        $rtActiveData = ga4Realtime($token, $propertyId, [
+            'metrics' => [['name' => 'activeUsers']],
+        ]);
+        $activeNow = (int)(($rtActiveData['rows'][0]['metricValues'][0]['value'] ?? 0));
 
-    $rtPagesData = ga4Realtime($token, $propertyId, [
-        'dimensions' => [['name' => 'unifiedScreenName']],
-        'metrics'    => [['name' => 'activeUsers']],
-        'orderBys'   => [['metric' => ['metricName' => 'activeUsers'], 'desc' => true]],
-        'limit'      => 5,
-    ]);
-    $realtimePages = [];
-    foreach ($rtPagesData['rows'] ?? [] as $row) {
-        $realtimePages[] = [
-            'path'  => $row['dimensionValues'][0]['value'] ?? '/',
-            'users' => (int)($row['metricValues'][0]['value'] ?? 0),
-        ];
-    }
+        $rtPagesData = ga4Realtime($token, $propertyId, [
+            'dimensions' => [['name' => 'unifiedScreenName']],
+            'metrics'    => [['name' => 'activeUsers']],
+            'orderBys'   => [['metric' => ['metricName' => 'activeUsers'], 'desc' => true]],
+            'limit'      => 5,
+        ]);
+        $realtimePages = [];
+        foreach ($rtPagesData['rows'] ?? [] as $row) {
+            $realtimePages[] = [
+                'path'  => $row['dimensionValues'][0]['value'] ?? '/',
+                'users' => (int)($row['metricValues'][0]['value'] ?? 0),
+            ];
+        }
 
-    $rtEventsData = ga4Realtime($token, $propertyId, [
-        'dimensions' => [['name' => 'eventName']],
-        'metrics'    => [['name' => 'eventCount']],
-        'orderBys'   => [['metric' => ['metricName' => 'eventCount'], 'desc' => true]],
-        'limit'      => 8,
-    ]);
-    $realtimeEvents = [];
-    foreach ($rtEventsData['rows'] ?? [] as $row) {
-        $realtimeEvents[] = [
-            'name'  => $row['dimensionValues'][0]['value'] ?? '',
-            'count' => (int)($row['metricValues'][0]['value'] ?? 0),
+        $rtEventsData = ga4Realtime($token, $propertyId, [
+            'dimensions' => [['name' => 'eventName']],
+            'metrics'    => [['name' => 'eventCount']],
+            'orderBys'   => [['metric' => ['metricName' => 'eventCount'], 'desc' => true]],
+            'limit'      => 8,
+        ]);
+        $realtimeEvents = [];
+        foreach ($rtEventsData['rows'] ?? [] as $row) {
+            $realtimeEvents[] = [
+                'name'  => $row['dimensionValues'][0]['value'] ?? '',
+                'count' => (int)($row['metricValues'][0]['value'] ?? 0),
+            ];
+        }
+
+        $realtimeResult = [
+            'activeUsers' => $activeNow,
+            'pages'       => $realtimePages,
+            'events'      => $realtimeEvents,
         ];
+    } catch (\Throwable $e) {
+        error_log('[GA4 Realtime] ' . $e->getMessage());
     }
 
     jsonSuccess([
@@ -378,11 +389,7 @@ try {
         'sources'    => $sources,
         'events'     => $events,
         'daily'      => $daily,
-        'realtime'   => [
-            'activeUsers' => $activeNow,
-            'pages'       => $realtimePages,
-            'events'      => $realtimeEvents,
-        ],
+        'realtime'   => $realtimeResult,
     ]);
 
 } catch (\Throwable $e) {
