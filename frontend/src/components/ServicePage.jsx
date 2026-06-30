@@ -64,7 +64,7 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
 
   const handleCheckout = () => {
     const amount = Number(service.price.replace(/[^\d]/g, '')) * 100;
-    navigate('/pago', { state: { amount, service: service.name, code: service.code } });
+    navigate('/agendar', { state: { amount, service: service.name, code: service.code } });
   };
 
   useEffect(() => {

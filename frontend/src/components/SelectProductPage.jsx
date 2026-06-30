@@ -41,8 +41,7 @@ export default function SelectProductPage({
   }, [motionSpeed]);
 
   const handleSelect = (svc) => {
-    trackCtaClick({ cta_id: `select_product_${svc.code}`, cta_text: svc.name, section: 'select_product', destination: '/pago' });
-    navigate('/pago', { state: { amount: priceToCents(svc.price), service: svc.name, code: svc.code } });
+    navigate('/agendar', { state: { amount: priceToCents(svc.price), service: svc.name, code: svc.code } });
   };
 
   return (

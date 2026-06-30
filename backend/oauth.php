@@ -60,7 +60,8 @@ if ($provider === 'google') {
             jsonError('Error interno al obtener claves de Firebase', 500);
         }
 
-        $keys    = JWK::parseKeySet($jwks);
+        $keys = JWK::parseKeySet($jwks);
+        JWT::$leeway = 300; // tolera hasta 5 min de desfase de reloj (común en Docker/Windows)
         $decoded = JWT::decode($token, $keys);
         $debug_log("JWT decodificado: sub=" . ($decoded->sub ?? 'N/A'));
 

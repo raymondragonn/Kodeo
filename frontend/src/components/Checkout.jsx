@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import Nav from './Nav';
 import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
@@ -75,12 +76,18 @@ export default function Checkout({
   user,
   onThemeToggle,
 }) {
+  const location     = useLocation();
+  const appointmentId = location.state?.appointmentId ?? null;
   const [method, setMethod]         = useState('card');
   const [methodChosen, setMethodChosen] = useState(false);
   const [installments, setInstallments] = useState(0);
   const [loading, setLoading]       = useState(false);
   const [result, setResult]         = useState(null);
   const [stripeReady, setStripeReady] = useState(false);
+  const [promoInput, setPromoInput]   = useState('');
+  const [promoResult, setPromoResult] = useState(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError]   = useState(null);
 
   const stripeRef    = useRef(null);
   const cardRef      = useRef(null);
@@ -103,13 +110,14 @@ export default function Checkout({
     if (!token) onNavigate?.('/login');
   }, [token, onNavigate]);
 
-  const displayAmount = (amount / 100).toLocaleString('es-MX', {
+  const chargeAmount  = promoResult?.valid ? promoResult.final_cents : amount;
+  const displayAmount = (chargeAmount / 100).toLocaleString('es-MX', {
     style: 'currency', currency,
   });
 
   const monthlyAmount = (plan) =>
     plan > 0
-      ? (amount / 100 / plan).toLocaleString('es-MX', { style: 'currency', currency })
+      ? (chargeAmount / 100 / plan).toLocaleString('es-MX', { style: 'currency', currency })
       : null;
 
   // ── Cargar Stripe.js ──────────────────────────────────────────────────────
@@ -169,12 +177,35 @@ export default function Checkout({
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const clearResult = () => setResult(null);
+  const clearPromo  = () => { setPromoResult(null); setPromoInput(''); setPromoError(null); };
+
+  const applyPromo = async () => {
+    const trimmed = promoInput.trim().toUpperCase();
+    if (!trimmed) return;
+    setPromoLoading(true); setPromoError(null);
+    try {
+      const res  = await fetch(`${API}/validate-promo.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code: trimmed, amount }),
+      });
+      const data = await res.json();
+      if (data.error && !('valid' in data)) throw new Error(data.error);
+      if (!data.valid) setPromoError(data.error || 'Código inválido o expirado');
+      else             setPromoResult({ ...data, code: trimmed });
+    } catch (err) {
+      setPromoError(err.message);
+    } finally { setPromoLoading(false); }
+  };
 
   const postAPI = async (endpoint, body) => {
+    const payload = { ...body, service, code };
+    if (appointmentId) payload.appointment_id = appointmentId;
+    if (promoResult?.valid) payload.promo_code = promoResult.code;
     const res  = await fetch(`${API}/${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ...body, service, code }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -190,7 +221,7 @@ export default function Checkout({
     }
     setLoading(true); clearResult();
     try {
-      const { clientSecret } = await postAPI('create-payment-intent.php', { amount, installments });
+      const { clientSecret } = await postAPI('create-payment-intent.php', { amount: chargeAmount, installments });
       const { paymentIntent, error } = await stripeRef.current.confirmCardPayment(clientSecret, {
         payment_method: { card: cardRef.current },
       });
@@ -214,8 +245,7 @@ export default function Checkout({
     const email = e.target.oxxoEmail.value.trim();
     setLoading(true); clearResult();
     try {
-      const data = await postAPI('create-oxxo.php', { amount, name, email });
-      trackFormSubmit({ form_id: 'checkout_oxxo', form_location: 'checkout' });
+      const data = await postAPI('create-oxxo.php', { amount: chargeAmount, name, email });
       setResult({
         type: 'info',
         title: 'Voucher OXXO generado',
@@ -235,8 +265,7 @@ export default function Checkout({
     const email = e.target.speiEmail.value.trim();
     setLoading(true); clearResult();
     try {
-      const data = await postAPI('create-spei.php', { amount, name, email });
-      trackFormSubmit({ form_id: 'checkout_spei', form_location: 'checkout' });
+      const data = await postAPI('create-spei.php', { amount: chargeAmount, name, email });
       const bd   = data.bankDetails;
       setResult({
         type: 'info',
@@ -302,6 +331,13 @@ export default function Checkout({
               {installments > 0 && method === 'card' && (
                 <Row label="Por mes">~{monthlyAmount(installments)}</Row>
               )}
+              {promoResult?.valid && (
+                <Row label="Descuento">
+                  <span style={{ fontFamily: 'var(--display)', fontSize: 14, letterSpacing: '-0.01em', color: '#63C44D' }}>
+                    −{(promoResult.discount_cents / 100).toLocaleString('es-MX', { style: 'currency', currency })}
+                  </span>
+                </Row>
+              )}
               <Row label="Total">
                 <span style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)' }}>
                   {displayAmount}
@@ -317,6 +353,49 @@ export default function Checkout({
                 Pagos procesados de forma segura por <strong style={{ color: 'var(--type-soft)' }}>Stripe</strong>. Tus datos están encriptados.
               </p>
             </div>
+          </div>
+
+          {/* ── Código de descuento ── */}
+          <div>
+            <p style={eyebrowStyle}>¿Tienes un código de descuento?</p>
+            {promoResult?.valid ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', border: '1px solid rgba(99,196,77,.4)', background: 'rgba(99,196,77,.06)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#63C44D" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span style={{ flex: 1, fontFamily: 'var(--body)', fontSize: 13, color: '#63C44D' }}>
+                  <strong>{promoResult.code}</strong> — {promoResult.description}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearPromo}
+                  style={{ background: 'none', border: 0, cursor: 'pointer', fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--type-muted)', padding: 0 }}
+                >
+                  Quitar
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', border: '1px solid var(--line)' }}>
+                  <input
+                    value={promoInput}
+                    onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
+                    onKeyDown={e => e.key === 'Enter' && applyPromo()}
+                    placeholder="KODEO20"
+                    style={{ ...inputStyle, flex: 1, border: 0, borderRight: '1px solid var(--line)' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={applyPromo}
+                    disabled={promoLoading || !promoInput.trim()}
+                    style={{ padding: '12px 20px', background: 'none', border: 0, cursor: promoLoading || !promoInput.trim() ? 'not-allowed' : 'pointer', fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--type-soft)', opacity: promoLoading || !promoInput.trim() ? 0.45 : 1, whiteSpace: 'nowrap', transition: 'opacity 0.2s' }}
+                  >
+                    {promoLoading ? '...' : 'Aplicar'}
+                  </button>
+                </div>
+                {promoError && <p style={{ ...hintStyle, color: '#e05050', marginTop: 8 }}>{promoError}</p>}
+              </>
+            )}
           </div>
 
           {/* ── Formulario de pago ── */}

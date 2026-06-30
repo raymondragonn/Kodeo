@@ -7,6 +7,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/promo.php';
 
 setCorsHeaders();
 
@@ -18,11 +19,13 @@ $auth = getAuthUser();
 
 $body = json_decode(file_get_contents('php://input'), true);
 
-$amount      = $body['amount'] ?? null;       // Monto en centavos (ej. 150000 = $1,500 MXN)
-$currency    = $body['currency'] ?? 'mxn';
-$service     = trim($body['service'] ?? 'Servicio Kodeo');
-$code        = trim($body['code'] ?? '');
-$installments = (int)($body['installments'] ?? 0); // 0 = sin MSI, 3, 6, 9, 12, 18, 24
+$amount        = $body['amount'] ?? null;       // Monto en centavos (ej. 150000 = $1,500 MXN)
+$currency      = $body['currency'] ?? 'mxn';
+$service       = trim($body['service'] ?? 'Servicio Kodeo');
+$code          = trim($body['code'] ?? '');
+$installments  = (int)($body['installments'] ?? 0); // 0 = sin MSI, 3, 6, 9, 12, 18, 24
+$appointmentId = isset($body['appointment_id']) ? (int)$body['appointment_id'] : null;
+$promoCode     = trim($body['promo_code'] ?? '');
 
 if (!$amount || !is_numeric($amount) || $amount < 1000) {
     jsonError('Monto inválido. Mínimo 1000 centavos ($10 MXN).');
@@ -30,9 +33,12 @@ if (!$amount || !is_numeric($amount) || $amount < 1000) {
 
 \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
 
+$promo       = resolvePromoCode($promoCode ?: null, (int)$amount);
+$finalAmount = $promo['final_amount'];
+
 try {
     $params = [
-        'amount'               => (int)$amount,
+        'amount'               => $finalAmount,
         'currency'             => $currency,
         'payment_method_types' => ['card'],
         'payment_method_options' => [
@@ -42,12 +48,15 @@ try {
                 ],
             ],
         ],
-        'metadata' => [
+        'metadata' => array_filter([
             'user_id'            => $auth['sub'],
             'service'            => $service,
             'service_code'       => $code,
             'installments_plan'  => $installments > 0 ? "{$installments}_months" : 'none',
-        ],
+            'appointment_id'     => $appointmentId ? (string)$appointmentId : null,
+            'promo_code'         => $promoCode ?: null,
+            'discount_cents'     => $promo['discount'] > 0 ? (string)$promo['discount'] : null,
+        ]),
     ];
 
     $paymentIntent = \Stripe\PaymentIntent::create($params);

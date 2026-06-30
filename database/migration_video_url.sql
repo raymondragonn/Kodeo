@@ -1,0 +1,2 @@
+ALTER TABLE appointments
+  ADD COLUMN IF NOT EXISTS video_url VARCHAR(500) NULL;
