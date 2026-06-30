@@ -19,6 +19,7 @@ define('STRIPE_PUBLISHABLE_KEY', getenv('STRIPE_PUBLISHABLE_KEY') ?: 'pk_test_RE
 define('STRIPE_WEBHOOK_SECRET', getenv('STRIPE_WEBHOOK_SECRET')  ?: 'whsec_REEMPLAZA_CON_TU_WEBHOOK_SECRET');
 define('ALLOWED_ORIGIN',        getenv('ALLOWED_ORIGIN')        ?: 'http://localhost:5000');
 define('CAL_WEBHOOK_SECRET',    getenv('CAL_WEBHOOK_SECRET')    ?: '');
+define('KODEO_WHATSAPP',        getenv('KODEO_WHATSAPP')        ?: '522298483706');
 
 define('SMTP_HOST',       getenv('SMTP_HOST')       ?: 'smtp.zoho.com');
 define('SMTP_PORT',       (int)(getenv('SMTP_PORT') ?: 465));
@@ -94,6 +95,7 @@ function sendMail(string $to, string $subject, string $html): bool {
         return false;
     }
 }
+
 
 // Acentos por servicio — deben coincidir con ACCENT en frontend/src/components/ServicePage.jsx
 const SERVICE_ACCENTS = [

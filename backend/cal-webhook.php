@@ -67,6 +67,9 @@ function handleBookingCreated(array $payload): void {
     $attendees     = $payload['attendees'] ?? [];
     $attendee      = $attendees[0] ?? [];
     $attendeeEmail = $attendee['email'] ?? null;
+    $responses     = $payload['responses'] ?? [];
+    $whatsapp      = trim($responses['attendeePhoneNumber']['value'] ?? '');
+    $videoUrl      = $payload['videoCallUrl'] ?? null;
 
     if (!$uid) {
         error_log("[CAL] BOOKING_CREATED sin uid — payload: " . json_encode($payload));
@@ -87,18 +90,21 @@ function handleBookingCreated(array $payload): void {
 
     try {
         getDb()->prepare('
-            INSERT INTO appointments (user_id, attendee_email, cal_booking_uid, service, service_code, scheduled_at, status)
-            VALUES (?, ?, ?, ?, ?, ?, \'confirmed\')
+            INSERT INTO appointments (user_id, attendee_email, whatsapp, cal_booking_uid, service, service_code, scheduled_at, status, video_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, \'confirmed\', ?)
             ON DUPLICATE KEY UPDATE
                 user_id        = COALESCE(user_id, VALUES(user_id)),
                 attendee_email = VALUES(attendee_email),
+                whatsapp       = VALUES(whatsapp),
                 service        = VALUES(service),
                 service_code   = VALUES(service_code),
                 scheduled_at   = VALUES(scheduled_at),
-                status         = \'confirmed\'
-        ')->execute([$userId ?: null, $attendeeEmail, $uid, $service, $serviceCode, $scheduledAt]);
+                status         = \'confirmed\',
+                video_url      = VALUES(video_url)
+        ')->execute([$userId ?: null, $attendeeEmail, $whatsapp ?: null, $uid, $service, $serviceCode, $scheduledAt, $videoUrl]);
 
         notifyTeamNewBooking($service, $scheduledAt, $attendee);
+        if ($attendeeEmail) notifyGuestBookingConfirmed($payload);
     } catch (\PDOException $e) {
         error_log('[CAL] Error al insertar cita: ' . $e->getMessage());
     }
@@ -114,6 +120,11 @@ function handleBookingCancelled(array $payload): void {
     } catch (\PDOException $e) {
         error_log('[CAL] Error al cancelar cita: ' . $e->getMessage());
     }
+
+    $attendees = $payload['attendees'] ?? [];
+    $hasEmail  = !empty(($attendees[0] ?? [])['email']);
+    if ($hasEmail) notifyGuestBookingCancelled($payload);
+
 }
 
 function handleBookingRescheduled(array $payload): void {
@@ -123,12 +134,194 @@ function handleBookingRescheduled(array $payload): void {
 
     $scheduledAt = $startTime ? date('Y-m-d H:i:s', strtotime($startTime)) : null;
 
+    $videoUrl = $payload['videoCallUrl'] ?? null;
+
     try {
-        getDb()->prepare('UPDATE appointments SET scheduled_at = ?, status = ? WHERE cal_booking_uid = ?')
-               ->execute([$scheduledAt, 'rescheduled', $uid]);
+        getDb()->prepare('UPDATE appointments SET scheduled_at = ?, status = ?, video_url = ? WHERE cal_booking_uid = ?')
+               ->execute([$scheduledAt, 'rescheduled', $videoUrl, $uid]);
     } catch (\PDOException $e) {
         error_log('[CAL] Error al reprogramar cita: ' . $e->getMessage());
     }
+
+    $attendees = $payload['attendees'] ?? [];
+    $hasEmail  = !empty(($attendees[0] ?? [])['email']);
+    if ($hasEmail) notifyGuestBookingRescheduled($payload);
+
+}
+
+function notifyGuestBookingCancelled(array $payload): void {
+    $attendees   = $payload['attendees']   ?? [];
+    $organizer   = $payload['organizer']   ?? [];
+    $startTime   = $payload['startTime']   ?? null;
+    $endTime     = $payload['endTime']     ?? null;
+    $metadata    = $payload['metadata']    ?? [];
+    $service     = $metadata['service']    ?? null;
+    $cancellationReason = trim($payload['cancellationReason'] ?? '');
+
+    $accent        = SERVICE_ACCENTS[$service] ?? DEFAULT_EMAIL_ACCENT;
+    $organizerName = htmlspecialchars($organizer['name'] ?? 'Kodeo | Agencia Digital');
+    $dateLabel     = formatBookingDateSpanish($startTime, $endTime);
+
+    foreach ($attendees as $attendee) {
+        $name  = $attendee['name']  ?? 'Cliente';
+        $email = $attendee['email'] ?? null;
+        if (!$email) continue;
+
+        $serviceRow = $service
+            ? '<p style="margin:0 0 8px;"><strong style="color:#ffffff;">Servicio:</strong> ' . htmlspecialchars($service) . '</p>'
+            : '';
+
+        $reasonRow = $cancellationReason
+            ? '<p style="margin:12px 0 0;"><strong style="color:#ffffff;">Motivo:</strong> ' . htmlspecialchars($cancellationReason) . '</p>'
+            : '';
+
+        $waUrl = 'https://wa.me/' . KODEO_WHATSAPP . '?text=' . rawurlencode('Hola, quisiera hablar sobre mi reunión con ustedes.');
+
+        $body = '
+            <p style="margin:0 0 24px;">Hola ' . htmlspecialchars($name) . ', tu reunión ha sido cancelada.</p>
+            <div style="border-left:3px solid #e05050; padding-left:16px;">
+                ' . $serviceRow . '
+                <p style="margin:0 0 8px;"><strong style="color:#ffffff;">Fecha que tenías:</strong> ' . htmlspecialchars($dateLabel) . '</p>
+                <p style="margin:0 0 4px;"><strong style="color:#ffffff;">Organizador:</strong> ' . $organizerName . '</p>
+                ' . $reasonRow . '
+            </div>
+            <p style="margin:24px 0 0; color:#9b9b9b;">Si deseas reagendar o tienes alguna duda, escríbenos directamente por WhatsApp.</p>
+        ';
+
+        $html = renderEmailLayout(
+            'Reunión cancelada',
+            $body,
+            ['label' => 'Escribir por WhatsApp', 'url' => $waUrl],
+            '#e05050'
+        );
+        sendMail($email, 'Tu reunión con Kodeo ha sido cancelada', $html);
+    }
+}
+
+function notifyGuestBookingRescheduled(array $payload): void {
+    $attendees = $payload['attendees'] ?? [];
+    $organizer = $payload['organizer'] ?? [];
+    $startTime = $payload['startTime'] ?? null;
+    $endTime   = $payload['endTime']   ?? null;
+    $videoUrl  = $payload['videoCallUrl'] ?? null;
+    $metadata  = $payload['metadata']    ?? [];
+    $service   = $metadata['service']    ?? null;
+
+    $accent        = SERVICE_ACCENTS[$service] ?? DEFAULT_EMAIL_ACCENT;
+    $organizerName = htmlspecialchars($organizer['name'] ?? 'Kodeo | Agencia Digital');
+    $dateLabel     = formatBookingDateSpanish($startTime, $endTime);
+
+    foreach ($attendees as $attendee) {
+        $name  = $attendee['name']  ?? 'Cliente';
+        $email = $attendee['email'] ?? null;
+        if (!$email) continue;
+
+        $serviceRow = $service
+            ? '<p style="margin:0 0 8px;"><strong style="color:#ffffff;">Servicio:</strong> ' . htmlspecialchars($service) . '</p>'
+            : '';
+
+        $whereRow = $videoUrl
+            ? '<p style="margin:12px 0 0;"><strong style="color:#ffffff;">Enlace de la reunión:</strong><br>
+               <a href="' . htmlspecialchars($videoUrl) . '" style="color:' . htmlspecialchars($accent) . '; word-break:break-all;">' . htmlspecialchars($videoUrl) . '</a></p>'
+            : '';
+
+        $waUrl = 'https://wa.me/' . KODEO_WHATSAPP . '?text=' . rawurlencode('Hola, quisiera hablar sobre mi reunión con ustedes.');
+
+        $body = '
+            <p style="margin:0 0 24px;">Hola ' . htmlspecialchars($name) . ', tu reunión ha sido reagendada.</p>
+            <div style="border-left:3px solid ' . htmlspecialchars($accent) . '; padding-left:16px;">
+                ' . $serviceRow . '
+                <p style="margin:0 0 8px;"><strong style="color:#ffffff;">Nueva fecha:</strong> ' . htmlspecialchars($dateLabel) . '</p>
+                <p style="margin:0 0 4px;"><strong style="color:#ffffff;">Organizador:</strong> ' . $organizerName . '</p>
+                ' . $whereRow . '
+            </div>
+            <p style="margin:24px 0 0; color:#9b9b9b;">Para reagendar o cancelar tu reunión, escríbenos directamente por WhatsApp.</p>
+        ';
+
+        $cta  = $videoUrl
+            ? ['label' => 'Unirse a la reunión', 'url' => $videoUrl]
+            : ['label' => 'Escribir por WhatsApp', 'url' => $waUrl];
+        $html = renderEmailLayout('Reunión reagendada', $body, $cta, $accent);
+        sendMail($email, 'Tu reunión con Kodeo ha sido reagendada', $html);
+    }
+}
+
+function notifyGuestBookingConfirmed(array $payload): void {
+    $attendees = $payload['attendees']    ?? [];
+    $organizer = $payload['organizer']    ?? [];
+    $startTime = $payload['startTime']    ?? null;
+    $endTime   = $payload['endTime']      ?? null;
+    $videoUrl  = $payload['videoCallUrl'] ?? null;
+    $metadata  = $payload['metadata']     ?? [];
+    $service   = $metadata['service']     ?? null;
+
+    $accent        = SERVICE_ACCENTS[$service] ?? DEFAULT_EMAIL_ACCENT;
+    $organizerName = htmlspecialchars($organizer['name'] ?? 'Kodeo | Agencia Digital');
+    $dateLabel     = formatBookingDateSpanish($startTime, $endTime);
+
+    $waUrl = 'https://wa.me/' . KODEO_WHATSAPP . '?text=' . rawurlencode('Hola, quisiera hablar sobre mi reunión con ustedes.');
+
+    foreach ($attendees as $attendee) {
+        $name  = $attendee['name']  ?? 'Cliente';
+        $email = $attendee['email'] ?? null;
+        if (!$email) continue;
+
+        $serviceRow = $service
+            ? '<p style="margin:0 0 8px;"><strong style="color:#ffffff;">Servicio:</strong> ' . htmlspecialchars($service) . '</p>'
+            : '';
+
+        $whereRow = $videoUrl
+            ? '<p style="margin:12px 0 0;"><strong style="color:#ffffff;">Enlace de la reunión:</strong><br>
+               <a href="' . htmlspecialchars($videoUrl) . '" style="color:' . htmlspecialchars($accent) . '; word-break:break-all;">' . htmlspecialchars($videoUrl) . '</a></p>'
+            : '';
+
+        $body = '
+            <p style="margin:0 0 24px;">Hola ' . htmlspecialchars($name) . ', tu reunión con el equipo de Kodeo ha sido agendada.</p>
+            <div style="border-left:3px solid ' . htmlspecialchars($accent) . '; padding-left:16px;">
+                ' . $serviceRow . '
+                <p style="margin:0 0 8px;"><strong style="color:#ffffff;">Cuándo:</strong> ' . htmlspecialchars($dateLabel) . '</p>
+                <p style="margin:0 0 4px;"><strong style="color:#ffffff;">Organizador:</strong> ' . $organizerName . '</p>
+                ' . $whereRow . '
+            </div>
+            <p style="margin:24px 0 0; color:#9b9b9b;">Para reagendar o cancelar tu reunión, escríbenos directamente por WhatsApp.</p>
+        ';
+
+        $cta = $videoUrl
+            ? ['label' => 'Unirse a la reunión', 'url' => $videoUrl]
+            : ['label' => 'Escribir por WhatsApp', 'url' => $waUrl];
+
+        $html = renderEmailLayout('Reunión agendada', $body, $cta, $accent);
+        sendMail($email, 'Tu reunión con Kodeo ha sido agendada', $html);
+    }
+}
+
+function formatBookingDateSpanish(?string $startIso, ?string $endIso): string {
+    if (!$startIso) return 'Por definir';
+
+    $days   = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    $months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+               'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+    $tz    = new \DateTimeZone('America/Mexico_City');
+    $start = new \DateTime($startIso);
+    $start->setTimezone($tz);
+
+    $dayName   = $days[(int) $start->format('w')];
+    $day       = (int) $start->format('j');
+    $monthName = $months[(int) $start->format('n') - 1];
+    $year      = $start->format('Y');
+    $startH    = $start->format('g:i') . ($start->format('A') === 'AM' ? ' am' : ' pm');
+
+    $dateStr = $dayName . ', ' . $day . ' de ' . $monthName . ' de ' . $year;
+
+    if ($endIso) {
+        $end  = new \DateTime($endIso);
+        $end->setTimezone($tz);
+        $endH = $end->format('g:i') . ($end->format('A') === 'AM' ? ' am' : ' pm');
+        return $dateStr . ' · ' . $startH . ' – ' . $endH . ' (Ciudad de México)';
+    }
+
+    return $dateStr . ' · ' . $startH . ' (Ciudad de México)';
 }
 
 function notifyTeamNewBooking(?string $service, ?string $scheduledAt, array $attendee): void {

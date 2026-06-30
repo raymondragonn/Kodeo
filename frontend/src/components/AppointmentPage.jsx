@@ -28,7 +28,7 @@ export default function AppointmentPage({
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const cal = await getCalApi({ namespace: 'consulta' });
+      const cal = await getCalApi({ namespace: '45min' });
       cal('on', {
         action: 'bookingSuccessful',
         callback: () => navigate('/panel', { state: { justBooked: true } }),
@@ -150,7 +150,7 @@ export default function AppointmentPage({
         {user && (
           <div style={{ border: '1px solid var(--line)', overflow: 'hidden', minHeight: 600 }}>
             <Cal
-              namespace="consulta"
+              namespace="45min"
               calLink={calLinkWithParams}
               config={{
                 name: user.name,
