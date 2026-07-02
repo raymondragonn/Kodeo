@@ -5,6 +5,7 @@ import Nav from './Nav';
 import Footer from './Footer';
 import PageMeta from './PageMeta';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { API_BASE_URL as API } from '../lib/api';
 
 const ACCENT = {
   '01': 'var(--accent-green)',
@@ -30,11 +31,26 @@ export default function AppointmentPage({
     (async () => {
       const cal = await getCalApi({ namespace: '45min' });
       cal('on', {
-        action: 'bookingSuccessful',
-        callback: () => navigate('/panel', { state: { justBooked: true } }),
+        action: 'bookingSuccessfulV2',
+        callback: async (e) => {
+          const { uid, startTime } = e.detail?.data || {};
+          const token = localStorage.getItem('token');
+          if (uid && token) {
+            try {
+              await fetch(`${API}/confirm-appointment.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ uid, startTime, service, serviceCode: code }),
+              });
+            } catch {
+              // El webhook de Cal.com es el respaldo si esto falla
+            }
+          }
+          navigate('/panel', { state: { justBooked: true } });
+        },
       });
     })();
-  }, [user, navigate]);
+  }, [user, navigate, service, code]);
 
   const calLinkWithParams = user
     ? `${calLink}?metadata[userId]=${user.id}&metadata[serviceCode]=${encodeURIComponent(code || '')}&metadata[service]=${encodeURIComponent(service || '')}`
