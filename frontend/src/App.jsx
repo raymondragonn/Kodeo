@@ -38,6 +38,8 @@ const Checkout         = lazy(() => import('./components/Checkout'));
 const PaymentConfirmedPage = lazy(() => import('./components/PaymentConfirmedPage'));
 const AppointmentPage  = lazy(() => import('./components/AppointmentPage'));
 const ClientDashboard  = lazy(() => import('./components/ClientDashboard'));
+const AnalyticsPage    = lazy(() => import('./components/AnalyticsPage'));
+const UsersPage        = lazy(() => import('./components/UsersPage'));
 
 const NAV_SECTION_MAP = {
   'Servicios': 'services', 'Services': 'services',
