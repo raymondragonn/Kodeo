@@ -380,10 +380,13 @@ export default function App() {
           <AppointmentPage {...sharedNavProps} onBack={handleBack} onNavigate={navigate} />
         } />
 
-        {/* ── Panel del cliente / admin (citas) ── */}
-        <Route path="/panel" element={
-          <ClientDashboard {...sharedNavProps} onBack={handleBack} onNavigate={navigate} />
+        {/* ── Citas del cliente / admin ── */}
+        <Route path="/citas" element={
+          !user ? <Navigate to="/login" replace /> :
+          <ClientDashboard user={user} copy={copy} onLogout={handleLogout} theme={theme} onThemeToggle={toggleTheme} onNavigate={navigate} />
         } />
+        {/* Redirección: la ruta se llamaba /panel — mantenemos el enlace vivo para correos y marcadores antiguos */}
+        <Route path="/panel" element={<Navigate to="/citas" replace />} />
 
         {/* ── Selección de producto ── */}
         <Route path="/comprar" element={

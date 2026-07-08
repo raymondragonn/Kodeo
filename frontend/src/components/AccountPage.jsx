@@ -76,11 +76,8 @@ export default function AccountPage({ user, onNavigate, onLogout, onUserUpdate, 
 
         {/* Header */}
         <div style={{ marginBottom: 36 }}>
-          <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 8px' }}>
-            {user?.username}
-          </p>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-            Mi cuenta
+            Cuenta
           </h1>
         </div>
 

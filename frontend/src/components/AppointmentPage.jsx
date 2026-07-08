@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Cal, { getCalApi } from '@calcom/embed-react';
 import Nav from './Nav';
 import Footer from './Footer';
 import PageMeta from './PageMeta';
+import CallScheduler from './CallScheduler';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { API_BASE_URL as API } from '../lib/api';
 
@@ -21,42 +21,32 @@ export default function AppointmentPage({
   const location     = useLocation();
   const { isMobile } = useBreakpoint();
 
-  const { service, code, amount } = location.state || {};
+  const { service, code } = location.state || {};
   const accent  = ACCENT[code] || ACCENT['01'];
   const calLink = import.meta.env.VITE_CAL_LINK || 'kodeo/consulta';
 
-  // Escuchar reserva exitosa — solo cuando hay sesión
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const cal = await getCalApi({ namespace: '45min' });
-      cal('on', {
-        action: 'bookingSuccessfulV2',
-        callback: async (e) => {
-          const { uid, startTime } = e.detail?.data || {};
-          const token = localStorage.getItem('token');
-          if (uid && token) {
-            try {
-              await fetch(`${API}/confirm-appointment.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ uid, startTime, service, serviceCode: code }),
-              });
-            } catch {
-              // El webhook de Cal.com es el respaldo si esto falla
-            }
-          }
-          navigate('/panel', { state: { justBooked: true } });
-        },
+  const [booked, setBooked] = useState(false);
+
+  // La consulta inicial ya no requiere cuenta ni formulario previo — se
+  // agenda de inmediato como invitado. El webhook de Cal.com crea la cita
+  // (ver cal-webhook.php) y se asocia al usuario cuando cree su cuenta con
+  // el mismo correo. El formulario de proyecto se llena después, desde el
+  // portal, una vez que el equipo lo libera tras la llamada. En vez de
+  // saltar a /citas (que exige sesión) o dejar solo la confirmación interna
+  // de Cal.com, mostramos aquí mismo un aviso propio.
+  function handleBookingSuccess({ uid, startTime }) {
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetch(`${API}/confirm-appointment.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ uid, startTime, service, serviceCode: code, call_type: 'intro' }),
+      }).catch(() => {
+        // El webhook de Cal.com es el respaldo si esto falla
       });
-    })();
-  }, [user, navigate, service, code]);
-
-  const calLinkWithParams = user
-    ? `${calLink}?metadata[userId]=${user.id}&metadata[serviceCode]=${encodeURIComponent(code || '')}&metadata[service]=${encodeURIComponent(service || '')}`
-    : calLink;
-
-  const authReturnState = { from: '/agendar', returnState: location.state };
+    }
+    setBooked(true);
+  }
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: 'var(--bg)', color: 'var(--type)' }}>
@@ -103,79 +93,59 @@ export default function AppointmentPage({
 
         <div style={{ height: 2, background: accent, width: 48, marginBottom: 36 }} />
 
-        {/* ── Sin sesión: gate de autenticación ── */}
-        {!user && (
+        {booked ? (
           <div style={{
             border: '1px solid var(--line)',
+            borderRadius: 'var(--radius-lg)',
             padding: isMobile ? '40px 24px' : '56px 48px',
             display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 24,
           }}>
             <div>
               <p style={{
                 fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em',
-                textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 10px',
+                textTransform: 'uppercase', color: accent, margin: '0 0 10px',
               }}>
-                Paso 1 de 2
+                Cita confirmada
               </p>
               <h2 style={{
                 fontFamily: 'var(--display)', fontWeight: 400,
                 fontSize: isMobile ? 28 : 36, letterSpacing: '-0.025em',
                 margin: '0 0 10px', lineHeight: 1.1,
               }}>
-                Crea tu cuenta o inicia sesión
+                ¡Tu cita se agendó correctamente!
               </h2>
               <p style={{
                 fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)',
-                margin: 0, maxWidth: 420, lineHeight: 1.6,
+                margin: 0, maxWidth: 440, lineHeight: 1.6,
               }}>
-                Necesitamos identificarte para asociar la cita a tu perfil y mantenerte
-                al tanto del proceso.
+                Te enviamos los detalles a tu correo electrónico. Para ver más información
+                y darle seguimiento a tu proyecto, inicia sesión o crea una cuenta con el
+                mismo correo.
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
-              <button
-                onClick={() => navigate('/register', { state: authReturnState })}
-                style={{
-                  padding: '13px 26px', background: 'var(--type)', color: 'var(--bg)',
-                  border: 0, borderRadius: 'var(--radius-pill)',
-                  fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
-                  textTransform: 'uppercase', cursor: 'pointer',
-                  flex: isMobile ? 1 : 'none',
-                }}
-              >
-                Crear cuenta →
-              </button>
-              <button
-                onClick={() => navigate('/login', { state: authReturnState })}
-                style={{
-                  padding: '13px 26px', background: 'transparent', color: 'var(--type)',
-                  border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)',
-                  fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
-                  textTransform: 'uppercase', cursor: 'pointer',
-                  flex: isMobile ? 1 : 'none',
-                }}
-              >
-                Ya tengo cuenta
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Con sesión: calendario Cal.com ── */}
-        {user && (
-          <div style={{ border: '1px solid var(--line)', overflow: 'hidden', minHeight: 600 }}>
-            <Cal
-              namespace="45min"
-              calLink={calLinkWithParams}
-              config={{
-                name: user.name,
-                email: user.email,
-                theme: theme === 'dark' ? 'dark' : 'light',
+            <button
+              onClick={() => navigate('/')}
+              style={{
+                padding: '13px 26px', background: 'var(--type)', color: 'var(--bg)',
+                border: 0, borderRadius: 'var(--radius-pill)',
+                fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
+                textTransform: 'uppercase', cursor: 'pointer',
+                width: isMobile ? '100%' : 'auto',
               }}
-              style={{ width: '100%', height: '100%', minHeight: 600 }}
-            />
+            >
+              Ir a inicio
+            </button>
           </div>
+        ) : (
+          <CallScheduler
+            namespace="intro"
+            calLink={calLink}
+            metadata={{ callType: 'intro', serviceCode: code, service, userId: user?.id }}
+            attendee={user ? { name: user.name, email: user.email } : undefined}
+            theme={theme}
+            onBookingSuccess={handleBookingSuccess}
+          />
         )}
       </main>
 

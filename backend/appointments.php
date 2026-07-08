@@ -37,7 +37,21 @@ if ($method === 'GET') {
         ');
         $stmt->execute([(int)$auth['sub']]);
     }
-    jsonSuccess(['appointments' => $stmt->fetchAll()]);
+
+    $appointments = $stmt->fetchAll();
+    // scheduled_at se guarda en UTC (date.timezone del backend) pero MySQL lo
+    // devuelve como "Y-m-d H:i:s" sin indicar zona — new Date() en el navegador
+    // interpreta ese formato como hora LOCAL del visitante, no UTC, corriendo
+    // la hora mostrada por el offset de su zona (p. ej. +6h en CDMX). Marcarlo
+    // explícitamente como UTC aquí para que el frontend lo parsee bien.
+    foreach ($appointments as &$apt) {
+        if ($apt['scheduled_at']) {
+            $apt['scheduled_at'] = str_replace(' ', 'T', $apt['scheduled_at']) . 'Z';
+        }
+    }
+    unset($apt);
+
+    jsonSuccess(['appointments' => $appointments]);
 }
 
 // ── PATCH: actualizar cita ─────────────────────────────────────────────────
@@ -48,18 +62,42 @@ if ($method === 'PATCH') {
 
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
-    // ── Cliente agrega detalles del proyecto ───────────────────────────────
+    // ── Admin libera el formulario de proyecto ─────────────────────────────
+    if ($action === 'release_form') {
+        if ($auth['role'] !== 'administrador') jsonError('Acceso denegado', 403);
+
+        $stmt = $db->prepare('
+            SELECT a.*, COALESCE(u.name, a.attendee_email) AS user_name,
+                   COALESCE(u.email, a.attendee_email) AS user_email
+            FROM appointments a
+            LEFT JOIN users u ON u.id = a.user_id
+            WHERE a.id = ? AND a.call_type = \'intro\'
+        ');
+        $stmt->execute([$id]);
+        $appointment = $stmt->fetch();
+        if (!$appointment) jsonError('Cita no encontrada', 404);
+        if ($appointment['form_released']) jsonError('El formulario ya fue liberado');
+        if (!$appointment['user_email']) jsonError('La cita no tiene un correo asociado', 400);
+
+        $db->prepare('UPDATE appointments SET form_released = 1 WHERE id = ?')->execute([$id]);
+
+        notifyClientFormReleased($appointment);
+        jsonSuccess(['updated' => true]);
+    }
+
+    // ── Cliente agrega detalles del proyecto (una vez liberado el formulario) ──
     if ($action === 'details') {
         $details = trim($body['project_details'] ?? '');
         if ($details === '') jsonError('project_details no puede estar vacío');
 
-        $stmt = $db->prepare('SELECT user_id FROM appointments WHERE id = ?');
+        $stmt = $db->prepare("SELECT user_id, form_released FROM appointments WHERE id = ? AND call_type = 'intro'");
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         if (!$row) jsonError('Cita no encontrada', 404);
         if ((int)$row['user_id'] !== (int)$auth['sub']) jsonError('Acceso denegado', 403);
+        if (!$row['form_released']) jsonError('El formulario aún no está disponible', 403);
 
-        $db->prepare("UPDATE appointments SET project_details = ?, status = 'details_submitted' WHERE id = ?")
+        $db->prepare("UPDATE appointments SET project_details = ?, status = 'form_submitted' WHERE id = ?")
            ->execute([$details, $id]);
 
         notifyTeamProjectDetails($id, $details, $auth);
@@ -73,12 +111,12 @@ if ($method === 'PATCH') {
         $amount = $body['amount'] ?? null;
         if (!$amount || !is_numeric($amount) || $amount <= 0) jsonError('Monto inválido');
 
-        $stmt = $db->prepare('
+        $stmt = $db->prepare("
             SELECT a.*, u.name AS user_name, u.email AS user_email
             FROM appointments a
             JOIN users u ON u.id = a.user_id
-            WHERE a.id = ?
-        ');
+            WHERE a.id = ? AND a.call_type = 'intro'
+        ");
         $stmt->execute([$id]);
         $appointment = $stmt->fetch();
         if (!$appointment) jsonError('Cita no encontrada', 404);
@@ -94,12 +132,12 @@ if ($method === 'PATCH') {
     if ($action === 'complete') {
         if ($auth['role'] !== 'administrador') jsonError('Acceso denegado', 403);
 
-        $stmt = $db->prepare('
+        $stmt = $db->prepare("
             SELECT a.*, u.name AS user_name, u.email AS user_email
             FROM appointments a
             JOIN users u ON u.id = a.user_id
-            WHERE a.id = ?
-        ');
+            WHERE a.id = ? AND a.call_type = 'intro'
+        ");
         $stmt->execute([$id]);
         $appointment = $stmt->fetch();
         if (!$appointment) jsonError('Cita no encontrada', 404);
@@ -117,7 +155,7 @@ if ($method === 'PATCH') {
         $feedback = trim($body['feedback'] ?? '');
         if ($feedback === '') jsonError('feedback no puede estar vacío');
 
-        $stmt = $db->prepare('SELECT user_id, status FROM appointments WHERE id = ?');
+        $stmt = $db->prepare("SELECT user_id, status FROM appointments WHERE id = ? AND call_type = 'intro'");
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         if (!$row) jsonError('Cita no encontrada', 404);
@@ -154,11 +192,32 @@ function notifyTeamProjectDetails(int $appointmentId, string $details, array $au
     $html = renderEmailLayout(
         'Nuevo detalle de proyecto',
         $body,
-        ['label' => 'Ver panel', 'url' => ALLOWED_ORIGIN . '/panel'],
+        ['label' => 'Ver citas', 'url' => ALLOWED_ORIGIN . '/citas'],
         DEFAULT_EMAIL_ACCENT
     );
 
     sendMail($teamEmail, 'Nuevo detalle de proyecto — Kodeo', $html);
+}
+
+function notifyClientFormReleased(array $appointment): void {
+    $accent = SERVICE_ACCENTS[$appointment['service']] ?? DEFAULT_EMAIL_ACCENT;
+
+    $body = '
+        <p style="margin: 0 0 14px;">Hola ' . htmlspecialchars($appointment['user_name']) . ',</p>
+        <p style="margin: 0 0 14px;">Gracias por platicar con nosotros sobre tu proyecto de
+            <strong style="color:#ffffff;">' . htmlspecialchars($appointment['service'] ?? 'tu proyecto') . '</strong>.
+            El siguiente paso es contarnos los detalles a través de un breve formulario.</p>
+        <p style="margin: 0; color: #aaa; font-size: 13px;">Si aún no tienes cuenta, podrás crear una fácilmente al entrar.</p>
+    ';
+
+    $html = renderEmailLayout(
+        'Cuéntanos sobre tu proyecto',
+        $body,
+        ['label' => 'Ir al formulario', 'url' => ALLOWED_ORIGIN . '/citas'],
+        $accent
+    );
+
+    sendMail($appointment['user_email'], 'Cuéntanos sobre tu proyecto — Kodeo', $html);
 }
 
 function notifyClientPaymentReady(array $appointment, float $amount): void {
@@ -177,7 +236,7 @@ function notifyClientPaymentReady(array $appointment, float $amount): void {
     $html = renderEmailLayout(
         'Tu pago está listo',
         $body,
-        ['label' => 'Ir a pagar', 'url' => ALLOWED_ORIGIN . '/panel'],
+        ['label' => 'Ir a pagar', 'url' => ALLOWED_ORIGIN . '/citas'],
         $accent
     );
 
@@ -192,14 +251,14 @@ function notifyClientProjectComplete(array $appointment): void {
         <p style="margin: 0 0 14px;">¡Tu proyecto de <strong style="color:#ffffff;">'
             . htmlspecialchars($appointment['service']) . '</strong> ha sido completado!</p>
         <p style="margin: 0 0 14px;">Nos encantaría saber tu opinión sobre el proceso y el resultado.
-            Entra a tu panel y completa la breve encuesta — solo toma un momento.</p>
+            Entra a tus citas y completa la breve encuesta — solo toma un momento.</p>
         <p style="margin: 0; color: #aaa; font-size: 13px;">Tu retroalimentación nos ayuda a seguir mejorando.</p>
     ';
 
     $html = renderEmailLayout(
         '¡Tu proyecto está listo!',
         $body,
-        ['label' => 'Dejar mi opinión', 'url' => ALLOWED_ORIGIN . '/panel'],
+        ['label' => 'Dejar mi opinión', 'url' => ALLOWED_ORIGIN . '/citas'],
         $accent
     );
 
@@ -230,7 +289,7 @@ function notifyTeamFeedback(int $appointmentId, array $data, array $auth): void 
     $html = renderEmailLayout(
         'Nueva encuesta de satisfacción',
         $body,
-        ['label' => 'Ver panel', 'url' => ALLOWED_ORIGIN . '/panel'],
+        ['label' => 'Ver citas', 'url' => ALLOWED_ORIGIN . '/citas'],
         '#63C44D'
     );
 

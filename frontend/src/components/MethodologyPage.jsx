@@ -123,6 +123,7 @@ export default function MethodologyPage({ copy, motionSpeed = 1, onBack, onNavIt
                 style={{
                   padding: isMobile ? '28px 20px 32px' : '52px 44px',
                   border: '1px solid var(--line)',
+                  borderRadius: 'var(--radius-lg)',
                   position: 'relative',
                   overflow: 'hidden',
                   background: 'var(--bg)',

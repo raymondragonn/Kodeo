@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import PortalLayout from './PortalLayout';
+import RefreshButton from './RefreshButton';
 import { API_BASE_URL } from '../lib/api';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 
@@ -353,24 +354,28 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
             </p>
           </div>
 
-          {/* Botón crear administrador */}
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              background: '#5170ff', border: 'none', cursor: 'pointer',
-              color: '#fff', fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-              borderRadius: 'var(--radius-pill)', padding: '10px 20px',
-              transition: 'opacity .2s', flexShrink: 0,
-            }}
-            onMouseEnter={e => e.currentTarget.style.opacity = '.85'}
-            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Crear administrador
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+            <RefreshButton onClick={fetchUsers} loading={loading} />
+
+            {/* Botón crear administrador */}
+            <button
+              onClick={() => setShowCreate(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                background: '#5170ff', border: 'none', cursor: 'pointer',
+                color: '#fff', fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                borderRadius: 'var(--radius-pill)', padding: '10px 20px',
+                transition: 'opacity .2s', flexShrink: 0,
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '.85'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Crear administrador
+            </button>
+          </div>
         </div>
 
         {/* ── KPIs ── */}
@@ -390,8 +395,8 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
         {/* ── Panel de tabla ── */}
         <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
 
-          {/* Toolbar: filtros + actualizar */}
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', background: 'var(--bg-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          {/* Toolbar: filtros */}
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', background: 'var(--bg-2)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             {/* Filtros */}
             <div style={{ display: 'flex', gap: 3, background: 'var(--bg-3)', border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)', padding: 3 }}>
               {FILTERS.map(f => (
@@ -416,16 +421,6 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
                 </button>
               ))}
             </div>
-
-            {/* Actualizar */}
-            <button
-              onClick={fetchUsers}
-              style={{ background: 'none', border: '1px solid var(--line)', cursor: 'pointer', color: 'var(--type-muted)', fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', borderRadius: 'var(--radius-pill)', padding: '6px 14px', transition: 'border-color .2s, color .2s' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-muted)'; }}
-            >
-              Actualizar
-            </button>
           </div>
 
           {/* Lista */}

@@ -1,18 +1,30 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Nav from './Nav';
-import Footer from './Footer';
+import PortalLayout from './PortalLayout';
 import PageMeta from './PageMeta';
+import RefreshButton from './RefreshButton';
+import ViewModeSwitch from './ViewModeSwitch';
+import CallScheduler from './CallScheduler';
+import FormField from './ProjectDetailsField';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { API_BASE_URL as API } from '../lib/api';
+import { OPTION_LABELS, getFieldsForService, inputStyle } from '../data/projectFormFields';
+
+const CAL_LINK = import.meta.env.VITE_CAL_LINK || 'kodeo/consulta';
 
 const STATUS_LABELS = {
-  pending:            { label: 'Pendiente',          color: 'var(--type-muted)' },
-  confirmed:          { label: 'Confirmada',         color: '#63C44D' },
-  cancelled:          { label: 'Cancelada',          color: '#e05050' },
-  rescheduled:        { label: 'Reprogramada',       color: '#FFDE59' },
-  details_submitted:  { label: 'Listo para reunión', color: '#5170ff' },
-  completado:         { label: 'Completado',         color: '#63C44D' },
+  pending:        { label: 'Pendiente',        color: 'var(--type-muted)' },
+  confirmed:      { label: 'Confirmada',       color: '#63C44D' },
+  cancelled:      { label: 'Cancelada',        color: '#e05050' },
+  rescheduled:    { label: 'Reprogramada',     color: '#FFDE59' },
+  form_submitted: { label: 'Formulario enviado', color: '#5170ff' },
+  completado:     { label: 'Completado',       color: '#63C44D' },
+};
+
+const CALL_TYPE_LABELS = {
+  intro:         'Consulta inicial',
+  design_review: 'Revisión de diseño',
+  delivery:      'Entrega',
 };
 
 const SERVICE_BASE = { '01': 6500, '02': 10000, '03': 12000 };
@@ -23,129 +35,18 @@ const ACCENT = {
   '03': 'var(--accent-yellow)',
 };
 
-// ── Campos de detalles por servicio ───────────────────────────────────────
-
-const COMMON_FIELDS = [
-  {
-    key: 'business_name',
-    label: 'Nombre del negocio o marca',
-    type: 'text',
-    placeholder: 'Ej. Cafetería Luna',
-    required: true,
-  },
-  {
-    key: 'business_description',
-    label: '¿A qué se dedica tu negocio?',
-    type: 'textarea',
-    placeholder: 'Ej. Vendemos café de especialidad y pasteles artesanales en Veracruz.',
-    required: true,
-  },
-  {
-    key: 'has_domain',
-    label: '¿Ya tienes dominio y hosting?',
-    type: 'radio',
-    options: [
-      { value: 'yes',     label: 'Sí, ya tengo' },
-      { value: 'no',      label: 'No, necesito uno' },
-      { value: 'unknown', label: 'No sé qué es eso' },
-    ],
-    required: true,
-  },
-];
-
-const SERVICE_FIELDS = {
-  '01': [
-    {
-      key: 'goal',
-      label: '¿Cuál es el objetivo principal de la página?',
-      type: 'radio',
-      options: [
-        { value: 'leads',     label: 'Captar clientes / leads' },
-        { value: 'info',      label: 'Informar sobre mis servicios' },
-        { value: 'portfolio', label: 'Mostrar mi portafolio' },
-        { value: 'other',     label: 'Otro' },
-      ],
-      required: true,
-    },
-    {
-      key: 'reference_url',
-      label: '¿Hay algún sitio web que te guste como referencia? (opcional)',
-      type: 'text',
-      placeholder: 'https://ejemplo.com',
-      required: false,
-    },
-  ],
-  '02': [
-    {
-      key: 'page_count',
-      label: '¿Cuántas páginas o secciones necesitas aproximadamente?',
-      type: 'radio',
-      options: [
-        { value: '1-5',  label: '1 – 5 páginas' },
-        { value: '6-10', label: '6 – 10 páginas' },
-        { value: '10+',  label: 'Más de 10' },
-      ],
-      required: true,
-    },
-    {
-      key: 'needs_blog',
-      label: '¿Necesitas blog o sección de noticias?',
-      type: 'radio',
-      options: [
-        { value: 'yes', label: 'Sí' },
-        { value: 'no',  label: 'No' },
-      ],
-      required: true,
-    },
-    {
-      key: 'reference_url',
-      label: '¿Referencia de diseño? (opcional)',
-      type: 'text',
-      placeholder: 'https://ejemplo.com',
-      required: false,
-    },
-  ],
-  '03': [
-    {
-      key: 'product_type',
-      label: '¿Qué tipo de productos vas a vender?',
-      type: 'text',
-      placeholder: 'Ej. Ropa femenina, suplementos, artesanías…',
-      required: true,
-    },
-    {
-      key: 'product_count',
-      label: '¿Cuántos productos tienes aproximadamente?',
-      type: 'radio',
-      options: [
-        { value: '1-50',  label: 'Menos de 50' },
-        { value: '51-200', label: '50 – 200' },
-        { value: '200+',  label: 'Más de 200' },
-      ],
-      required: true,
-    },
-    {
-      key: 'has_payment',
-      label: '¿Ya tienes pasarela de pago (Stripe, PayPal, etc.)?',
-      type: 'radio',
-      options: [
-        { value: 'yes',     label: 'Sí' },
-        { value: 'no',      label: 'No' },
-        { value: 'unknown', label: 'No lo sé' },
-      ],
-      required: true,
-    },
-  ],
-};
-
-const OPTION_LABELS = {
-  has_domain:    { yes: 'Sí', no: 'No', unknown: 'No sabe' },
-  goal:          { leads: 'Captar leads', info: 'Informar servicios', portfolio: 'Portafolio', other: 'Otro' },
-  page_count:    { '1-5': '1–5 páginas', '6-10': '6–10 páginas', '10+': 'Más de 10' },
-  needs_blog:    { yes: 'Sí', no: 'No' },
-  product_count: { '1-50': 'Menos de 50', '51-200': '50–200', '200+': 'Más de 200' },
-  has_payment:   { yes: 'Sí', no: 'No', unknown: 'No lo sé' },
-};
+// Estado visible de un proyecto: superpone pago/formulario sobre el status
+// crudo de la fila para que el mosaico y la tabla no requieran abrir el
+// detalle para saber en qué paso va.
+function getStatusInfo(appointment) {
+  const isPaid      = !!appointment.stripe_payment_intent_id;
+  const isCompleted = appointment.status === 'completado';
+  if (isCompleted) return { label: 'Completado', color: '#63C44D' };
+  if (isPaid)      return { label: 'Pagado', color: '#63C44D' };
+  if (Number(appointment.payment_enabled) === 1) return { label: 'Pago habilitado', color: '#63C44D' };
+  if (appointment.form_released && !appointment.project_details) return { label: 'Formulario disponible', color: '#5170ff' };
+  return STATUS_LABELS[appointment.status] || { label: appointment.status, color: 'var(--type-muted)' };
+}
 
 // ── Preguntas de la encuesta ───────────────────────────────────────────────
 
@@ -192,8 +93,7 @@ const SURVEY_QUESTIONS = [
 // ── Página principal ───────────────────────────────────────────────────────
 
 export default function ClientDashboard({
-  user, copy, motionSpeed = 1, onBack, onNavItemClick, onContact,
-  onServiceClick, onAuthClick, onLogout, theme, onThemeToggle, onNavigate,
+  user, copy, onLogout, theme, onThemeToggle, onNavigate,
 }) {
   const navigate     = useNavigate();
   const location     = useLocation();
@@ -203,7 +103,11 @@ export default function ClientDashboard({
 
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
   const [error, setError]               = useState(null);
+  const [view, setView]                 = useState('grid');
+  const [appointmentsView, setAppointmentsView] = useState('mosaico'); // 'mosaico' | 'tabla'
+  const [selectedId, setSelectedId]     = useState(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -231,6 +135,13 @@ export default function ClientDashboard({
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
+      if (res.status === 401) {
+        // Sesión expirada o token de una clave de firma anterior — se cierra
+        // sesión en vez de dejar al usuario viendo el error crudo del backend.
+        onLogout();
+        navigate('/login');
+        return 0;
+      }
       if (data.error) throw new Error(data.error);
       const list = data.appointments || [];
       setAppointments(list);
@@ -246,104 +157,345 @@ export default function ClientDashboard({
   if (!user) return null;
 
   const isAdmin = user.role === 'administrador';
+  // Cada proyecto es una fila call_type='intro'; las llamadas de revisión de
+  // diseño y entrega son filas ligeras enlazadas por project_id, nunca se
+  // muestran como tarjetas propias.
+  const projects            = appointments.filter(a => a.call_type === 'intro');
+  const selectedAppointment = projects.find(a => a.id === selectedId) || null;
+
+  function handleSelect(appointment) {
+    setSelectedId(appointment.id);
+    setView('detail');
+  }
+
+  function handleBack() {
+    setView('grid');
+    setSelectedId(null);
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await fetchAppointments(true);
+    setRefreshing(false);
+  }
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', background: 'var(--bg)', color: 'var(--type)' }}>
+    <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
       <PageMeta
-        title="Panel | Kodeo"
+        title="Citas | Kodeo"
         description="Administra tus citas y proyectos con Kodeo."
-        path="/panel"
-      />
-      <Nav
-        copy={copy}
-        onLogoClick={onBack}
-        onNavItemClick={onNavItemClick}
-        onContact={onContact}
-        onServiceClick={onServiceClick}
-        onAuthClick={onAuthClick}
-        onLogout={onLogout}
-        user={user}
-        theme={theme}
-        onThemeToggle={onThemeToggle}
+        path="/citas"
       />
 
-      <main style={{ padding: isMobile ? '50px 20px 80px' : '80px 36px 120px', maxWidth: 860, margin: '0 auto' }}>
-        <p style={eyebrowStyle}>{isAdmin ? 'Admin · Todas las citas' : 'Mi panel'}</p>
-        <h1 style={{
-          fontFamily: 'var(--display)',
-          fontWeight: 400,
-          fontSize: isMobile ? 'clamp(34px, 9vw, 52px)' : 'clamp(40px, 5vw, 64px)',
-          lineHeight: 1,
-          letterSpacing: '-0.03em',
-          margin: '0 0 48px',
-          paddingBottom: '0.08em',
-        }}>
-          {isAdmin ? 'Citas' : 'Tu consulta'}
-        </h1>
+      <div style={{ maxWidth: 960, width: '100%', margin: '0 auto', padding: isMobile ? '32px 16px 60px' : '44px 28px 80px' }}>
+        {(isAdmin || view === 'grid') && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+              <div>
+                {isAdmin && (
+                  <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
+                    Panel de gestión
+                  </p>
+                )}
+                <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
+                  Citas
+                </h1>
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+                {!isAdmin && !loading && !error && projects.length > 0 && (
+                  <ViewModeSwitch
+                    value={appointmentsView}
+                    onChange={setAppointmentsView}
+                    options={[
+                      { id: 'mosaico', label: 'Mosaico', icon: 'grid' },
+                      { id: 'tabla',   label: 'Tabla',   icon: 'list' },
+                    ]}
+                  />
+                )}
+                <RefreshButton onClick={handleRefresh} loading={refreshing} />
+              </div>
+            </div>
+            <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
+              {isAdmin
+                ? 'Da seguimiento a las citas agendadas por tus clientes.'
+                : 'Selecciona una cita para ver los detalles del proyecto que compartiste al agendar.'}
+            </p>
+            {isAdmin && (
+              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '6px 0 0' }}>
+                {projects.length} cita{projects.length !== 1 ? 's' : ''} en total
+              </p>
+            )}
+          </div>
+        )}
+
+        {!isAdmin && view === 'detail' && selectedAppointment && (
+          <AppointmentDetailHeader appointment={selectedAppointment} onBack={handleBack} isMobile={isMobile} />
+        )}
 
         {loading && <p style={{ color: 'var(--type-muted)', fontFamily: 'var(--body)', fontSize: 14 }}>Cargando…</p>}
         {error   && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 14 }}>{error}</p>}
 
-        {!loading && !error && appointments.length === 0 && (
+        {!loading && !error && projects.length === 0 && (
           <EmptyState isAdmin={isAdmin} onNavigate={navigate} />
         )}
 
-        {!loading && !error && appointments.length > 0 && (
-          isAdmin
-            ? <AdminView appointments={appointments} token={token} onRefresh={fetchAppointments} isMobile={isMobile} />
-            : <ClientView
-                appointments={appointments}
-                token={token}
-                onDetailsSaved={(id) => setAppointments(prev =>
-                  prev.map(a => a.id === id ? { ...a, status: 'details_submitted' } : a)
-                )}
-                navigate={navigate}
-                isMobile={isMobile}
-              />
+        {!loading && !error && projects.length > 0 && (
+          isAdmin ? (
+            <AdminView projects={projects} allAppointments={appointments} token={token} onRefresh={fetchAppointments} isMobile={isMobile} theme={theme} />
+          ) : view === 'detail' && selectedAppointment ? (
+            <AppointmentClientCard
+              appointment={selectedAppointment}
+              calls={appointments.filter(a => a.project_id === selectedAppointment.id)}
+              token={token}
+              navigate={navigate}
+              onRefresh={fetchAppointments}
+              theme={theme}
+              user={user}
+            />
+          ) : appointmentsView === 'tabla' ? (
+            <AppointmentsTable appointments={projects} onSelect={handleSelect} isMobile={isMobile} />
+          ) : (
+            <AppointmentsGrid appointments={projects} onSelect={handleSelect} isMobile={isMobile} />
+          )
         )}
-      </main>
-
-      <Footer copy={copy} motionSpeed={motionSpeed} onNavigate={onNavigate} />
-    </div>
+      </div>
+    </PortalLayout>
   );
 }
 
-// ── Vista Cliente ──────────────────────────────────────────────────────────
+// ── Vista Cliente: mosaico de citas ─────────────────────────────────────────
 
-function ClientView({ appointments, token, onDetailsSaved, navigate, isMobile }) {
+function AppointmentsGrid({ appointments, onSelect, isMobile }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 48 }}>
-      {appointments.map((appointment, index) => (
-        <AppointmentClientCard
-          key={appointment.id}
-          appointment={appointment}
-          index={index}
-          total={appointments.length}
-          token={token}
-          onDetailsSaved={() => onDetailsSaved(appointment.id)}
-          navigate={navigate}
-          isMobile={isMobile}
-        />
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 14 }}>
+      {appointments.map(appointment => (
+        <AppointmentGridCard key={appointment.id} appointment={appointment} onSelect={onSelect} />
       ))}
     </div>
   );
 }
 
-function AppointmentClientCard({ appointment, index, total, token, onDetailsSaved, navigate, isMobile }) {
+function AppointmentGridCard({ appointment, onSelect }) {
+  const [hovered, setHovered] = useState(false);
+
+  const accent      = ACCENT[appointment.service_code] || ACCENT['01'];
+  const statusInfo  = getStatusInfo(appointment);
+  const scheduledDate = appointment.scheduled_at
+    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' })
+    : 'Sin fecha asignada';
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        border: `1px solid ${hovered ? 'var(--line-2)' : 'var(--line)'}`,
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        background: 'var(--bg-2)',
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'border-color .2s, transform .15s',
+        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+      }}
+    >
+      <div style={{ height: 4, background: statusInfo.color === '#63C44D' ? '#63C44D' : accent, flexShrink: 0 }} />
+
+      <div style={{ padding: '20px 20px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
+            {appointment.service || 'Cita'}
+          </span>
+          <span style={{
+            fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
+            color: statusInfo.color, border: `1px solid ${statusInfo.color}`,
+            borderRadius: 'var(--radius-pill)', padding: '3px 8px', flexShrink: 0,
+          }}>
+            {statusInfo.label}
+          </span>
+        </div>
+
+        <div style={{ flex: 1, minHeight: 52 }}>
+          <span style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', lineHeight: 1.25, display: 'block' }}>
+            {scheduledDate}
+          </span>
+        </div>
+
+        <button
+          onClick={() => onSelect(appointment)}
+          style={{
+            width: '100%', padding: '10px 14px',
+            border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)',
+            background: 'transparent', cursor: 'pointer',
+            fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
+            color: 'var(--type-soft)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            transition: 'border-color .2s, color .2s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = accent;
+            e.currentTarget.style.color = 'var(--type)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'var(--line)';
+            e.currentTarget.style.color = 'var(--type-soft)';
+          }}
+        >
+          <span>Ver detalles</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12" />
+            <polyline points="12 5 19 12 12 19" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Vista Cliente: tabla de citas ───────────────────────────────────────────
+
+const thStyle = {
+  textAlign: 'left', padding: '12px 16px', whiteSpace: 'nowrap',
+  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
+  color: 'var(--type-muted)',
+};
+
+const tdStyle = {
+  padding: '14px 16px', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)',
+};
+
+function AppointmentsTable({ appointments, onSelect, isMobile }) {
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 560 : 'auto' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-2)', borderBottom: '1px solid var(--line)' }}>
+              <th style={thStyle}>Servicio</th>
+              <th style={thStyle}>Estado</th>
+              <th style={thStyle}>Fecha y hora</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            {appointments.map(appointment => (
+              <AppointmentTableRow key={appointment.id} appointment={appointment} onSelect={onSelect} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function AppointmentTableRow({ appointment, onSelect }) {
+  const [hovered, setHovered] = useState(false);
+
+  const statusInfo  = getStatusInfo(appointment);
+  const scheduledDate = appointment.scheduled_at
+    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' })
+    : 'Sin fecha asignada';
+
+  return (
+    <tr
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ borderBottom: '1px solid var(--line)', background: hovered ? 'var(--bg-2)' : 'transparent', transition: 'background .15s' }}
+    >
+      <td style={tdStyle}>{appointment.service || 'Cita'}</td>
+      <td style={tdStyle}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
+          color: statusInfo.color, border: `1px solid ${statusInfo.color}`,
+          borderRadius: 'var(--radius-pill)', padding: '3px 8px',
+        }}>
+          {statusInfo.label}
+        </span>
+      </td>
+      <td style={tdStyle}>{scheduledDate}</td>
+      <td style={{ ...tdStyle, textAlign: 'right' }}>
+        <button
+          onClick={() => onSelect(appointment)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+            padding: '7px 14px', borderRadius: 'var(--radius-pill)',
+            border: '1px solid var(--line)', background: 'transparent', color: 'var(--type-soft)', cursor: 'pointer',
+            transition: 'border-color .2s, color .2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
+        >
+          Ver detalles
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+          </svg>
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+// ── Vista Cliente: encabezado de detalle ────────────────────────────────────
+
+function AppointmentDetailHeader({ appointment, onBack, isMobile }) {
+  const statusInfo  = getStatusInfo(appointment);
+  const scheduledDate = appointment.scheduled_at
+    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })
+    : null;
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <button
+        onClick={onBack}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase',
+          color: 'var(--type-muted)', background: 'none', border: 'none',
+          cursor: 'pointer', padding: '0 0 10px', transition: 'color .15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
+        onMouseLeave={e => e.currentTarget.style.color = 'var(--type-muted)'}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+        Citas
+      </button>
+
+      <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: statusInfo.color, margin: '0 0 4px' }}>
+        {statusInfo.label}
+      </p>
+      <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
+        {appointment.service || 'Cita'}
+      </h1>
+      {scheduledDate && (
+        <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '6px 0 0' }}>
+          {scheduledDate}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AppointmentClientCard({ appointment, calls, token, navigate, onRefresh, theme, user }) {
   const [feedbackSent, setFeedbackSent] = useState(false);
 
   const accent        = ACCENT[appointment.service_code] || ACCENT['01'];
-  const statusInfo    = STATUS_LABELS[appointment.status] || { label: appointment.status, color: 'var(--type-muted)' };
+  const statusInfo    = getStatusInfo(appointment);
   const scheduledDate = appointment.scheduled_at
-    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' })
+    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })
     : null;
 
-  const alreadySubmitted = appointment.status === 'details_submitted'
-    || appointment.status === 'completado'
-    || !!appointment.project_details;
   const isPaid       = !!appointment.stripe_payment_intent_id;
   const isCompleted  = appointment.status === 'completado';
   const hasFeedback  = !!appointment.feedback;
+
+  const needsForm               = !!appointment.form_released && !appointment.project_details;
+  const designReviewCall        = calls.find(c => c.call_type === 'design_review');
+  const canScheduleDesignReview = !!appointment.project_details && !designReviewCall;
 
   function handlePay() {
     navigate('/pago', {
@@ -356,21 +508,38 @@ function AppointmentClientCard({ appointment, index, total, token, onDetailsSave
     });
   }
 
+  async function handleDetailsSubmit(values) {
+    const res  = await fetch(`${API}/appointments.php?id=${appointment.id}&action=details`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ project_details: JSON.stringify(values) }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    onRefresh();
+  }
+
+  function handleDesignReviewBooked({ uid, startTime }) {
+    fetch(`${API}/confirm-appointment.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        uid, startTime, service: appointment.service, serviceCode: appointment.service_code,
+        call_type: 'design_review', project_id: appointment.id,
+      }),
+    }).catch(() => {
+      // El webhook de Cal.com es el respaldo si esto falla
+    }).finally(() => onRefresh());
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      {total > 1 && (
-        <p style={{ ...eyebrowStyle, margin: 0 }}>Cita {index + 1} de {total}</p>
-      )}
-
       {/* ── Datos de la cita ── */}
-      <div style={{ border: '1px solid var(--line)' }}>
+      <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
         <div style={{ height: 3, background: isPaid ? '#63C44D' : accent }} />
         <InfoRow label="Servicio">{appointment.service || '—'}</InfoRow>
         <InfoRow label="Estado">
-          {isPaid
-            ? <span style={{ color: statusInfo.color, fontWeight: 600 }}>{statusInfo.label}</span>
-            : <span style={{ color: statusInfo.color, fontWeight: 600 }}>{statusInfo.label}</span>
-          }
+          <span style={{ color: statusInfo.color, fontWeight: 600 }}>{statusInfo.label}</span>
         </InfoRow>
         {scheduledDate && <InfoRow label="Fecha y hora">{scheduledDate}</InfoRow>}
         {(appointment.payment_enabled == 1 || isPaid) && (
@@ -387,7 +556,7 @@ function AppointmentClientCard({ appointment, index, total, token, onDetailsSave
       {/* ── Banner de pago / completado ── */}
       {isPaid && (
         <div style={{
-          border: '1px solid #63C44D', padding: '20px 24px',
+          border: '1px solid #63C44D', borderRadius: 'var(--radius-lg)', padding: '20px 24px',
           display: 'flex', alignItems: 'center', gap: 16,
         }}>
           <span style={{ fontSize: 22, lineHeight: 1 }}>{isCompleted ? '★' : '✓'}</span>
@@ -406,7 +575,7 @@ function AppointmentClientCard({ appointment, index, total, token, onDetailsSave
 
       {!isPaid && appointment.payment_enabled == 1 && (
         <div style={{
-          border: `1px solid ${accent}`, padding: '20px 24px',
+          border: `1px solid ${accent}`, borderRadius: 'var(--radius-lg)', padding: '20px 24px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
         }}>
           <div>
@@ -431,25 +600,54 @@ function AppointmentClientCard({ appointment, index, total, token, onDetailsSave
         </div>
       )}
 
-      {/* ── Detalles del proyecto ── */}
-      <div>
-        <p style={eyebrowStyle}>Detalles del proyecto</p>
-        <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '0 0 28px', lineHeight: 1.6 }}>
-          {alreadySubmitted
-            ? 'Ya enviaste tus detalles. Nuestro equipo los revisará antes de la reunión.'
-            : 'Esta información nos ayuda a preparar una propuesta personalizada antes de tu llamada.'}
-        </p>
-        {alreadySubmitted
-          ? <SubmittedDetails project_details={appointment.project_details} serviceCode={appointment.service_code} />
-          : <ProjectForm
-              serviceCode={appointment.service_code}
-              appointmentId={appointment.id}
-              token={token}
-              onDetailsSaved={onDetailsSaved}
-              isMobile={isMobile}
-            />
-        }
-      </div>
+      {/* ── Formulario de proyecto (liberado tras la llamada inicial) ── */}
+      {needsForm && (
+        <div>
+          <p style={eyebrowStyle}>Cuéntanos sobre tu proyecto</p>
+          <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '0 0 24px', lineHeight: 1.6 }}>
+            El equipo ya revisó tu llamada inicial — completa este formulario para continuar
+            y poder agendar la revisión de diseño.
+          </p>
+          <ProjectIntakeForm serviceCode={appointment.service_code} onSubmit={handleDetailsSubmit} />
+        </div>
+      )}
+
+      {/* ── Detalles ya enviados (solo lectura) ── */}
+      {appointment.project_details && (
+        <div>
+          <p style={eyebrowStyle}>Detalles del proyecto</p>
+          <SubmittedDetails project_details={appointment.project_details} serviceCode={appointment.service_code} />
+        </div>
+      )}
+
+      {/* ── Agendar revisión de diseño ── */}
+      {canScheduleDesignReview && (
+        <div>
+          <p style={eyebrowStyle}>Agenda tu revisión de diseño</p>
+          <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '0 0 24px', lineHeight: 1.6 }}>
+            Elige el horario que más te acomode para mostrarte la propuesta de diseño.
+          </p>
+          <CallScheduler
+            namespace="design_review"
+            calLink={CAL_LINK}
+            metadata={{
+              callType: 'design_review', projectId: appointment.id, userId: user?.id,
+              serviceCode: appointment.service_code, service: appointment.service,
+            }}
+            attendee={{ name: user?.name, email: user?.email }}
+            theme={theme}
+            onBookingSuccess={handleDesignReviewBooked}
+          />
+        </div>
+      )}
+
+      {/* ── Llamadas del proyecto ── */}
+      {calls.length > 0 && (
+        <div>
+          <p style={eyebrowStyle}>Llamadas</p>
+          <CallsTimeline calls={calls} />
+        </div>
+      )}
 
       {/* ── Encuesta de satisfacción (solo cuando está completado) ── */}
       {isCompleted && (
@@ -457,7 +655,7 @@ function AppointmentClientCard({ appointment, index, total, token, onDetailsSave
           <p style={eyebrowStyle}>Tu opinión</p>
           {hasFeedback || feedbackSent ? (
             <div style={{
-              border: '1px solid #63C44D', padding: '28px 24px',
+              border: '1px solid #63C44D', borderRadius: 'var(--radius-lg)', padding: '28px 24px',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center',
             }}>
               <span style={{ fontSize: 28 }}>★</span>
@@ -482,6 +680,127 @@ function AppointmentClientCard({ appointment, index, total, token, onDetailsSave
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Formulario de detalles del proyecto (post-llamada inicial) ────────────
+
+function ProjectIntakeForm({ serviceCode, onSubmit }) {
+  const fields  = getFieldsForService(serviceCode);
+  const initial = Object.fromEntries(fields.map(f => [f.key, f.type === 'link-list' ? [] : '']));
+  const [form, setForm]     = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState(null);
+
+  function set(key, value) { setForm(prev => ({ ...prev, [key]: value })); }
+
+  const isComplete = fields
+    .filter(f => f.required)
+    .every(f => form[f.key]?.trim());
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!isComplete || saving) return;
+    // Los campos link-list llegan con filas vacías del propio input dinámico
+    // — se limpian antes de guardar para no persistir enlaces en blanco.
+    const cleaned = { ...form };
+    fields.forEach(f => {
+      if (f.type === 'link-list') {
+        cleaned[f.key] = (Array.isArray(form[f.key]) ? form[f.key] : [])
+          .map(s => s.trim())
+          .filter(Boolean);
+      }
+    });
+    setSaving(true); setError(null);
+    try {
+      await onSubmit(cleaned);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '32px 28px' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {fields.map(field => (
+          <FormField
+            key={field.key}
+            field={field}
+            value={form[field.key]}
+            onChange={v => set(field.key, v)}
+          />
+        ))}
+
+        {error && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 12, margin: 0 }}>{error}</p>}
+
+        <button
+          type="submit"
+          disabled={!isComplete || saving}
+          style={{
+            alignSelf: 'flex-start',
+            padding: '13px 28px',
+            background: isComplete ? 'var(--type)' : 'var(--bg-3)',
+            color: isComplete ? 'var(--bg)' : 'var(--type-muted)',
+            border: isComplete ? 0 : '1px solid var(--line)',
+            borderRadius: 'var(--radius-pill)',
+            fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+            cursor: (!isComplete || saving) ? 'not-allowed' : 'pointer',
+            transition: 'background 0.2s, color 0.2s',
+          }}
+        >
+          {saving ? 'Enviando…' : 'Enviar →'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ── Bitácora de llamadas del proyecto ──────────────────────────────────────
+
+function CallsTimeline({ calls }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      {calls.map((call, i) => {
+        const date = call.scheduled_at
+          ? new Date(call.scheduled_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' })
+          : 'Sin fecha';
+        const info = STATUS_LABELS[call.status] || { label: call.status, color: 'var(--type-muted)' };
+        return (
+          <div
+            key={call.id}
+            style={{
+              padding: '14px 20px', borderTop: i === 0 ? 'none' : '1px solid var(--line)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', margin: '0 0 2px' }}>
+                {CALL_TYPE_LABELS[call.call_type] || call.call_type}
+              </p>
+              <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: 0 }}>{date}</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{
+                fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
+                color: info.color, border: `1px solid ${info.color}`, borderRadius: 'var(--radius-pill)', padding: '3px 8px',
+              }}>
+                {info.label}
+              </span>
+              {call.video_url && (
+                <a
+                  href={call.video_url} target="_blank" rel="noopener noreferrer"
+                  style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--type-soft)' }}
+                >
+                  Unirse →
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -644,171 +963,19 @@ function SurveyForm({ appointmentId, token, onSubmitted }) {
   );
 }
 
-// ── Formulario de detalles del proyecto ───────────────────────────────────
-
-function ProjectForm({ serviceCode, appointmentId, token, onDetailsSaved, isMobile }) {
-  const fields = [...COMMON_FIELDS, ...(SERVICE_FIELDS[serviceCode] || SERVICE_FIELDS['01'])];
-
-  const initial = Object.fromEntries(fields.map(f => [f.key, '']));
-  const [form, setForm]           = useState(initial);
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
-  const [saveError, setSaveError] = useState(null);
-
-  function set(key, value) {
-    setForm(prev => ({ ...prev, [key]: value }));
-    setSaved(false);
-  }
-
-  const isComplete = fields
-    .filter(f => f.required)
-    .every(f => form[f.key]?.trim());
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!isComplete) return;
-    setSaving(true); setSaveError(null);
-    try {
-      const res = await fetch(`${API}/appointments.php?id=${appointmentId}&action=details`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ project_details: JSON.stringify(form) }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setSaved(true);
-      onDetailsSaved();
-    } catch (e) {
-      setSaveError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {fields.map(field => (
-        <FormField
-          key={field.key}
-          field={field}
-          value={form[field.key]}
-          onChange={v => set(field.key, v)}
-          isMobile={isMobile}
-        />
-      ))}
-
-      {saveError && (
-        <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 12, margin: 0 }}>{saveError}</p>
-      )}
-
-      <button
-        type="submit"
-        disabled={saving || !isComplete}
-        style={{
-          alignSelf: 'flex-start',
-          padding: '13px 28px',
-          background: isComplete ? 'var(--type)' : 'var(--bg-3)',
-          color: isComplete ? 'var(--bg)' : 'var(--type-muted)',
-          border: isComplete ? 0 : '1px solid var(--line)',
-          borderRadius: 'var(--radius-pill)',
-          fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-          cursor: (saving || !isComplete) ? 'not-allowed' : 'pointer',
-          transition: 'background 0.2s, color 0.2s',
-        }}
-      >
-        {saving ? 'Enviando…' : saved ? 'Enviado ✓' : 'Enviar detalles →'}
-      </button>
-    </form>
-  );
-}
-
-function FormField({ field, value, onChange }) {
-  const labelEl = (
-    <label style={{
-      fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em',
-      textTransform: 'uppercase', color: 'var(--type-soft)',
-      display: 'block', marginBottom: field.type === 'radio' ? 12 : 8,
-    }}>
-      {field.label}
-      {field.required && <span style={{ color: '#e05050', marginLeft: 4 }}>*</span>}
-    </label>
-  );
-
-  if (field.type === 'text') {
-    return (
-      <div>
-        {labelEl}
-        <input
-          type="text"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={field.placeholder}
-          style={inputStyle}
-          onFocus={e => e.target.style.borderColor = 'var(--line-2)'}
-          onBlur={e => e.target.style.borderColor = 'var(--line)'}
-        />
-      </div>
-    );
-  }
-
-  if (field.type === 'textarea') {
-    return (
-      <div>
-        {labelEl}
-        <textarea
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={field.placeholder}
-          rows={3}
-          style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
-          onFocus={e => e.target.style.borderColor = 'var(--line-2)'}
-          onBlur={e => e.target.style.borderColor = 'var(--line)'}
-        />
-      </div>
-    );
-  }
-
-  if (field.type === 'radio') {
-    return (
-      <div>
-        {labelEl}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {field.options.map(opt => {
-            const selected = value === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onChange(opt.value)}
-                style={{
-                  padding: '9px 18px',
-                  background: selected ? 'var(--type)' : 'transparent',
-                  color: selected ? 'var(--bg)' : 'var(--type-soft)',
-                  border: selected ? '1px solid var(--type)' : '1px solid var(--line)',
-                  borderRadius: 'var(--radius-pill)',
-                  fontFamily: 'var(--body)', fontSize: 13,
-                  cursor: 'pointer',
-                  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-                  letterSpacing: 0, textTransform: 'none',
-                }}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
-
-// ── Detalles ya enviados ───────────────────────────────────────────────────
+// ── Detalles ya enviados (solo lectura) ────────────────────────────────────
 
 function SubmittedDetails({ project_details, serviceCode }) {
   let parsed = null;
   try { parsed = project_details ? JSON.parse(project_details) : null; } catch { parsed = null; }
+
+  if (!project_details) {
+    return (
+      <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', lineHeight: 1.6 }}>
+        No se registraron detalles del proyecto para esta cita.
+      </p>
+    );
+  }
 
   if (!parsed) {
     return (
@@ -818,15 +985,15 @@ function SubmittedDetails({ project_details, serviceCode }) {
     );
   }
 
-  const fields = [...COMMON_FIELDS, ...(SERVICE_FIELDS[serviceCode] || SERVICE_FIELDS['01'])];
+  const fields = getFieldsForService(serviceCode);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid var(--line)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       {fields.map((field, i) => {
         const val = parsed[field.key];
-        if (!val) return null;
+        const isEmpty = Array.isArray(val) ? val.length === 0 : !val;
+        if (isEmpty) return null;
         const optLabels = OPTION_LABELS[field.key];
-        const display = optLabels ? (optLabels[val] || val) : val;
         return (
           <div
             key={field.key}
@@ -836,12 +1003,25 @@ function SubmittedDetails({ project_details, serviceCode }) {
               display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16,
             }}
           >
-            <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: '#d0d0d0', flexShrink: 0, paddingTop: 2 }}>
+            <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-muted)', flexShrink: 0, paddingTop: 2 }}>
               {field.label.replace(' (opcional)', '')}
             </span>
-            <span style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', textAlign: 'right', lineHeight: 1.5 }}>
-              {display}
-            </span>
+            {field.type === 'link-list' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                {/* Citas guardadas antes de este campo tener soporte para varios enlaces
+                    guardaron reference_url como texto plano, no arreglo */}
+                {(Array.isArray(val) ? val : [val]).map((url, idx) => (
+                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer"
+                     style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', textAlign: 'right', lineHeight: 1.5, wordBreak: 'break-all' }}>
+                    {url}
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <span style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', textAlign: 'right', lineHeight: 1.5 }}>
+                {optLabels ? (optLabels[val] || val) : val}
+              </span>
+            )}
           </div>
         );
       })}
@@ -851,23 +1031,25 @@ function SubmittedDetails({ project_details, serviceCode }) {
 
 // ── Vista Admin ────────────────────────────────────────────────────────────
 
-function AdminView({ appointments, token, onRefresh, isMobile }) {
+function AdminView({ projects, allAppointments, token, onRefresh, isMobile, theme }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {appointments.map(apt => (
+      {projects.map(apt => (
         <AppointmentAdminCard
           key={apt.id}
           appointment={apt}
+          calls={allAppointments.filter(a => a.project_id === apt.id)}
           token={token}
           onRefresh={onRefresh}
           isMobile={isMobile}
+          theme={theme}
         />
       ))}
     </div>
   );
 }
 
-function AppointmentAdminCard({ appointment, token, onRefresh, isMobile }) {
+function AppointmentAdminCard({ appointment, calls, token, onRefresh, isMobile, theme }) {
   const [open, setOpen]               = useState(false);
   const [amount, setAmount]           = useState(
     appointment.amount ? String(parseFloat(appointment.amount)) : String(SERVICE_BASE[appointment.service_code] || '')
@@ -877,26 +1059,62 @@ function AppointmentAdminCard({ appointment, token, onRefresh, isMobile }) {
   const [enableError, setEnableError] = useState(null);
   const [completing, setCompleting]   = useState(false);
   const [completeError, setCompleteError] = useState(null);
+  const [releasingForm, setReleasingForm] = useState(false);
+  const [formReleased, setFormReleased]   = useState(!!appointment.form_released);
+  const [releaseError, setReleaseError]   = useState(null);
+  const [showDeliveryScheduler, setShowDeliveryScheduler] = useState(false);
 
   const accent      = ACCENT[appointment.service_code] || ACCENT['01'];
   const isPaid      = !!appointment.stripe_payment_intent_id;
   const isCompleted = appointment.status === 'completado';
+  const deliveryCall = calls.find(c => c.call_type === 'delivery');
 
-  const statusInfo = isCompleted
-    ? { label: 'Completado', color: '#63C44D' }
-    : isPaid
-      ? { label: 'Pagado', color: '#63C44D' }
-      : STATUS_LABELS[appointment.status] || { label: appointment.status, color: 'var(--type-muted)' };
+  const statusInfo = getStatusInfo(appointment);
 
   const scheduledDate = appointment.scheduled_at
-    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' })
+    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })
     : 'Sin fecha';
 
   let parsedDetails = null;
   try { parsedDetails = appointment.project_details ? JSON.parse(appointment.project_details) : null; } catch { parsedDetails = null; }
 
   const serviceCode  = appointment.service_code;
-  const detailFields = [...COMMON_FIELDS, ...(SERVICE_FIELDS[serviceCode] || SERVICE_FIELDS['01'])];
+  const detailFields = getFieldsForService(serviceCode);
+
+  async function handleReleaseForm() {
+    setReleasingForm(true); setReleaseError(null);
+    try {
+      const res  = await fetch(`${API}/appointments.php?id=${appointment.id}&action=release_form`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setFormReleased(true);
+      onRefresh();
+    } catch (e) {
+      setReleaseError(e.message);
+    } finally {
+      setReleasingForm(false);
+    }
+  }
+
+  function handleDeliveryBooked({ uid, startTime }) {
+    fetch(`${API}/confirm-appointment.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        uid, startTime, service: appointment.service, serviceCode: appointment.service_code,
+        call_type: 'delivery', project_id: appointment.id,
+      }),
+    }).catch(() => {
+      // El webhook de Cal.com es el respaldo si esto falla
+    }).finally(() => {
+      setShowDeliveryScheduler(false);
+      onRefresh();
+    });
+  }
 
   async function handleEnablePayment() {
     const parsed = parseFloat(amount);
@@ -938,7 +1156,7 @@ function AppointmentAdminCard({ appointment, token, onRefresh, isMobile }) {
   }
 
   return (
-    <div style={{ border: '1px solid var(--line)' }}>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <div style={{ height: 3, background: isCompleted ? '#63C44D' : isPaid ? '#63C44D' : accent }} />
 
       {/* ── Encabezado colapsable ── */}
@@ -969,6 +1187,7 @@ function AppointmentAdminCard({ appointment, token, onRefresh, isMobile }) {
           <span style={{
             fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase',
             color: statusInfo.color, border: `1px solid ${statusInfo.color}`,
+            borderRadius: 'var(--radius-pill)',
             padding: '3px 8px',
           }}>
             {statusInfo.label}
@@ -992,34 +1211,71 @@ function AppointmentAdminCard({ appointment, token, onRefresh, isMobile }) {
             <DetailLine label="Fecha" value={scheduledDate} />
           </div>
 
-          {/* Detalles del proyecto */}
-          {parsedDetails && (
+          {/* Llamadas del proyecto (revisión de diseño / entrega) */}
+          {calls.length > 0 && (
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <p style={{ ...detailLabelStyle, marginBottom: 12 }}>Detalles del proyecto</p>
+              <p style={{ ...detailLabelStyle, marginBottom: 12 }}>Llamadas</p>
+              <CallsTimeline calls={calls} />
+            </div>
+          )}
+
+          {/* Formulario de proyecto */}
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+            <p style={{ ...detailLabelStyle, marginBottom: 12 }}>Formulario de proyecto</p>
+            {parsedDetails ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {detailFields.map(field => {
                   const val = parsedDetails[field.key];
-                  if (!val) return null;
+                  const isEmpty = Array.isArray(val) ? val.length === 0 : !val;
+                  if (isEmpty) return null;
                   const optLabels = OPTION_LABELS[field.key];
-                  const display = optLabels ? (optLabels[val] || val) : val;
                   return (
-                    <p key={field.key} style={{ margin: 0, fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', lineHeight: 1.5 }}>
+                    <div key={field.key} style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', lineHeight: 1.5 }}>
                       <span style={detailLabelStyle}>{field.label.replace(' (opcional)', '')}: </span>
-                      {display}
-                    </p>
+                      {field.type === 'link-list' ? (
+                        <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, verticalAlign: 'top' }}>
+                          {(Array.isArray(val) ? val : [val]).map((url, idx) => (
+                            <a key={idx} href={url} target="_blank" rel="noopener noreferrer"
+                               style={{ color: 'var(--type-soft)', fontSize: 13, wordBreak: 'break-all' }}>
+                              {url}
+                            </a>
+                          ))}
+                        </span>
+                      ) : (
+                        optLabels ? (optLabels[val] || val) : val
+                      )}
+                    </div>
                   );
                 })}
               </div>
-            </div>
-          )}
-          {appointment.project_details && !parsedDetails && (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <p style={{ ...detailLabelStyle, marginBottom: 8 }}>Detalles del proyecto</p>
+            ) : appointment.project_details ? (
               <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
                 {appointment.project_details}
               </p>
-            </div>
-          )}
+            ) : formReleased ? (
+              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: 0 }}>
+                Formulario liberado — esperando respuesta del cliente.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleReleaseForm}
+                  disabled={releasingForm}
+                  style={{
+                    padding: '11px 22px',
+                    background: accent, color: 'var(--bg)',
+                    border: 0, borderRadius: 'var(--radius-pill)',
+                    fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                    cursor: releasingForm ? 'not-allowed' : 'pointer',
+                    opacity: releasingForm ? 0.6 : 1,
+                  }}
+                >
+                  {releasingForm ? 'Liberando…' : 'Liberar formulario'}
+                </button>
+                {releaseError && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 12, margin: 0 }}>{releaseError}</p>}
+              </div>
+            )}
+          </div>
 
           {/* Encuesta del cliente (si ya la respondió) */}
           {appointment.feedback && (
@@ -1048,7 +1304,7 @@ function AppointmentAdminCard({ appointment, token, onRefresh, isMobile }) {
                   step="1"
                   style={{
                     padding: '10px 12px', width: 160, boxSizing: 'border-box',
-                    background: 'var(--bg)', border: '1px solid var(--line)',
+                    background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius)',
                     fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)', outline: 'none',
                   }}
                 />
@@ -1076,6 +1332,51 @@ function AppointmentAdminCard({ appointment, token, onRefresh, isMobile }) {
                   style: 'currency', currency: 'MXN', minimumFractionDigits: 0, maximumFractionDigits: 0,
                 })}
               </p>
+            </div>
+          )}
+
+          {/* Agendar entrega — solo una vez pagado */}
+          {isPaid && !isCompleted && (
+            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+              <p style={{ ...detailLabelStyle, marginBottom: 12 }}>Entrega</p>
+              {deliveryCall ? (
+                <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0 }}>
+                  Entrega agendada — {deliveryCall.scheduled_at
+                    ? new Date(deliveryCall.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })
+                    : 'sin fecha'}
+                </p>
+              ) : showDeliveryScheduler ? (
+                <CallScheduler
+                  namespace="delivery"
+                  calLink={CAL_LINK}
+                  metadata={{
+                    callType: 'delivery', projectId: appointment.id, userId: appointment.user_id,
+                    serviceCode: appointment.service_code, service: appointment.service,
+                  }}
+                  attendee={{ name: appointment.user_name, email: appointment.user_email }}
+                  theme={theme}
+                  onBookingSuccess={handleDeliveryBooked}
+                  style={{ minHeight: 500 }}
+                />
+              ) : (
+                <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '0 0 12px', lineHeight: 1.6 }}>
+                  Una vez confirmado el día y la hora por WhatsApp con el cliente, agenda aquí la llamada de entrega.
+                </p>
+              )}
+              {!deliveryCall && !showDeliveryScheduler && (
+                <button
+                  onClick={() => setShowDeliveryScheduler(true)}
+                  style={{
+                    padding: '11px 22px',
+                    background: 'transparent', color: 'var(--type)',
+                    border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)',
+                    fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Agendar entrega
+                </button>
+              )}
             </div>
           )}
 
@@ -1118,7 +1419,7 @@ function AppointmentAdminCard({ appointment, token, onRefresh, isMobile }) {
 
 function AdminFeedbackView({ feedback }) {
   let data = null;
-  try { data = JSON.parse(feedback); } catch { data = null; }
+  try { data = JSON.parse(feedback); } catch { /* data ya es null */ }
   if (!data) return <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0 }}>{feedback}</p>;
 
   const recommendLabels = { yes: 'Sí, sin duda', maybe: 'Tal vez', no: 'No por ahora' };
@@ -1182,7 +1483,7 @@ function RatingDots({ value }) {
 
 function EmptyState({ isAdmin, onNavigate }) {
   return (
-    <div style={{ border: '1px solid var(--line)', padding: '40px 28px', textAlign: 'center' }}>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '40px 28px', textAlign: 'center' }}>
       <p style={{ fontFamily: 'var(--body)', fontSize: 15, color: 'var(--type-soft)', margin: '0 0 20px' }}>
         {isAdmin ? 'No hay citas registradas aún.' : 'Aún no tienes ninguna cita agendada.'}
       </p>
@@ -1236,15 +1537,5 @@ const eyebrowStyle = {
 
 const detailLabelStyle = {
   fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.16em',
-  textTransform: 'uppercase', color: '#d0d0d0',
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: '12px 14px',
-  background: 'var(--bg-2)',
-  border: '1px solid var(--line)',
-  fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)',
-  outline: 'none', boxSizing: 'border-box',
-  transition: 'border-color 0.2s',
+  textTransform: 'uppercase', color: 'var(--type-muted)',
 };

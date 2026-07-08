@@ -11,7 +11,7 @@ googleProvider.addScope('email');
 
 export default function RegisterPage({ copy, onNavigate }) {
   const location      = useLocation();
-  const redirectTo    = location.state?.from ?? '/panel';
+  const redirectTo    = location.state?.from ?? '/citas';
   const redirectState = location.state?.returnState ?? undefined;
   const [name, setName]         = useState('');
   const [username, setUsername] = useState('');

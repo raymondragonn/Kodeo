@@ -100,7 +100,7 @@ export default function StackPage({ copy, motionSpeed = 1, onBack, onNavItemClic
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
             border: '1px solid var(--line)',
-            borderRadius: isMobile ? 'var(--radius)' : 'var(--radius-lg)',
+            borderRadius: 'var(--radius-lg)',
             overflow: 'hidden',
           }}
         >

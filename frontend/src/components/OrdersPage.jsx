@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import PortalLayout from './PortalLayout';
+import RefreshButton from './RefreshButton';
 import { formatDMY } from '../utils/deliveryDate';
 import { API_BASE_URL as API } from '../lib/api';
 
@@ -839,6 +840,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
   const isMobile = useIsMobile();
   const [orders, setOrders]               = useState([]);
   const [loading, setLoading]             = useState(true);
+  const [refreshing, setRefreshing]       = useState(false);
   const [error, setError]                 = useState('');
   const [saveError, setSaveError]         = useState('');
   const [view, setView]                   = useState('list');
@@ -848,13 +850,27 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
   const [sort, setSort]                   = useState('newest');
   const isAdmin = user?.role === 'administrador';
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    fetch(`${API}/orders.php`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(d => { setOrders(d.orders ?? []); setLoading(false); })
-      .catch(() => { setError('No se pudieron cargar los pedidos'); setLoading(false); });
+  const fetchOrders = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res   = await fetch(`${API}/orders.php`, { headers: { Authorization: `Bearer ${token}` } });
+      const d     = await res.json();
+      setOrders(d.orders ?? []);
+      setError('');
+    } catch {
+      setError('No se pudieron cargar los pedidos');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOrders();
+  }, [fetchOrders]);
 
   const applyFilters = (list) => list.filter(o => {
     if (statusFilter !== 'todos' && o.status !== statusFilter) return false;
@@ -921,11 +937,13 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
         {/* Page header */}
         <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
-              {isAdmin ? 'Panel de gestión' : user?.username}
-            </p>
+            {isAdmin && (
+              <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
+                Panel de gestión
+              </p>
+            )}
             <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-              {isAdmin ? 'Todos los pedidos' : 'Mis pedidos'}
+              {isAdmin ? 'Todos los pedidos' : 'Pedidos'}
             </h1>
             {isAdmin && (
               <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '6px 0 0' }}>
@@ -933,21 +951,24 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
               </p>
             )}
           </div>
-          {/* View switcher */}
-          {!loading && !error && orders.length > 0 && (
-            <div style={{ display: 'flex', gap: 4, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: 4, flexShrink: 0 }}>
-              {[
-                { id: 'list',     label: 'Lista'      },
-                { id: 'kanban',   label: 'Kanban'     },
-                { id: 'calendar', label: 'Calendario' },
-              ].map(v => (
-                <button key={v.id} className="kd-btn" onClick={() => setView(v.id)} style={viewBtnStyle(v.id)} title={v.label} aria-label={v.label} aria-pressed={view === v.id}>
-                  <ViewIcon type={v.id} active={view === v.id}/>
-                  <span className="kd-view-label">{v.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+            {/* View switcher */}
+            {!loading && !error && orders.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: 4, flexShrink: 0 }}>
+                {[
+                  { id: 'list',     label: 'Lista'      },
+                  { id: 'kanban',   label: 'Kanban'     },
+                  { id: 'calendar', label: 'Calendario' },
+                ].map(v => (
+                  <button key={v.id} className="kd-btn" onClick={() => setView(v.id)} style={viewBtnStyle(v.id)} title={v.label} aria-label={v.label} aria-pressed={view === v.id}>
+                    <ViewIcon type={v.id} active={view === v.id}/>
+                    <span className="kd-view-label">{v.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <RefreshButton onClick={() => fetchOrders(true)} loading={refreshing} />
+          </div>
         </div>
 
         {loading && (

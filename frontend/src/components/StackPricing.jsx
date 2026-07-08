@@ -88,6 +88,8 @@ export default function StackPricing({ copy, motionSpeed = 1, onServiceClick }) 
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
           borderLeft: isMobile ? 'none' : '1px solid var(--line)',
+          borderRadius: isMobile ? 0 : 'var(--radius-lg)',
+          overflow: isMobile ? 'visible' : 'hidden',
           gap: isMobile ? 16 : 0,
           marginBottom: isMobile ? 48 : 80,
         }}
@@ -191,9 +193,10 @@ function PricingCard({ svc, accent, ctaLabel, maxIncludes, motionSpeed, isMobile
 
   return (
     <div style={{
-      borderRight: '1px solid var(--line)',
-      borderTop: '1px solid var(--line)',
-      borderBottom: '1px solid var(--line)',
+      ...(isMobile
+        ? { border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)' }
+        : { borderRight: '1px solid var(--line)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }),
+      overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
     }}>

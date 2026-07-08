@@ -51,13 +51,15 @@ function PortalSidebar({ user, onNavigate, onLogout }) {
 
   const links = isAdmin ? [
     { label: 'Pedidos',    href: '/pedidos'    },
+    { label: 'Citas',      href: '/citas'      },
     { label: 'Analíticas', href: '/analiticas' },
     { label: 'Usuarios',   href: '/usuarios'   },
-    { label: 'Mi cuenta',  href: '/cuenta'     },
+    { label: 'Cuenta',     href: '/cuenta'     },
   ] : [
-    { label: 'Mis pedidos',  href: '/pedidos'    },
-    { label: 'Mis analíticas', href: '/analiticas' },
-    { label: 'Mi cuenta',    href: '/cuenta'     },
+    { label: 'Pedidos',    href: '/pedidos'    },
+    { label: 'Citas',      href: '/citas'      },
+    { label: 'Analíticas', href: '/analiticas' },
+    { label: 'Cuenta',     href: '/cuenta'     },
   ];
 
   return (
@@ -175,6 +177,15 @@ function IconPerson() {
   );
 }
 
+function IconCalendar() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="16" rx="2"/>
+      <path d="M3 10h18M8 3v4M16 3v4"/>
+    </svg>
+  );
+}
+
 const BOTTOM_NAV_H = 64;
 
 function MobileBottomNav({ user, onNavigate }) {
@@ -182,14 +193,16 @@ function MobileBottomNav({ user, onNavigate }) {
   const isAdmin = user?.role === 'administrador';
 
   const tabs = isAdmin ? [
-    { label: 'Pedidos',    href: '/pedidos',    Icon: IconOrders },
-    { label: 'Analíticas', href: '/analiticas', Icon: IconChart  },
-    { label: 'Usuarios',   href: '/usuarios',   Icon: IconUsers  },
-    { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson },
+    { label: 'Pedidos',    href: '/pedidos',    Icon: IconOrders    },
+    { label: 'Citas',      href: '/citas',      Icon: IconCalendar  },
+    { label: 'Analíticas', href: '/analiticas', Icon: IconChart     },
+    { label: 'Usuarios',   href: '/usuarios',   Icon: IconUsers     },
+    { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson    },
   ] : [
-    { label: 'Pedidos',    href: '/pedidos',    Icon: IconOrders },
-    { label: 'Analíticas', href: '/analiticas', Icon: IconChart  },
-    { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson },
+    { label: 'Pedidos',    href: '/pedidos',    Icon: IconOrders    },
+    { label: 'Citas',      href: '/citas',      Icon: IconCalendar  },
+    { label: 'Analíticas', href: '/analiticas', Icon: IconChart     },
+    { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson    },
   ];
 
   return (

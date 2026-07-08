@@ -19,7 +19,7 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
   const location     = useLocation();
 
   // Si venimos de /agendar (o cualquier otra ruta protegida), volvemos ahí después del login
-  const redirectTo    = location.state?.from ?? '/panel';
+  const redirectTo    = location.state?.from ?? '/citas';
   const redirectState = location.state?.returnState ?? undefined;
 
   useEffect(() => {

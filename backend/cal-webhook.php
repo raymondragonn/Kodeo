@@ -62,8 +62,12 @@ function handleBookingCreated(array $payload): void {
     $uid           = $payload['uid'] ?? null;
     $startTime     = $payload['startTime'] ?? null;
     $metadata      = $payload['metadata'] ?? [];
-    $serviceCode   = $metadata['serviceCode'] ?? null;
-    $service       = $metadata['service'] ?? null;
+    // Cal.com puede truncar/descartar la metadata en bookings con payloads muy
+    // grandes — normalizar a null en vez de string vacío para que el COALESCE
+    // del UPDATE no lo confunda con un valor real y borre el servicio ya
+    // guardado por confirm-appointment.php.
+    $serviceCode   = trim($metadata['serviceCode'] ?? '') ?: null;
+    $service       = trim($metadata['service'] ?? '') ?: null;
     $attendees     = $payload['attendees'] ?? [];
     $attendee      = $attendees[0] ?? [];
     $attendeeEmail = $attendee['email'] ?? null;
@@ -71,12 +75,60 @@ function handleBookingCreated(array $payload): void {
     $whatsapp      = trim($responses['attendeePhoneNumber']['value'] ?? '');
     $videoUrl      = $payload['videoCallUrl'] ?? null;
 
+    // callType distingue las 3 llamadas del proyecto (consulta inicial,
+    // revisión de diseño, entrega) — viaja en la metadata del booking.
+    $callType = trim($metadata['callType'] ?? '') ?: 'intro';
+    if (!in_array($callType, ['intro', 'design_review', 'delivery'], true)) $callType = 'intro';
+    $projectId = isset($metadata['projectId']) ? (int)$metadata['projectId'] : null;
+
     if (!$uid) {
         error_log("[CAL] BOOKING_CREATED sin uid — payload: " . json_encode($payload));
         return;
     }
 
-    // Intentar resolver el user_id: primero por metadata, luego por email
+    $scheduledAt = $startTime ? date('Y-m-d H:i:s', strtotime($startTime)) : null;
+
+    // ── Revisión de diseño / entrega: fila ligera enlazada al proyecto ya
+    // existente. El formulario, el pago y el feedback siempre viven en la
+    // fila raíz ("intro"); estas filas solo registran la llamada en sí.
+    if ($callType !== 'intro') {
+        if (!$projectId) {
+            error_log("[CAL] BOOKING_CREATED de tipo $callType sin projectId — payload: " . json_encode($payload));
+            return;
+        }
+
+        $userId = isset($metadata['userId']) ? (int)$metadata['userId'] : null;
+        if (!$userId) {
+            $row = getDb()->prepare('SELECT user_id FROM appointments WHERE id = ?');
+            $row->execute([$projectId]);
+            $found  = $row->fetch();
+            $userId = $found ? (int)$found['user_id'] : null;
+        }
+
+        try {
+            getDb()->prepare('
+                INSERT INTO appointments (user_id, project_id, attendee_email, whatsapp, cal_booking_uid, service, service_code, call_type, scheduled_at, status, video_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, \'confirmed\', ?)
+                ON DUPLICATE KEY UPDATE
+                    user_id      = COALESCE(user_id, VALUES(user_id)),
+                    project_id   = COALESCE(project_id, VALUES(project_id)),
+                    scheduled_at = COALESCE(VALUES(scheduled_at), scheduled_at),
+                    video_url    = COALESCE(VALUES(video_url), video_url)
+            ')->execute([$userId ?: null, $projectId, $attendeeEmail, $whatsapp ?: null, $uid, $service, $serviceCode, $callType, $scheduledAt, $videoUrl]);
+
+            notifyTeamNewBooking($service, $scheduledAt, $attendee);
+            if ($attendeeEmail) notifyGuestBookingConfirmed($payload);
+        } catch (\PDOException $e) {
+            error_log('[CAL] Error al insertar llamada de proyecto: ' . $e->getMessage());
+        }
+        return;
+    }
+
+    // ── Consulta inicial: crea o actualiza la fila raíz del proyecto. Puede
+    // llegar sin cuenta asociada (agendada como invitado, sin login) — se
+    // vincula por email cuando el cliente cree su cuenta (ver GET en
+    // appointments.php). El formulario de detalles ya no viaja aquí: se
+    // llena después, desde el portal, una vez que el admin lo libera.
     $userId = isset($metadata['userId']) ? (int)$metadata['userId'] : null;
     if (!$userId && $attendeeEmail) {
         $row = getDb()->prepare('SELECT id FROM users WHERE email = ?');
@@ -84,23 +136,19 @@ function handleBookingCreated(array $payload): void {
         $found  = $row->fetch();
         $userId = $found ? (int)$found['id'] : null;
     }
-    // Si no hay usuario aún, se guarda null — se asociará cuando el usuario cree su cuenta
-
-    $scheduledAt = $startTime ? date('Y-m-d H:i:s', strtotime($startTime)) : null;
 
     try {
         getDb()->prepare('
-            INSERT INTO appointments (user_id, attendee_email, whatsapp, cal_booking_uid, service, service_code, scheduled_at, status, video_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, \'confirmed\', ?)
+            INSERT INTO appointments (user_id, attendee_email, whatsapp, cal_booking_uid, service, service_code, call_type, scheduled_at, status, video_url)
+            VALUES (?, ?, ?, ?, ?, ?, \'intro\', ?, \'confirmed\', ?)
             ON DUPLICATE KEY UPDATE
                 user_id        = COALESCE(user_id, VALUES(user_id)),
-                attendee_email = VALUES(attendee_email),
-                whatsapp       = VALUES(whatsapp),
-                service        = VALUES(service),
-                service_code   = VALUES(service_code),
-                scheduled_at   = VALUES(scheduled_at),
-                status         = \'confirmed\',
-                video_url      = VALUES(video_url)
+                attendee_email = COALESCE(VALUES(attendee_email), attendee_email),
+                whatsapp       = COALESCE(VALUES(whatsapp), whatsapp),
+                service        = COALESCE(VALUES(service), service),
+                service_code   = COALESCE(VALUES(service_code), service_code),
+                scheduled_at   = COALESCE(VALUES(scheduled_at), scheduled_at),
+                video_url      = COALESCE(VALUES(video_url), video_url)
         ')->execute([$userId ?: null, $attendeeEmail, $whatsapp ?: null, $uid, $service, $serviceCode, $scheduledAt, $videoUrl]);
 
         notifyTeamNewBooking($service, $scheduledAt, $attendee);
@@ -344,7 +392,7 @@ function notifyTeamNewBooking(?string $service, ?string $scheduledAt, array $att
     $html = renderEmailLayout(
         'Nueva consulta agendada',
         $body,
-        ['label' => 'Ver panel', 'url' => ALLOWED_ORIGIN . '/panel'],
+        ['label' => 'Ver citas', 'url' => ALLOWED_ORIGIN . '/citas'],
         DEFAULT_EMAIL_ACCENT
     );
 

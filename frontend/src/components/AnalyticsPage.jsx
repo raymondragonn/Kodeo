@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import PortalLayout from './PortalLayout';
+import RefreshButton from './RefreshButton';
+import ViewModeSwitch from './ViewModeSwitch';
 import { API_BASE_URL } from '../lib/api';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 
@@ -197,6 +199,97 @@ function ProjectCard({ project, label, isConfigured, onView, onSaveLabel }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ── Tabla de proyectos ────────────────────────────────────────────────────────
+
+const thStyle = {
+  textAlign: 'left', padding: '12px 16px', whiteSpace: 'nowrap',
+  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
+  color: 'var(--type-muted)',
+};
+
+const tdStyle = {
+  padding: '14px 16px', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)',
+};
+
+function ProjectsTable({ projects, getLabel, meta, onView, isMobile }) {
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 520 : 'auto' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-2)', borderBottom: '1px solid var(--line)' }}>
+              <th style={thStyle}>Servicio</th>
+              <th style={thStyle}>Etiqueta</th>
+              <th style={thStyle}>Estado</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map(project => (
+              <ProjectsTableRow
+                key={project.id}
+                project={project}
+                label={getLabel(project)}
+                isConfigured={meta.configured[project.id] ?? false}
+                onView={onView}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ProjectsTableRow({ project, label, isConfigured, onView }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <tr
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ borderBottom: '1px solid var(--line)', background: hovered ? 'var(--bg-2)' : 'transparent', transition: 'background .15s' }}
+    >
+      <td style={tdStyle}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: project.accent, flexShrink: 0 }} />
+          {project.serviceType}
+        </span>
+      </td>
+      <td style={{ ...tdStyle, fontFamily: 'var(--display)', fontSize: 15, letterSpacing: '-0.01em' }}>{label}</td>
+      <td style={tdStyle}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
+          color: isConfigured ? '#16a34a' : 'var(--type-muted)',
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: isConfigured ? '#16a34a' : 'var(--line-2)' }} />
+          {isConfigured ? 'Configurado' : 'En configuración'}
+        </span>
+      </td>
+      <td style={{ ...tdStyle, textAlign: 'right' }}>
+        <button
+          onClick={() => onView(project)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+            padding: '7px 14px', borderRadius: 'var(--radius-pill)',
+            border: '1px solid var(--line)', background: 'transparent', color: 'var(--type-soft)', cursor: 'pointer',
+            transition: 'border-color .2s, color .2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = project.accent; e.currentTarget.style.color = 'var(--type)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
+        >
+          Ver analíticas
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+          </svg>
+        </button>
+      </td>
+    </tr>
   );
 }
 
@@ -632,9 +725,11 @@ function Pending({ projectLabel }) {
 export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme, onThemeToggle }) {
   // Vista: 'grid' = mosaico de proyectos | 'detail' = dashboard de analíticas
   const [view,          setView]         = useState('grid');
+  const [projectsView,  setProjectsView] = useState('mosaico'); // 'mosaico' | 'tabla'
   const [projects,      setProjects]     = useState([]);
   const [meta,          setMeta]         = useState({ labels: {}, configured: {} });
   const [loadingMeta,   setLoadingMeta]  = useState(() => !!localStorage.getItem('token'));
+  const [refreshingMeta, setRefreshingMeta] = useState(false);
   const [selectedId,    setSelectedId]   = useState(null);
   const [period,        setPeriod]       = useState('7daysAgo');
   const [analyticsData, setAnalytics]    = useState(null);
@@ -646,37 +741,49 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
   const [exportLoading, setExportLoading] = useState(false);
   const { isMobile } = useBreakpoint();
 
-  // Cargar proyectos + etiquetas al montar
-  useEffect(() => {
+  // Cargar proyectos + etiquetas
+  const loadProjects = useCallback(async (isRefresh = false) => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    Promise.all([
-      fetch(`${API_BASE_URL}/orders.php`,                { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      fetch(`${API_BASE_URL}/analytics.php?action=meta`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-    ])
-      .then(([ordersJson, metaJson]) => {
-        // orders.php ya filtra por user_id en el backend para clientes;
-        // para admins devuelve todos, por eso usamos user.id para quedarnos
-        // solo con los pedidos del propio usuario autenticado.
-        const userId = String(user?.id ?? '');
-        const userOrders = (ordersJson.orders ?? []).filter(
-          o => o.status !== 'cancelado' && (!userId || String(o.user_id) === userId),
-        );
-        const orderCards = userOrders.map(o => ({
-          id:          String(o.id),
-          serviceType: o.service,
-          accent:      SERVICE_ACCENT[o.service] ?? '#5170ff',
-        }));
+    if (isRefresh) setRefreshingMeta(true);
+    else setLoadingMeta(true);
 
-        const isAdmin = user?.role === 'administrador';
-        const base = isAdmin ? [{ id: 'kodeo', serviceType: 'Plataforma propia', accent: '#5170ff' }] : [];
-        setProjects([...base, ...orderCards]);
-        setMeta({ labels: metaJson.labels ?? {}, configured: metaJson.configured ?? {} });
-      })
-      .catch(() => {})
-      .finally(() => setLoadingMeta(false));
+    try {
+      const [ordersJson, metaJson] = await Promise.all([
+        fetch(`${API_BASE_URL}/orders.php`,                { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+        fetch(`${API_BASE_URL}/analytics.php?action=meta`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      ]);
+
+      // orders.php ya filtra por user_id en el backend para clientes;
+      // para admins devuelve todos, por eso usamos user.id para quedarnos
+      // solo con los pedidos del propio usuario autenticado.
+      const userId = String(user?.id ?? '');
+      const userOrders = (ordersJson.orders ?? []).filter(
+        o => o.status !== 'cancelado' && (!userId || String(o.user_id) === userId),
+      );
+      const orderCards = userOrders.map(o => ({
+        id:          String(o.id),
+        serviceType: o.service,
+        accent:      SERVICE_ACCENT[o.service] ?? '#5170ff',
+      }));
+
+      const isAdmin = user?.role === 'administrador';
+      const base = isAdmin ? [{ id: 'kodeo', serviceType: 'Plataforma propia', accent: '#5170ff' }] : [];
+      setProjects([...base, ...orderCards]);
+      setMeta({ labels: metaJson.labels ?? {}, configured: metaJson.configured ?? {} });
+    } catch {
+      // Se ignora — el mosaico simplemente conserva los datos anteriores
+    } finally {
+      setLoadingMeta(false);
+      setRefreshingMeta(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadProjects();
+  }, [user, loadProjects]);
 
   // Cargar datos de analíticas
   const loadAnalytics = useCallback(async (proj, p, isRefresh = false) => {
@@ -865,7 +972,6 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
     <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
       <style>{`
         @keyframes kd-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-        @keyframes kd-spin   { to{transform:rotate(360deg)} }
       `}</style>
       <div style={{ maxWidth: 960, width: '100%', margin: '0 auto', padding: isMobile ? '32px 16px 60px' : '44px 28px 80px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
@@ -875,16 +981,31 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
         {view === 'grid' && (
           <>
             {/* Header */}
-            <div>
-              <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 34, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-                Mis analíticas
-              </h1>
-              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
-                Selecciona un proyecto para ver sus analíticas. Haz clic en el nombre para añadir o editar una etiqueta.
-              </p>
+            <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+              <div>
+                <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 34, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
+                  Analíticas
+                </h1>
+                <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
+                  Selecciona un proyecto para ver sus analíticas. Haz clic en el nombre para añadir o editar una etiqueta.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+                {!loadingMeta && projects.length > 0 && (
+                  <ViewModeSwitch
+                    value={projectsView}
+                    onChange={setProjectsView}
+                    options={[
+                      { id: 'mosaico', label: 'Mosaico', icon: 'grid' },
+                      { id: 'tabla',   label: 'Tabla',   icon: 'list' },
+                    ]}
+                  />
+                )}
+                <RefreshButton onClick={() => loadProjects(true)} loading={refreshingMeta} />
+              </div>
             </div>
 
-            {/* Mosaico de tarjetas */}
+            {/* Mosaico / tabla de proyectos */}
             {loadingMeta ? (
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 14 }}>
                 {[1, 2, 3].map(i => (
@@ -909,6 +1030,14 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                   Ver servicios →
                 </button>
               </div>
+            ) : projectsView === 'tabla' ? (
+              <ProjectsTable
+                projects={projects}
+                getLabel={getLabel}
+                meta={meta}
+                onView={handleView}
+                isMobile={isMobile}
+              />
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 14 }}>
                 {projects.map(project => (
@@ -950,7 +1079,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                     <line x1="19" y1="12" x2="5" y2="12" />
                     <polyline points="12 19 5 12 12 5" />
                   </svg>
-                  Mis analíticas
+                  Analíticas
                 </button>
 
                 {selectedProject && (
@@ -995,27 +1124,10 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                 )}
 
                 {/* Botón actualizar */}
-                <button
-                  onClick={() => { if (!refreshing && !loading) loadAnalytics(selectedId, period, true); }}
-                  disabled={loading || refreshing}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
-                    padding: '8px 16px', borderRadius: 'var(--radius-pill)',
-                    border: '1px solid var(--line)', background: 'var(--bg-2)',
-                    color: 'var(--type-soft)', cursor: loading || refreshing ? 'not-allowed' : 'pointer',
-                    opacity: loading ? 0.5 : 1, transition: 'border-color .2s, color .2s',
-                  }}
-                  onMouseEnter={e => { if (!loading && !refreshing) { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                    style={{ animation: refreshing ? 'kd-spin .8s linear infinite' : 'none' }}>
-                    <polyline points="23 4 23 10 17 10" />
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                  </svg>
-                  {refreshing ? 'Actualizando...' : 'Actualizar'}
-                </button>
+                <RefreshButton
+                  onClick={() => loadAnalytics(selectedId, period, true)}
+                  loading={loading || refreshing}
+                />
 
                 {/* Selector de período */}
                 <div style={{ display: 'flex', gap: 3, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)', padding: 3 }}>
