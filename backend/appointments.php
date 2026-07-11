@@ -13,6 +13,10 @@ $db     = getDb();
 
 // ── GET: listar citas ──────────────────────────────────────────────────────
 if ($method === 'GET') {
+    // Citas de panel vencidas: se eliminan automáticamente al pasar su fecha
+    // (scheduled_at se guarda en UTC y el contenedor corre en UTC)
+    $db->exec("DELETE FROM appointments WHERE call_type = 'panel' AND scheduled_at IS NOT NULL AND scheduled_at < NOW()");
+
     // Auto-asociar citas que llegaron por webhook antes de que el usuario tuviera cuenta
     $db->prepare('
         UPDATE appointments SET user_id = ? WHERE user_id IS NULL AND attendee_email = ?
@@ -54,6 +58,30 @@ if ($method === 'GET') {
     jsonSuccess(['appointments' => $appointments]);
 }
 
+// ── POST: registrar cita agendada desde el panel (confirmada por WhatsApp) ──
+if ($method === 'POST') {
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    $service = trim($body['service'] ?? '');
+    $reason  = trim($body['reason'] ?? '');
+    $tipo    = ($body['tipo'] ?? '') === 'existente' ? 'existente' : 'nuevo';
+    $when    = trim($body['scheduled_at'] ?? '');
+
+    if ($service === '') jsonError('El proyecto o producto es requerido');
+    if ($reason === '')  jsonError('El motivo es requerido');
+
+    try { $dt = new DateTime($when); } catch (Exception $e) { jsonError('Fecha inválida'); }
+    $dt->setTimezone(new DateTimeZone('UTC'));
+    if ($dt <= new DateTime('now', new DateTimeZone('UTC'))) jsonError('La fecha de la cita debe ser futura');
+
+    $db->prepare("
+        INSERT INTO appointments (user_id, attendee_email, service, service_code, call_type, scheduled_at, status, project_details)
+        VALUES (?, ?, ?, ?, 'panel', ?, 'pending', ?)
+    ")->execute([(int)$auth['sub'], $auth['email'], $service, $tipo, $dt->format('Y-m-d H:i:s'), $reason]);
+
+    jsonSuccess(['created' => true, 'id' => (int)$db->lastInsertId()]);
+}
+
 // ── PATCH: actualizar cita ─────────────────────────────────────────────────
 if ($method === 'PATCH') {
     $id     = (int) ($_GET['id'] ?? 0);
@@ -61,6 +89,33 @@ if ($method === 'PATCH') {
     if (!$id) jsonError('ID requerido');
 
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    // ── Admin cambia el horario de una cita de panel ───────────────────────
+    if ($action === 'reschedule') {
+        if ($auth['role'] !== 'administrador') jsonError('Acceso denegado', 403);
+
+        $when = trim($body['scheduled_at'] ?? '');
+        if (!$when) jsonError('scheduled_at requerido');
+        try { $dt = new DateTime($when); } catch (Exception $e) { jsonError('Fecha inválida'); }
+        $dt->setTimezone(new DateTimeZone('UTC'));
+
+        $stmt = $db->prepare("
+            SELECT a.*, COALESCE(u.name, a.attendee_email) AS user_name,
+                   COALESCE(u.email, a.attendee_email) AS user_email
+            FROM appointments a
+            LEFT JOIN users u ON u.id = a.user_id
+            WHERE a.id = ? AND a.call_type = 'panel'
+        ");
+        $stmt->execute([$id]);
+        $appointment = $stmt->fetch();
+        if (!$appointment) jsonError('Cita no encontrada', 404);
+
+        $db->prepare("UPDATE appointments SET scheduled_at = ?, status = 'rescheduled' WHERE id = ?")
+           ->execute([$dt->format('Y-m-d H:i:s'), $id]);
+
+        notifyClientRescheduled($appointment, $dt);
+        jsonSuccess(['updated' => true]);
+    }
 
     // ── Admin libera el formulario de proyecto ─────────────────────────────
     if ($action === 'release_form') {
@@ -175,6 +230,31 @@ if ($method === 'PATCH') {
 jsonError('Método no permitido', 405);
 
 // ── Helpers de notificación ────────────────────────────────────────────────
+
+function notifyClientRescheduled(array $appointment, DateTime $utc): void {
+    if (empty($appointment['user_email'])) return;
+
+    $mx = clone $utc;
+    $mx->setTimezone(new DateTimeZone('America/Mexico_City'));
+    $fecha = $mx->format('d/m/Y') . ' a las ' . $mx->format('g:i A') . ' (hora del centro de México)';
+
+    $body = '
+        <p style="margin: 0 0 14px;">Hola ' . htmlspecialchars($appointment['user_name']) . ',</p>
+        <p style="margin: 0 0 14px;">Tu cita sobre <strong style="color:#ffffff;">'
+            . htmlspecialchars($appointment['service'] ?? 'tu proyecto') . '</strong> cambió de horario.</p>
+        <p style="margin: 0 0 4px; font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: bold; color: #ffffff;">'
+            . htmlspecialchars($fecha) . '</p>
+    ';
+
+    $html = renderEmailLayout(
+        'Tu cita fue reprogramada',
+        $body,
+        ['label' => 'Ver mis citas', 'url' => ALLOWED_ORIGIN . '/citas'],
+        DEFAULT_EMAIL_ACCENT
+    );
+
+    sendMail($appointment['user_email'], 'Tu cita fue reprogramada — Kodeo', $html);
+}
 
 function notifyTeamProjectDetails(int $appointmentId, string $details, array $auth): void {
     $teamEmail = SMTP_FROM_EMAIL;

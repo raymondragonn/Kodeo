@@ -18,8 +18,10 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
   const appleLoaded  = useRef(false);
   const location     = useLocation();
 
-  // Si venimos de /agendar (o cualquier otra ruta protegida), volvemos ahí después del login
-  const redirectTo    = location.state?.from ?? '/citas';
+  // Si venimos de /agendar, /pago/orden/:token o cualquier ruta protegida, volvemos ahí
+  // después del login. kodeo_redirect respalda el destino si el state se pierde
+  // (p. ej. el usuario recarga /login o llega desde el flujo de registro).
+  const redirectTo    = location.state?.from ?? localStorage.getItem('kodeo_redirect') ?? '/citas';
   const redirectState = location.state?.returnState ?? undefined;
 
   useEffect(() => {
@@ -86,6 +88,7 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
       if (!res.ok) { setError(data.error ?? 'Error de autenticación'); return; }
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.removeItem('kodeo_redirect');
       onLoginSuccess?.(data.user);
       onNavigate?.(redirectTo, redirectState ? { state: redirectState } : undefined);
     } catch {
@@ -215,6 +218,7 @@ export default function LoginPage({ copy, theme, onNavigate, onLoginSuccess }) {
               if (!res.ok) { setError(data.error ?? 'Error al iniciar sesión'); return; }
               localStorage.setItem('token', data.token);
               localStorage.setItem('user', JSON.stringify(data.user));
+              localStorage.removeItem('kodeo_redirect');
               onLoginSuccess?.(data.user);
               onNavigate?.(redirectTo, redirectState ? { state: redirectState } : undefined);
             } catch {

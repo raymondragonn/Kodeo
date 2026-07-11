@@ -50,13 +50,13 @@ function PortalSidebar({ user, onNavigate, onLogout }) {
   const isAdmin = user?.role === 'administrador';
 
   const links = isAdmin ? [
-    { label: 'Pedidos',    href: '/pedidos'    },
+    { label: 'Proyectos',  href: '/proyectos'  },
     { label: 'Citas',      href: '/citas'      },
     { label: 'Analíticas', href: '/analiticas' },
     { label: 'Usuarios',   href: '/usuarios'   },
     { label: 'Cuenta',     href: '/cuenta'     },
   ] : [
-    { label: 'Pedidos',    href: '/pedidos'    },
+    { label: 'Proyectos',  href: '/proyectos'  },
     { label: 'Citas',      href: '/citas'      },
     { label: 'Analíticas', href: '/analiticas' },
     { label: 'Cuenta',     href: '/cuenta'     },
@@ -193,13 +193,13 @@ function MobileBottomNav({ user, onNavigate }) {
   const isAdmin = user?.role === 'administrador';
 
   const tabs = isAdmin ? [
-    { label: 'Pedidos',    href: '/pedidos',    Icon: IconOrders    },
+    { label: 'Proyectos',  href: '/proyectos',  Icon: IconOrders    },
     { label: 'Citas',      href: '/citas',      Icon: IconCalendar  },
     { label: 'Analíticas', href: '/analiticas', Icon: IconChart     },
     { label: 'Usuarios',   href: '/usuarios',   Icon: IconUsers     },
     { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson    },
   ] : [
-    { label: 'Pedidos',    href: '/pedidos',    Icon: IconOrders    },
+    { label: 'Proyectos',  href: '/proyectos',  Icon: IconOrders    },
     { label: 'Citas',      href: '/citas',      Icon: IconCalendar  },
     { label: 'Analíticas', href: '/analiticas', Icon: IconChart     },
     { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson    },

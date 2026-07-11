@@ -1,24 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PortalLayout from './PortalLayout';
 import PageMeta from './PageMeta';
 import RefreshButton from './RefreshButton';
-import ViewModeSwitch from './ViewModeSwitch';
-import CallScheduler from './CallScheduler';
-import FormField from './ProjectDetailsField';
+import BookingCalendar from './BookingCalendar';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { API_BASE_URL as API } from '../lib/api';
-import { OPTION_LABELS, getFieldsForService, inputStyle } from '../data/projectFormFields';
+import { inputStyle } from '../data/projectFormFields';
 
-const CAL_LINK = import.meta.env.VITE_CAL_LINK || 'kodeo/consulta';
+// WhatsApp de Kodeo al que llega la solicitud de cita (mismo número que /agendar)
+const WA_PHONE = '522298483706';
 
 const STATUS_LABELS = {
-  pending:        { label: 'Pendiente',        color: 'var(--type-muted)' },
-  confirmed:      { label: 'Confirmada',       color: '#63C44D' },
-  cancelled:      { label: 'Cancelada',        color: '#e05050' },
-  rescheduled:    { label: 'Reprogramada',     color: '#FFDE59' },
-  form_submitted: { label: 'Formulario enviado', color: '#5170ff' },
-  completado:     { label: 'Completado',       color: '#63C44D' },
+  pending:        { label: 'Pendiente',    color: 'var(--type-muted)' },
+  confirmed:      { label: 'Confirmada',   color: '#63C44D' },
+  cancelled:      { label: 'Cancelada',    color: '#e05050' },
+  rescheduled:    { label: 'Reprogramada', color: '#FFDE59' },
+  form_submitted: { label: 'Confirmada',   color: '#63C44D' },
+  completado:     { label: 'Completada',   color: '#63C44D' },
 };
 
 const CALL_TYPE_LABELS = {
@@ -27,7 +26,12 @@ const CALL_TYPE_LABELS = {
   delivery:      'Entrega',
 };
 
-const SERVICE_BASE = { '01': 6500, '02': 10000, '03': 12000 };
+const CALL_TYPE_COLORS = {
+  intro:         'var(--accent-green)',
+  design_review: 'var(--accent-yellow)',
+  delivery:      '#63C44D',
+  panel:         'var(--accent-blue)',
+};
 
 const ACCENT = {
   '01': 'var(--accent-green)',
@@ -35,60 +39,27 @@ const ACCENT = {
   '03': 'var(--accent-yellow)',
 };
 
-// Estado visible de un proyecto: superpone pago/formulario sobre el status
-// crudo de la fila para que el mosaico y la tabla no requieran abrir el
-// detalle para saber en qué paso va.
-function getStatusInfo(appointment) {
-  const isPaid      = !!appointment.stripe_payment_intent_id;
-  const isCompleted = appointment.status === 'completado';
-  if (isCompleted) return { label: 'Completado', color: '#63C44D' };
-  if (isPaid)      return { label: 'Pagado', color: '#63C44D' };
-  if (Number(appointment.payment_enabled) === 1) return { label: 'Pago habilitado', color: '#63C44D' };
-  if (appointment.form_released && !appointment.project_details) return { label: 'Formulario disponible', color: '#5170ff' };
-  return STATUS_LABELS[appointment.status] || { label: appointment.status, color: 'var(--type-muted)' };
+const MX_TZ = 'America/Mexico_City';
+
+// Clave YYYY-MM-DD de una cita en horario del centro de México
+function citaDayKey(dateStr) {
+  return new Date(dateStr).toLocaleDateString('en-CA', { timeZone: MX_TZ });
 }
 
-// ── Preguntas de la encuesta ───────────────────────────────────────────────
+function citaTime(dateStr) {
+  return new Date(dateStr).toLocaleTimeString('es-MX', {
+    hour: 'numeric', minute: '2-digit', hour12: true, timeZone: MX_TZ,
+  });
+}
 
-const SURVEY_QUESTIONS = [
-  {
-    key: 'satisfaction',
-    label: '¿Qué tan satisfecho estás con el resultado?',
-    type: 'rating',
-    required: true,
-  },
-  {
-    key: 'communication',
-    label: '¿Cómo calificarías la comunicación durante el proyecto?',
-    type: 'rating',
-    required: true,
-  },
-  {
-    key: 'highlight',
-    label: '¿Qué fue lo que más te gustó?',
-    type: 'textarea',
-    placeholder: 'El diseño, los tiempos, la atención…',
-    required: true,
-  },
-  {
-    key: 'improve',
-    label: '¿Qué podríamos haber hecho mejor? (opcional)',
-    type: 'textarea',
-    placeholder: 'Tu opinión nos ayuda a mejorar…',
-    required: false,
-  },
-  {
-    key: 'recommend',
-    label: '¿Recomendarías Kodeo?',
-    type: 'radio',
-    options: [
-      { value: 'yes',   label: 'Sí, sin duda' },
-      { value: 'maybe', label: 'Tal vez' },
-      { value: 'no',    label: 'No por ahora' },
-    ],
-    required: true,
-  },
-];
+// Etiqueta del asunto de la cita: para citas de panel, el tipo elegido;
+// para las llamadas del flujo Cal.com, el tipo de llamada
+function citaTipoLabel(cita) {
+  if (cita.call_type === 'panel') {
+    return cita.service_code === 'existente' ? 'Proyecto existente' : 'Proyecto nuevo';
+  }
+  return CALL_TYPE_LABELS[cita.call_type] || 'Cita';
+}
 
 // ── Página principal ───────────────────────────────────────────────────────
 
@@ -105,9 +76,7 @@ export default function ClientDashboard({
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
   const [error, setError]               = useState(null);
-  const [view, setView]                 = useState('grid');
-  const [appointmentsView, setAppointmentsView] = useState('mosaico'); // 'mosaico' | 'tabla'
-  const [selectedId, setSelectedId]     = useState(null);
+  const [view, setView]                 = useState('calendar'); // 'calendar' | 'book'
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -125,7 +94,7 @@ export default function ClientDashboard({
       }
     });
     return () => clearInterval(pollRef.current);
-  }, [user]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Devuelve el número de citas para el polling. silent=true evita el spinner.
   async function fetchAppointments(silent = false) {
@@ -157,21 +126,12 @@ export default function ClientDashboard({
   if (!user) return null;
 
   const isAdmin = user.role === 'administrador';
-  // Cada proyecto es una fila call_type='intro'; las llamadas de revisión de
-  // diseño y entrega son filas ligeras enlazadas por project_id, nunca se
-  // muestran como tarjetas propias.
-  const projects            = appointments.filter(a => a.call_type === 'intro');
-  const selectedAppointment = projects.find(a => a.id === selectedId) || null;
 
-  function handleSelect(appointment) {
-    setSelectedId(appointment.id);
-    setView('detail');
-  }
-
-  function handleBack() {
-    setView('grid');
-    setSelectedId(null);
-  }
+  // Solo información de citas: con fecha, futuras y no canceladas.
+  // Las citas pasadas no se muestran (las de panel además se borran en backend).
+  const upcoming = appointments
+    .filter(a => a.scheduled_at && new Date(a.scheduled_at) > new Date() && a.status !== 'cancelled')
+    .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -183,12 +143,12 @@ export default function ClientDashboard({
     <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
       <PageMeta
         title="Citas | Kodeo"
-        description="Administra tus citas y proyectos con Kodeo."
+        description="Consulta el calendario de tus citas con Kodeo."
         path="/citas"
       />
 
       <div style={{ maxWidth: 960, width: '100%', margin: '0 auto', padding: isMobile ? '32px 16px 60px' : '44px 28px 80px' }}>
-        {(isAdmin || view === 'grid') && (
+        {view === 'calendar' && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
               <div>
@@ -202,1340 +162,842 @@ export default function ClientDashboard({
                 </h1>
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-                {!isAdmin && !loading && !error && projects.length > 0 && (
-                  <ViewModeSwitch
-                    value={appointmentsView}
-                    onChange={setAppointmentsView}
-                    options={[
-                      { id: 'mosaico', label: 'Mosaico', icon: 'grid' },
-                      { id: 'tabla',   label: 'Tabla',   icon: 'list' },
-                    ]}
-                  />
+                {!isAdmin && (
+                  <button
+                    onClick={() => setView('book')}
+                    style={{
+                      padding: '10px 20px',
+                      background: 'var(--type)', color: 'var(--bg)',
+                      border: 0, borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+                      fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    + Agendar cita
+                  </button>
                 )}
                 <RefreshButton onClick={handleRefresh} loading={refreshing} />
               </div>
             </div>
             <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
               {isAdmin
-                ? 'Da seguimiento a las citas agendadas por tus clientes.'
-                : 'Selecciona una cita para ver los detalles del proyecto que compartiste al agendar.'}
+                ? `Calendario de citas agendadas por tus clientes${upcoming.length ? ` — ${upcoming.length} próxima${upcoming.length !== 1 ? 's' : ''}` : ''}.`
+                : 'Tu calendario de citas con Kodeo. Las citas pasadas se retiran automáticamente.'}
             </p>
-            {isAdmin && (
-              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '6px 0 0' }}>
-                {projects.length} cita{projects.length !== 1 ? 's' : ''} en total
-              </p>
-            )}
           </div>
         )}
 
-        {!isAdmin && view === 'detail' && selectedAppointment && (
-          <AppointmentDetailHeader appointment={selectedAppointment} onBack={handleBack} isMobile={isMobile} />
-        )}
+        {view === 'book' && !isAdmin ? (
+          <PanelBooking
+            user={user}
+            copy={copy}
+            isMobile={isMobile}
+            token={token}
+            onBack={() => setView('calendar')}
+            onRefresh={() => fetchAppointments(true)}
+          />
+        ) : (
+          <>
+            {loading && <p style={{ color: 'var(--type-muted)', fontFamily: 'var(--body)', fontSize: 14 }}>Cargando…</p>}
+            {error   && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 14 }}>{error}</p>}
 
-        {loading && <p style={{ color: 'var(--type-muted)', fontFamily: 'var(--body)', fontSize: 14 }}>Cargando…</p>}
-        {error   && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 14 }}>{error}</p>}
+            {!loading && !error && upcoming.length === 0 && (
+              <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '40px 28px', textAlign: 'center' }}>
+                <p style={{ fontFamily: 'var(--body)', fontSize: 15, color: 'var(--type-soft)', margin: 0 }}>
+                  {isAdmin ? 'No hay citas generadas.' : 'No tienes citas generadas.'}
+                </p>
+              </div>
+            )}
 
-        {!loading && !error && projects.length === 0 && (
-          <EmptyState isAdmin={isAdmin} onNavigate={navigate} />
-        )}
-
-        {!loading && !error && projects.length > 0 && (
-          isAdmin ? (
-            <AdminView projects={projects} allAppointments={appointments} token={token} onRefresh={fetchAppointments} isMobile={isMobile} theme={theme} />
-          ) : view === 'detail' && selectedAppointment ? (
-            <AppointmentClientCard
-              appointment={selectedAppointment}
-              calls={appointments.filter(a => a.project_id === selectedAppointment.id)}
-              token={token}
-              navigate={navigate}
-              onRefresh={fetchAppointments}
-              theme={theme}
-              user={user}
-            />
-          ) : appointmentsView === 'tabla' ? (
-            <AppointmentsTable appointments={projects} onSelect={handleSelect} isMobile={isMobile} />
-          ) : (
-            <AppointmentsGrid appointments={projects} onSelect={handleSelect} isMobile={isMobile} />
-          )
+            {!loading && !error && upcoming.length > 0 && (
+              <CitasCalendar
+                citas={upcoming}
+                isAdmin={isAdmin}
+                token={token}
+                onRefresh={() => fetchAppointments(true)}
+                isMobile={isMobile}
+              />
+            )}
+          </>
         )}
       </div>
     </PortalLayout>
   );
 }
 
-// ── Vista Cliente: mosaico de citas ─────────────────────────────────────────
+// ── Calendario mensual de citas (estilo Google Calendar) ───────────────────
 
-function AppointmentsGrid({ appointments, onSelect, isMobile }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 14 }}>
-      {appointments.map(appointment => (
-        <AppointmentGridCard key={appointment.id} appointment={appointment} onSelect={onSelect} />
-      ))}
-    </div>
+function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile }) {
+  const today = new Date();
+
+  // Citas agrupadas por día (horario del centro de México)
+  const byDay = useMemo(() => {
+    const map = {};
+    for (const cita of citas) {
+      const key = citaDayKey(cita.scheduled_at);
+      (map[key] = map[key] || []).push(cita);
+    }
+    return map;
+  }, [citas]);
+
+  const firstCitaDate = new Date(citas[0].scheduled_at);
+  const [viewMonth, setViewMonth] = useState(
+    () => new Date(firstCitaDate.getFullYear(), firstCitaDate.getMonth(), 1)
   );
-}
+  const [selectedKey, setSelectedKey] = useState(() => citaDayKey(citas[0].scheduled_at));
 
-function AppointmentGridCard({ appointment, onSelect }) {
-  const [hovered, setHovered] = useState(false);
+  const monthFmt = useMemo(() => new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }), []);
+  const dayFmt   = useMemo(() => new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }), []);
 
-  const accent      = ACCENT[appointment.service_code] || ACCENT['01'];
-  const statusInfo  = getStatusInfo(appointment);
-  const scheduledDate = appointment.scheduled_at
-    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' })
-    : 'Sin fecha asignada';
+  // Encabezados lun→dom (la cuadrícula arranca en lunes)
+  const weekdayLabels = useMemo(() => {
+    const base = new Date(2026, 5, 1); // 1 jun 2026 = lunes
+    const fmt  = new Intl.DateTimeFormat('es-MX', { weekday: 'short' });
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      return fmt.format(d).replace('.', '');
+    });
+  }, []);
+
+  // Celdas del mes visible (null = hueco antes del día 1)
+  const cells = useMemo(() => {
+    const first       = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
+    const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate();
+    const leading     = (first.getDay() + 6) % 7; // lunes = 0
+    return [
+      ...Array.from({ length: leading }, () => null),
+      ...Array.from({ length: daysInMonth }, (_, i) =>
+        new Date(viewMonth.getFullYear(), viewMonth.getMonth(), i + 1)
+      ),
+    ];
+  }, [viewMonth]);
+
+  const pad     = n => String(n).padStart(2, '0');
+  const cellKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayKey = cellKey(today);
+
+  const changeMonth = (delta) =>
+    setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + delta, 1));
+
+  const selectedCitas = selectedKey ? (byDay[selectedKey] || []) : [];
+  const selectedDate  = selectedKey ? new Date(`${selectedKey}T12:00:00`) : null;
+
+  const navBtn = {
+    width: 34, height: 34, borderRadius: 'var(--radius-sm)',
+    border: '1px solid var(--line)', background: 'transparent',
+    color: 'var(--type)', cursor: 'pointer',
+    fontFamily: 'var(--ui)', fontSize: 14, lineHeight: 1,
+  };
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        border: `1px solid ${hovered ? 'var(--line-2)' : 'var(--line)'}`,
-        borderRadius: 'var(--radius-lg)',
-        overflow: 'hidden',
-        background: 'var(--bg-2)',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'border-color .2s, transform .15s',
-        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
-      }}
-    >
-      <div style={{ height: 4, background: statusInfo.color === '#63C44D' ? '#63C44D' : accent, flexShrink: 0 }} />
-
-      <div style={{ padding: '20px 20px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
-            {appointment.service || 'Cita'}
-          </span>
-          <span style={{
-            fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
-            color: statusInfo.color, border: `1px solid ${statusInfo.color}`,
-            borderRadius: 'var(--radius-pill)', padding: '3px 8px', flexShrink: 0,
-          }}>
-            {statusInfo.label}
-          </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* ── Cuadrícula del mes ── */}
+      <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '16px 16px 0' : '22px 24px 0' }}>
+          <div style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 20 : 24, letterSpacing: '-0.02em', textTransform: 'capitalize', color: 'var(--type)' }}>
+            {monthFmt.format(viewMonth)}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button aria-label="Mes anterior" onClick={() => changeMonth(-1)} style={navBtn}>←</button>
+            <button aria-label="Mes siguiente" onClick={() => changeMonth(1)} style={navBtn}>→</button>
+          </div>
         </div>
 
-        <div style={{ flex: 1, minHeight: 52 }}>
-          <span style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', lineHeight: 1.25, display: 'block' }}>
-            {scheduledDate}
-          </span>
-        </div>
-
-        <button
-          onClick={() => onSelect(appointment)}
-          style={{
-            width: '100%', padding: '10px 14px',
-            border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)',
-            background: 'transparent', cursor: 'pointer',
-            fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
-            color: 'var(--type-soft)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            transition: 'border-color .2s, color .2s',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = accent;
-            e.currentTarget.style.color = 'var(--type)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'var(--line)';
-            e.currentTarget.style.color = 'var(--type-soft)';
-          }}
-        >
-          <span>Ver detalles</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="12 5 19 12 12 19" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Vista Cliente: tabla de citas ───────────────────────────────────────────
-
-const thStyle = {
-  textAlign: 'left', padding: '12px 16px', whiteSpace: 'nowrap',
-  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
-  color: 'var(--type-muted)',
-};
-
-const tdStyle = {
-  padding: '14px 16px', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)',
-};
-
-function AppointmentsTable({ appointments, onSelect, isMobile }) {
-  return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 560 : 'auto' }}>
-          <thead>
-            <tr style={{ background: 'var(--bg-2)', borderBottom: '1px solid var(--line)' }}>
-              <th style={thStyle}>Servicio</th>
-              <th style={thStyle}>Estado</th>
-              <th style={thStyle}>Fecha y hora</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {appointments.map(appointment => (
-              <AppointmentTableRow key={appointment.id} appointment={appointment} onSelect={onSelect} />
+        <div style={{ padding: isMobile ? '12px 10px 14px' : '16px 18px 20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
+            {weekdayLabels.map(w => (
+              <div key={w} style={{
+                textAlign: 'center', fontFamily: 'var(--ui)', fontSize: 10,
+                letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-muted)',
+                padding: '6px 0',
+              }}>
+                {w}
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+            {cells.map((date, i) => {
+              if (!date) return <div key={`gap-${i}`} />;
+              const key       = cellKey(date);
+              const dayCitas  = byDay[key] || [];
+              const hasCitas  = dayCitas.length > 0;
+              const isSelected = key === selectedKey;
+              const isToday    = key === todayKey;
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => hasCitas && setSelectedKey(key)}
+                  style={{
+                    minHeight: isMobile ? 52 : 92,
+                    borderRadius: 'var(--radius-sm)',
+                    border: isSelected ? '1px solid var(--accent-blue)' : '1px solid var(--line)',
+                    background: isSelected ? 'var(--bg-3)' : hasCitas ? 'var(--bg-2)' : 'transparent',
+                    cursor: hasCitas ? 'pointer' : 'default',
+                    padding: isMobile ? '6px 4px' : '8px 8px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4,
+                    textAlign: 'left',
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={e => { if (hasCitas && !isSelected) e.currentTarget.style.borderColor = 'var(--line-2)'; }}
+                  onMouseLeave={e => { if (hasCitas && !isSelected) e.currentTarget.style.borderColor = 'var(--line)'; }}
+                >
+                  <span style={{
+                    fontFamily: 'var(--ui)', fontSize: 12, lineHeight: 1,
+                    color: isToday ? 'var(--bg)' : hasCitas ? 'var(--type)' : 'var(--type-muted)',
+                    background: isToday ? 'var(--type)' : 'transparent',
+                    borderRadius: '50%',
+                    width: 22, height: 22,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    alignSelf: isMobile ? 'center' : 'flex-start',
+                    flexShrink: 0,
+                  }}>
+                    {date.getDate()}
+                  </span>
+
+                  {/* Eventos: chips con hora en desktop, puntos en mobile */}
+                  {isMobile ? (
+                    hasCitas && (
+                      <span style={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
+                        {dayCitas.slice(0, 3).map(c => (
+                          <span key={c.id} style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: CALL_TYPE_COLORS[c.call_type] || 'var(--accent-blue)',
+                          }} />
+                        ))}
+                      </span>
+                    )
+                  ) : (
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 3, overflow: 'hidden' }}>
+                      {dayCitas.slice(0, 2).map(c => (
+                        <span key={c.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          fontFamily: 'var(--body)', fontSize: 11, lineHeight: 1.2,
+                          color: 'var(--type-soft)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          <span style={{
+                            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                            background: CALL_TYPE_COLORS[c.call_type] || 'var(--accent-blue)',
+                          }} />
+                          {citaTime(c.scheduled_at)}
+                        </span>
+                      ))}
+                      {dayCitas.length > 2 && (
+                        <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: 'var(--type-muted)' }}>
+                          +{dayCitas.length - 2} más
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
-    </div>
-  );
-}
 
-function AppointmentTableRow({ appointment, onSelect }) {
-  const [hovered, setHovered] = useState(false);
-
-  const statusInfo  = getStatusInfo(appointment);
-  const scheduledDate = appointment.scheduled_at
-    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' })
-    : 'Sin fecha asignada';
-
-  return (
-    <tr
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ borderBottom: '1px solid var(--line)', background: hovered ? 'var(--bg-2)' : 'transparent', transition: 'background .15s' }}
-    >
-      <td style={tdStyle}>{appointment.service || 'Cita'}</td>
-      <td style={tdStyle}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
-          color: statusInfo.color, border: `1px solid ${statusInfo.color}`,
-          borderRadius: 'var(--radius-pill)', padding: '3px 8px',
-        }}>
-          {statusInfo.label}
-        </span>
-      </td>
-      <td style={tdStyle}>{scheduledDate}</td>
-      <td style={{ ...tdStyle, textAlign: 'right' }}>
-        <button
-          onClick={() => onSelect(appointment)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
-            padding: '7px 14px', borderRadius: 'var(--radius-pill)',
-            border: '1px solid var(--line)', background: 'transparent', color: 'var(--type-soft)', cursor: 'pointer',
-            transition: 'border-color .2s, color .2s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
-        >
-          Ver detalles
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-          </svg>
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-// ── Vista Cliente: encabezado de detalle ────────────────────────────────────
-
-function AppointmentDetailHeader({ appointment, onBack, isMobile }) {
-  const statusInfo  = getStatusInfo(appointment);
-  const scheduledDate = appointment.scheduled_at
-    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })
-    : null;
-
-  return (
-    <div style={{ marginBottom: 24 }}>
-      <button
-        onClick={onBack}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase',
-          color: 'var(--type-muted)', background: 'none', border: 'none',
-          cursor: 'pointer', padding: '0 0 10px', transition: 'color .15s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--type-muted)'}
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12" />
-          <polyline points="12 19 5 12 12 5" />
-        </svg>
-        Citas
-      </button>
-
-      <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: statusInfo.color, margin: '0 0 4px' }}>
-        {statusInfo.label}
-      </p>
-      <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-        {appointment.service || 'Cita'}
-      </h1>
-      {scheduledDate && (
-        <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '6px 0 0' }}>
-          {scheduledDate}
-        </p>
+      {/* ── Detalle del día seleccionado ── */}
+      {selectedDate && (
+        <div>
+          <p style={{
+            fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase',
+            color: 'var(--type-muted)', margin: '0 0 12px',
+          }}>
+            {selectedCitas.length > 0
+              ? `Citas del ${dayFmt.format(selectedDate)}`
+              : dayFmt.format(selectedDate)}
+          </p>
+          {selectedCitas.length === 0 ? (
+            <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: 0 }}>
+              Sin citas este día.
+            </p>
+          ) : (
+            <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+              {selectedCitas.map((cita, i) => (
+                <CitaRow key={cita.id} cita={cita} first={i === 0} isAdmin={isAdmin} token={token} onRefresh={onRefresh} />
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-function AppointmentClientCard({ appointment, calls, token, navigate, onRefresh, theme, user }) {
-  const [feedbackSent, setFeedbackSent] = useState(false);
+// ── Fila de cita (solo información; el admin puede reprogramar las de panel) ─
 
-  const accent        = ACCENT[appointment.service_code] || ACCENT['01'];
-  const statusInfo    = getStatusInfo(appointment);
-  const scheduledDate = appointment.scheduled_at
-    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })
-    : null;
+function CitaRow({ cita, first, isAdmin, token, onRefresh }) {
+  const [editing, setEditing] = useState(false);
+  const [when, setWhen]       = useState('');
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState(null);
 
-  const isPaid       = !!appointment.stripe_payment_intent_id;
-  const isCompleted  = appointment.status === 'completado';
-  const hasFeedback  = !!appointment.feedback;
+  const info  = STATUS_LABELS[cita.status] || { label: cita.status, color: 'var(--type-muted)' };
+  const color = CALL_TYPE_COLORS[cita.call_type] || 'var(--accent-blue)';
+  // project_details solo es texto legible en citas de panel (en el flujo
+  // Cal.com guarda el JSON del formulario de proyecto — no se muestra aquí)
+  const motivo = cita.call_type === 'panel' ? cita.project_details : null;
 
-  const needsForm               = !!appointment.form_released && !appointment.project_details;
-  const designReviewCall        = calls.find(c => c.call_type === 'design_review');
-  const canScheduleDesignReview = !!appointment.project_details && !designReviewCall;
+  const startEdit = () => {
+    if (cita.scheduled_at) {
+      const d   = new Date(cita.scheduled_at);
+      const pad = n => String(n).padStart(2, '0');
+      setWhen(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    }
+    setEditing(true);
+    setError(null);
+  };
 
-  function handlePay() {
-    navigate('/pago', {
-      state: {
-        amount: Math.round((appointment.amount || 0) * 100),
-        service: appointment.service,
-        code: appointment.service_code,
-        appointmentId: appointment.id,
-      },
-    });
-  }
-
-  async function handleDetailsSubmit(values) {
-    const res  = await fetch(`${API}/appointments.php?id=${appointment.id}&action=details`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ project_details: JSON.stringify(values) }),
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    onRefresh();
-  }
-
-  function handleDesignReviewBooked({ uid, startTime }) {
-    fetch(`${API}/confirm-appointment.php`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        uid, startTime, service: appointment.service, serviceCode: appointment.service_code,
-        call_type: 'design_review', project_id: appointment.id,
-      }),
-    }).catch(() => {
-      // El webhook de Cal.com es el respaldo si esto falla
-    }).finally(() => onRefresh());
-  }
+  const save = async () => {
+    if (!when) return;
+    setSaving(true); setError(null);
+    try {
+      const res  = await fetch(`${API}/appointments.php?id=${cita.id}&action=reschedule`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ scheduled_at: new Date(when).toISOString() }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setEditing(false);
+      onRefresh?.();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      {/* ── Datos de la cita ── */}
-      <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-        <div style={{ height: 3, background: isPaid ? '#63C44D' : accent }} />
-        <InfoRow label="Servicio">{appointment.service || '—'}</InfoRow>
-        <InfoRow label="Estado">
-          <span style={{ color: statusInfo.color, fontWeight: 600 }}>{statusInfo.label}</span>
-        </InfoRow>
-        {scheduledDate && <InfoRow label="Fecha y hora">{scheduledDate}</InfoRow>}
-        {(appointment.payment_enabled == 1 || isPaid) && (
-          <InfoRow label={isPaid ? 'Monto pagado' : 'Monto a pagar'}>
-            <span style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: isPaid ? '#63C44D' : 'var(--type)' }}>
-              {Number(appointment.amount || 0).toLocaleString('es-MX', {
-                style: 'currency', currency: 'MXN', minimumFractionDigits: 0, maximumFractionDigits: 0,
-              })}
+    <div style={{ padding: '16px 20px', borderTop: first ? 'none' : '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <span style={{
+          fontFamily: 'var(--display)', fontSize: 18, letterSpacing: '-0.02em',
+          color: 'var(--type)', flexShrink: 0, minWidth: 82,
+        }}>
+          {citaTime(cita.scheduled_at)}
+        </span>
+
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', margin: '0 0 2px' }}>
+            {cita.service || 'Cita'}
+            <span style={{ marginLeft: 10, fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
+              {citaTipoLabel(cita)}
             </span>
-          </InfoRow>
+          </p>
+          {isAdmin && cita.user_name && (
+            <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: 0 }}>
+              {cita.user_name} ({cita.user_email})
+            </p>
+          )}
+          {motivo && (
+            <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)', margin: '4px 0 0', lineHeight: 1.5 }}>
+              Motivo: {motivo}
+            </p>
+          )}
+        </div>
+
+        <span style={{
+          fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
+          color: info.color, border: `1px solid ${info.color}`,
+          borderRadius: 'var(--radius-pill)', padding: '3px 8px', flexShrink: 0,
+        }}>
+          {info.label}
+        </span>
+
+        {isAdmin && cita.call_type === 'panel' && !editing && (
+          <button
+            onClick={startEdit}
+            style={{
+              padding: '7px 14px', background: 'transparent', color: 'var(--type-soft)',
+              border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+              fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >
+            Cambiar horario
+          </button>
         )}
       </div>
 
-      {/* ── Banner de pago / completado ── */}
-      {isPaid && (
-        <div style={{
-          border: '1px solid #63C44D', borderRadius: 'var(--radius-lg)', padding: '20px 24px',
-          display: 'flex', alignItems: 'center', gap: 16,
-        }}>
-          <span style={{ fontSize: 22, lineHeight: 1 }}>{isCompleted ? '★' : '✓'}</span>
-          <div>
-            <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: '#63C44D', margin: '0 0 4px' }}>
-              {isCompleted ? 'Proyecto completado' : 'Pago recibido'}
-            </p>
-            <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: 0 }}>
-              {isCompleted
-                ? 'Tu proyecto ha finalizado. ¡Gracias por confiar en Kodeo!'
-                : 'Tu proyecto está en marcha. Te notificaremos sobre el avance.'}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {!isPaid && appointment.payment_enabled == 1 && (
-        <div style={{
-          border: `1px solid ${accent}`, borderRadius: 'var(--radius-lg)', padding: '20px 24px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
-        }}>
-          <div>
-            <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-soft)', margin: '0 0 4px' }}>
-              Tu pago está listo
-            </p>
-            <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: 0 }}>
-              El equipo de Kodeo ha habilitado tu acceso al pago.
-            </p>
-          </div>
-          <button
-            onClick={handlePay}
+      {isAdmin && editing && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="datetime-local"
+            value={when}
+            onChange={e => setWhen(e.target.value)}
             style={{
-              padding: '13px 28px', background: 'var(--type)', color: 'var(--bg)',
+              padding: '9px 12px', background: 'var(--bg)', border: '1px solid var(--line)',
+              borderRadius: 'var(--radius)', fontFamily: 'var(--body)', fontSize: 13,
+              color: 'var(--type)', outline: 'none', colorScheme: 'inherit',
+            }}
+          />
+          <button
+            onClick={save}
+            disabled={saving || !when}
+            style={{
+              padding: '9px 18px', background: 'var(--type)', color: 'var(--bg)',
               border: 0, borderRadius: 'var(--radius-pill)',
-              fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-              cursor: 'pointer', flexShrink: 0,
+              fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+              cursor: saving || !when ? 'not-allowed' : 'pointer', opacity: saving || !when ? 0.6 : 1,
             }}
           >
-            Pagar ahora →
+            {saving ? 'Guardando…' : 'Guardar'}
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            style={{
+              padding: '9px 18px', background: 'transparent', color: 'var(--type-muted)',
+              border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+              fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+            }}
+          >
+            Cancelar
           </button>
         </div>
       )}
 
-      {/* ── Formulario de proyecto (liberado tras la llamada inicial) ── */}
-      {needsForm && (
-        <div>
-          <p style={eyebrowStyle}>Cuéntanos sobre tu proyecto</p>
-          <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '0 0 24px', lineHeight: 1.6 }}>
-            El equipo ya revisó tu llamada inicial — completa este formulario para continuar
-            y poder agendar la revisión de diseño.
-          </p>
-          <ProjectIntakeForm serviceCode={appointment.service_code} onSubmit={handleDetailsSubmit} />
-        </div>
-      )}
-
-      {/* ── Detalles ya enviados (solo lectura) ── */}
-      {appointment.project_details && (
-        <div>
-          <p style={eyebrowStyle}>Detalles del proyecto</p>
-          <SubmittedDetails project_details={appointment.project_details} serviceCode={appointment.service_code} />
-        </div>
-      )}
-
-      {/* ── Agendar revisión de diseño ── */}
-      {canScheduleDesignReview && (
-        <div>
-          <p style={eyebrowStyle}>Agenda tu revisión de diseño</p>
-          <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '0 0 24px', lineHeight: 1.6 }}>
-            Elige el horario que más te acomode para mostrarte la propuesta de diseño.
-          </p>
-          <CallScheduler
-            namespace="design_review"
-            calLink={CAL_LINK}
-            metadata={{
-              callType: 'design_review', projectId: appointment.id, userId: user?.id,
-              serviceCode: appointment.service_code, service: appointment.service,
-            }}
-            attendee={{ name: user?.name, email: user?.email }}
-            theme={theme}
-            onBookingSuccess={handleDesignReviewBooked}
-          />
-        </div>
-      )}
-
-      {/* ── Llamadas del proyecto ── */}
-      {calls.length > 0 && (
-        <div>
-          <p style={eyebrowStyle}>Llamadas</p>
-          <CallsTimeline calls={calls} />
-        </div>
-      )}
-
-      {/* ── Encuesta de satisfacción (solo cuando está completado) ── */}
-      {isCompleted && (
-        <div>
-          <p style={eyebrowStyle}>Tu opinión</p>
-          {hasFeedback || feedbackSent ? (
-            <div style={{
-              border: '1px solid #63C44D', borderRadius: 'var(--radius-lg)', padding: '28px 24px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center',
-            }}>
-              <span style={{ fontSize: 28 }}>★</span>
-              <p style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: '#63C44D', margin: 0 }}>
-                ¡Gracias por tu opinión!
-              </p>
-              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: 0, maxWidth: 340, lineHeight: 1.6 }}>
-                Tu retroalimentación nos ayuda a seguir mejorando para futuros clientes.
-              </p>
-            </div>
-          ) : (
-            <>
-              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '0 0 28px', lineHeight: 1.6 }}>
-                Cuéntanos cómo fue tu experiencia. Solo toma un momento y nos ayuda mucho.
-              </p>
-              <SurveyForm
-                appointmentId={appointment.id}
-                token={token}
-                onSubmitted={() => setFeedbackSent(true)}
-              />
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Formulario de detalles del proyecto (post-llamada inicial) ────────────
-
-function ProjectIntakeForm({ serviceCode, onSubmit }) {
-  const fields  = getFieldsForService(serviceCode);
-  const initial = Object.fromEntries(fields.map(f => [f.key, f.type === 'link-list' ? [] : '']));
-  const [form, setForm]     = useState(initial);
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState(null);
-
-  function set(key, value) { setForm(prev => ({ ...prev, [key]: value })); }
-
-  const isComplete = fields
-    .filter(f => f.required)
-    .every(f => form[f.key]?.trim());
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!isComplete || saving) return;
-    // Los campos link-list llegan con filas vacías del propio input dinámico
-    // — se limpian antes de guardar para no persistir enlaces en blanco.
-    const cleaned = { ...form };
-    fields.forEach(f => {
-      if (f.type === 'link-list') {
-        cleaned[f.key] = (Array.isArray(form[f.key]) ? form[f.key] : [])
-          .map(s => s.trim())
-          .filter(Boolean);
-      }
-    });
-    setSaving(true); setError(null);
-    try {
-      await onSubmit(cleaned);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '32px 28px' }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        {fields.map(field => (
-          <FormField
-            key={field.key}
-            field={field}
-            value={form[field.key]}
-            onChange={v => set(field.key, v)}
-          />
-        ))}
-
-        {error && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 12, margin: 0 }}>{error}</p>}
-
-        <button
-          type="submit"
-          disabled={!isComplete || saving}
-          style={{
-            alignSelf: 'flex-start',
-            padding: '13px 28px',
-            background: isComplete ? 'var(--type)' : 'var(--bg-3)',
-            color: isComplete ? 'var(--bg)' : 'var(--type-muted)',
-            border: isComplete ? 0 : '1px solid var(--line)',
-            borderRadius: 'var(--radius-pill)',
-            fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-            cursor: (!isComplete || saving) ? 'not-allowed' : 'pointer',
-            transition: 'background 0.2s, color 0.2s',
-          }}
-        >
-          {saving ? 'Enviando…' : 'Enviar →'}
-        </button>
-      </form>
-    </div>
-  );
-}
-
-// ── Bitácora de llamadas del proyecto ──────────────────────────────────────
-
-function CallsTimeline({ calls }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-      {calls.map((call, i) => {
-        const date = call.scheduled_at
-          ? new Date(call.scheduled_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' })
-          : 'Sin fecha';
-        const info = STATUS_LABELS[call.status] || { label: call.status, color: 'var(--type-muted)' };
-        return (
-          <div
-            key={call.id}
-            style={{
-              padding: '14px 20px', borderTop: i === 0 ? 'none' : '1px solid var(--line)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap',
-            }}
-          >
-            <div>
-              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', margin: '0 0 2px' }}>
-                {CALL_TYPE_LABELS[call.call_type] || call.call_type}
-              </p>
-              <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: 0 }}>{date}</p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{
-                fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
-                color: info.color, border: `1px solid ${info.color}`, borderRadius: 'var(--radius-pill)', padding: '3px 8px',
-              }}>
-                {info.label}
-              </span>
-              {call.video_url && (
-                <a
-                  href={call.video_url} target="_blank" rel="noopener noreferrer"
-                  style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--type-soft)' }}
-                >
-                  Unirse →
-                </a>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Encuesta de satisfacción ───────────────────────────────────────────────
-
-function SurveyForm({ appointmentId, token, onSubmitted }) {
-  const initial = Object.fromEntries(SURVEY_QUESTIONS.map(q => [q.key, '']));
-  const [form, setForm]     = useState(initial);
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState(null);
-
-  function set(key, val) { setForm(prev => ({ ...prev, [key]: val })); }
-
-  const isComplete = SURVEY_QUESTIONS
-    .filter(q => q.required)
-    .every(q => form[q.key]?.toString().trim());
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!isComplete) return;
-    setSaving(true); setError(null);
-    try {
-      const res = await fetch(`${API}/appointments.php?id=${appointmentId}&action=feedback`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ feedback: JSON.stringify(form) }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      onSubmitted();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      {SURVEY_QUESTIONS.map(q => {
-        if (q.type === 'rating') {
-          return (
-            <div key={q.key}>
-              <label style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 14 }}>
-                {q.label}
-                {q.required && <span style={{ color: '#e05050', marginLeft: 4 }}>*</span>}
-              </label>
-              <div style={{ display: 'flex', gap: 10 }}>
-                {[1, 2, 3, 4, 5].map(n => {
-                  const selected = Number(form[q.key]) === n;
-                  return (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => set(q.key, String(n))}
-                      style={{
-                        width: 44, height: 44,
-                        background: selected ? '#63C44D' : 'transparent',
-                        color: selected ? '#000' : 'var(--type-soft)',
-                        border: selected ? '1px solid #63C44D' : '1px solid var(--line)',
-                        borderRadius: '50%',
-                        fontFamily: 'var(--display)', fontSize: 16,
-                        cursor: 'pointer',
-                        transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-                      }}
-                    >
-                      {n}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, maxWidth: 262 }}>
-                <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Malo</span>
-                <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Excelente</span>
-              </div>
-            </div>
-          );
-        }
-
-        if (q.type === 'textarea') {
-          return (
-            <div key={q.key}>
-              <label style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 8 }}>
-                {q.label}
-                {q.required && <span style={{ color: '#e05050', marginLeft: 4 }}>*</span>}
-              </label>
-              <textarea
-                value={form[q.key]}
-                onChange={e => set(q.key, e.target.value)}
-                placeholder={q.placeholder}
-                rows={3}
-                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
-                onFocus={e => e.target.style.borderColor = 'var(--line-2)'}
-                onBlur={e => e.target.style.borderColor = 'var(--line)'}
-              />
-            </div>
-          );
-        }
-
-        if (q.type === 'radio') {
-          return (
-            <div key={q.key}>
-              <label style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 12 }}>
-                {q.label}
-                {q.required && <span style={{ color: '#e05050', marginLeft: 4 }}>*</span>}
-              </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {q.options.map(opt => {
-                  const selected = form[q.key] === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => set(q.key, opt.value)}
-                      style={{
-                        padding: '9px 18px',
-                        background: selected ? 'var(--type)' : 'transparent',
-                        color: selected ? 'var(--bg)' : 'var(--type-soft)',
-                        border: selected ? '1px solid var(--type)' : '1px solid var(--line)',
-                        borderRadius: 'var(--radius-pill)',
-                        fontFamily: 'var(--body)', fontSize: 13,
-                        cursor: 'pointer',
-                        transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-                        letterSpacing: 0, textTransform: 'none',
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }
-
-        return null;
-      })}
-
       {error && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 12, margin: 0 }}>{error}</p>}
-
-      <button
-        type="submit"
-        disabled={saving || !isComplete}
-        style={{
-          alignSelf: 'flex-start',
-          padding: '13px 28px',
-          background: isComplete ? '#63C44D' : 'var(--bg-3)',
-          color: isComplete ? '#000' : 'var(--type-muted)',
-          border: 0,
-          borderRadius: 'var(--radius-pill)',
-          fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-          cursor: (saving || !isComplete) ? 'not-allowed' : 'pointer',
-          transition: 'background 0.2s, color 0.2s',
-        }}
-      >
-        {saving ? 'Enviando…' : 'Enviar opinión →'}
-      </button>
-    </form>
-  );
-}
-
-// ── Detalles ya enviados (solo lectura) ────────────────────────────────────
-
-function SubmittedDetails({ project_details, serviceCode }) {
-  let parsed = null;
-  try { parsed = project_details ? JSON.parse(project_details) : null; } catch { parsed = null; }
-
-  if (!project_details) {
-    return (
-      <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', lineHeight: 1.6 }}>
-        No se registraron detalles del proyecto para esta cita.
-      </p>
-    );
-  }
-
-  if (!parsed) {
-    return (
-      <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-        {project_details}
-      </p>
-    );
-  }
-
-  const fields = getFieldsForService(serviceCode);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-      {fields.map((field, i) => {
-        const val = parsed[field.key];
-        const isEmpty = Array.isArray(val) ? val.length === 0 : !val;
-        if (isEmpty) return null;
-        const optLabels = OPTION_LABELS[field.key];
-        return (
-          <div
-            key={field.key}
-            style={{
-              padding: '14px 20px',
-              borderTop: i === 0 ? 'none' : '1px solid var(--line)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16,
-            }}
-          >
-            <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-muted)', flexShrink: 0, paddingTop: 2 }}>
-              {field.label.replace(' (opcional)', '')}
-            </span>
-            {field.type === 'link-list' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
-                {/* Citas guardadas antes de este campo tener soporte para varios enlaces
-                    guardaron reference_url como texto plano, no arreglo */}
-                {(Array.isArray(val) ? val : [val]).map((url, idx) => (
-                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer"
-                     style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', textAlign: 'right', lineHeight: 1.5, wordBreak: 'break-all' }}>
-                    {url}
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <span style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', textAlign: 'right', lineHeight: 1.5 }}>
-                {optLabels ? (optLabels[val] || val) : val}
-              </span>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }
 
-// ── Vista Admin ────────────────────────────────────────────────────────────
+// ── Agendar cita desde el panel (clientes existentes) ──────────────────────
+// Mismo calendario propio que /agendar (BookingCalendar); la confirmación se
+// envía por WhatsApp con nombre, tipo, proyecto, correo y motivo de la cita,
+// y la cita se registra en el backend para aparecer en el calendario.
 
-function AdminView({ projects, allAppointments, token, onRefresh, isMobile, theme }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {projects.map(apt => (
-        <AppointmentAdminCard
-          key={apt.id}
-          appointment={apt}
-          calls={allAppointments.filter(a => a.project_id === apt.id)}
-          token={token}
-          onRefresh={onRefresh}
-          isMobile={isMobile}
-          theme={theme}
-        />
-      ))}
-    </div>
-  );
-}
+function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
+  const bk     = copy.booking;
+  const locale = navigator.language || 'es-MX';
 
-function AppointmentAdminCard({ appointment, calls, token, onRefresh, isMobile, theme }) {
-  const [open, setOpen]               = useState(false);
-  const [amount, setAmount]           = useState(
-    appointment.amount ? String(parseFloat(appointment.amount)) : String(SERVICE_BASE[appointment.service_code] || '')
-  );
-  const [enabling, setEnabling]       = useState(false);
-  const [enabled, setEnabled]         = useState(Number(appointment.payment_enabled) === 1);
-  const [enableError, setEnableError] = useState(null);
-  const [completing, setCompleting]   = useState(false);
-  const [completeError, setCompleteError] = useState(null);
-  const [releasingForm, setReleasingForm] = useState(false);
-  const [formReleased, setFormReleased]   = useState(!!appointment.form_released);
-  const [releaseError, setReleaseError]   = useState(null);
-  const [showDeliveryScheduler, setShowDeliveryScheduler] = useState(false);
+  const [projects, setProjects]           = useState(null);
+  const [mode, setMode]                   = useState(null); // 'new' | 'existing'
+  const [projectChoice, setProjectChoice] = useState('');
+  const [serviceChoice, setServiceChoice] = useState('');
+  const [customProject, setCustomProject] = useState('');
+  const [reason, setReason]               = useState('');
+  const [slot, setSlot]                   = useState(null);
+  const [sent, setSent]                   = useState(false);
 
-  const accent      = ACCENT[appointment.service_code] || ACCENT['01'];
-  const isPaid      = !!appointment.stripe_payment_intent_id;
-  const isCompleted = appointment.status === 'completado';
-  const deliveryCall = calls.find(c => c.call_type === 'delivery');
+  // Proyectos del cliente — para seleccionar uno cuando la cita es de un proyecto existente
+  useEffect(() => {
+    fetch(`${API}/projects.php`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => setProjects(d.projects || []))
+      .catch(() => setProjects([]));
+  }, [token]);
 
-  const statusInfo = getStatusInfo(appointment);
+  const TYPE_LABELS = { new: 'Proyecto nuevo', existing: 'Proyecto existente' };
 
-  const scheduledDate = appointment.scheduled_at
-    ? new Date(appointment.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })
-    : 'Sin fecha';
+  const hasProjects = (projects?.length ?? 0) > 0;
+  const projectName = mode === 'existing'
+    ? projectChoice
+    : serviceChoice === '__otro__' ? customProject.trim() : serviceChoice;
+  const canConfirm  = !!mode && !!projectName && !!reason.trim() && !!slot;
 
-  let parsedDetails = null;
-  try { parsedDetails = appointment.project_details ? JSON.parse(appointment.project_details) : null; } catch { parsedDetails = null; }
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    setProjectChoice('');
+    setServiceChoice('');
+    setCustomProject('');
+  };
 
-  const serviceCode  = appointment.service_code;
-  const detailFields = getFieldsForService(serviceCode);
+  const buildWaLink = () => {
+    const dateFmt = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const timeFmt = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', hour12: true });
+    const msg = bk.panelWaMessage
+      .replace('{name}', user?.name || '')
+      .replace('{type}', TYPE_LABELS[mode] || '')
+      .replace('{project}', projectName)
+      .replace('{email}', user?.email || '')
+      .replace('{reason}', reason.trim())
+      .replace('{date}', dateFmt.format(slot))
+      .replace('{time}', timeFmt.format(slot));
+    return `https://wa.me/${WA_PHONE}?text=${encodeURIComponent(msg)}`;
+  };
 
-  async function handleReleaseForm() {
-    setReleasingForm(true); setReleaseError(null);
-    try {
-      const res  = await fetch(`${API}/appointments.php?id=${appointment.id}&action=release_form`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setFormReleased(true);
-      onRefresh();
-    } catch (e) {
-      setReleaseError(e.message);
-    } finally {
-      setReleasingForm(false);
-    }
-  }
-
-  function handleDeliveryBooked({ uid, startTime }) {
-    fetch(`${API}/confirm-appointment.php`, {
+  const handleConfirm = () => {
+    window.open(buildWaLink(), '_blank', 'noopener');
+    // Registra la cita en el backend para que aparezca en la sección de citas
+    // (si falla, la solicitud igual llegó por WhatsApp)
+    fetch(`${API}/appointments.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
-        uid, startTime, service: appointment.service, serviceCode: appointment.service_code,
-        call_type: 'delivery', project_id: appointment.id,
+        service: projectName,
+        reason: reason.trim(),
+        tipo: mode === 'existing' ? 'existente' : 'nuevo',
+        scheduled_at: slot.toISOString(),
       }),
-    }).catch(() => {
-      // El webhook de Cal.com es el respaldo si esto falla
-    }).finally(() => {
-      setShowDeliveryScheduler(false);
-      onRefresh();
-    });
-  }
+    }).catch(() => {}).finally(() => onRefresh?.());
+    setSent(true);
+  };
 
-  async function handleEnablePayment() {
-    const parsed = parseFloat(amount);
-    if (!parsed || parsed <= 0) { setEnableError('Monto inválido'); return; }
-    setEnabling(true); setEnableError(null);
-    try {
-      const res  = await fetch(`${API}/appointments.php?id=${appointment.id}&action=enable_payment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount: parsed }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setEnabled(true);
-      onRefresh();
-    } catch (e) {
-      setEnableError(e.message);
-    } finally {
-      setEnabling(false);
-    }
-  }
+  const dateFmt = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+  const timeFmt = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', hour12: true });
 
-  async function handleComplete() {
-    setCompleting(true); setCompleteError(null);
-    try {
-      const res  = await fetch(`${API}/appointments.php?id=${appointment.id}&action=complete`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      onRefresh();
-    } catch (e) {
-      setCompleteError(e.message);
-    } finally {
-      setCompleting(false);
-    }
+  const fieldLabel = {
+    fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em',
+    textTransform: 'uppercase', color: 'var(--type-soft)',
+    display: 'block', marginBottom: 8,
+  };
+
+  if (sent) {
+    return (
+      <div style={{
+        border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)',
+        padding: isMobile ? '40px 24px' : '56px 48px',
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 24,
+      }}>
+        <div>
+          <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: '#63C44D', margin: '0 0 10px' }}>
+            {bk.success.label}
+          </p>
+          <h2 style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: isMobile ? 28 : 36, letterSpacing: '-0.025em', margin: '0 0 10px', lineHeight: 1.1 }}>
+            {bk.success.title}
+          </h2>
+          <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: 0, maxWidth: 460, lineHeight: 1.6 }}>
+            {bk.success.body}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
+          <button
+            onClick={() => window.open(buildWaLink(), '_blank', 'noopener')}
+            style={{
+              padding: '13px 26px', background: 'var(--type)', color: 'var(--bg)',
+              border: 0, borderRadius: 'var(--radius-pill)',
+              fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer',
+            }}
+          >
+            {bk.success.resend}
+          </button>
+          <button
+            onClick={onBack}
+            style={{
+              padding: '13px 26px', background: 'transparent', color: 'var(--type)',
+              border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)',
+              fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer',
+            }}
+          >
+            Volver a citas
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-      <div style={{ height: 3, background: isCompleted ? '#63C44D' : isPaid ? '#63C44D' : accent }} />
+    <div>
+      {/* Encabezado con regreso */}
+      <div style={{ marginBottom: 24 }}>
+        <button
+          onClick={onBack}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase',
+            color: 'var(--type-muted)', background: 'none', border: 'none',
+            cursor: 'pointer', padding: '0 0 10px', transition: 'color .15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--type-muted)'}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          Citas
+        </button>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
+          Agendar cita
+        </h1>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
+          {mode === null
+            ? '¿Tu cita es sobre un producto nuevo o sobre uno que ya tienes?'
+            : 'Cuéntanos el motivo, elige el horario y confirma por WhatsApp.'}
+        </p>
+      </div>
 
-      {/* ── Encabezado colapsable ── */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-          padding: isMobile ? '16px 20px' : '18px 28px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-          textAlign: 'left',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
-          <div style={{ minWidth: 0 }}>
-            <p style={{
-              fontFamily: 'var(--display)', fontSize: 17, letterSpacing: '-0.02em',
-              margin: '0 0 2px', color: 'var(--type)',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
-              {appointment.user_name}
-            </p>
-            <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: 0 }}>
-              {appointment.service || '—'} · {scheduledDate}
-            </p>
+      {mode === null ? (
+        /* Paso 1: elección en grande — producto nuevo (izquierda) o existente (derecha) */
+        <div style={{ padding: isMobile ? '24px 0 40px' : '48px 0 64px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+            gap: isMobile ? 14 : 22,
+            maxWidth: 780, margin: '0 auto',
+          }}>
+            {[
+              {
+                id: 'new',
+                title: 'Un producto nuevo',
+                desc: 'Quiero cotizar o arrancar un proyecto nuevo.',
+                disabled: false,
+              },
+              {
+                id: 'existing',
+                title: 'Un producto que ya tengo',
+                desc: projects === null
+                  ? 'Cargando tus proyectos…'
+                  : hasProjects
+                    ? 'Es sobre uno de mis proyectos actuales.'
+                    : 'Aún no tienes proyectos activos.',
+                disabled: !hasProjects,
+              },
+            ].map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                disabled={opt.disabled}
+                onClick={() => handleModeChange(opt.id)}
+                style={{
+                  cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                  background: 'transparent',
+                  border: '1px solid var(--line)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: isMobile ? '36px 24px' : '60px 32px',
+                  opacity: opt.disabled ? 0.45 : 1,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
+                  textAlign: 'center',
+                  transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
+                }}
+                onMouseEnter={e => {
+                  if (opt.disabled) return;
+                  e.currentTarget.style.background = 'var(--bg-2)';
+                  e.currentTarget.style.borderColor = 'var(--line-2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.borderColor = 'var(--line)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <span style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 24 : 30, letterSpacing: '-0.025em', color: 'var(--type)', lineHeight: 1.15 }}>
+                  {opt.title}
+                </span>
+                <span style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', lineHeight: 1.55, maxWidth: 260 }}>
+                  {opt.desc}
+                </span>
+                <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', marginTop: 6 }}>
+                  Elegir →
+                </span>
+              </button>
+            ))}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+      ) : (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* Tipo elegido + opción de cambiar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{
-            fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase',
-            color: statusInfo.color, border: `1px solid ${statusInfo.color}`,
-            borderRadius: 'var(--radius-pill)',
-            padding: '3px 8px',
+            fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase',
+            color: 'var(--type-soft)', border: '1px solid var(--line)',
+            borderRadius: 'var(--radius-pill)', padding: '7px 14px',
           }}>
-            {statusInfo.label}
+            {TYPE_LABELS[mode]}
           </span>
-          <span style={{
-            color: 'var(--type-muted)', fontSize: 12,
-            display: 'inline-block',
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s',
-          }}>
-            ▾
-          </span>
+          <button
+            type="button"
+            onClick={() => handleModeChange(null)}
+            style={{
+              background: 'transparent', border: 0, padding: 0, cursor: 'pointer',
+              fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.16em',
+              textTransform: 'uppercase', color: 'var(--type-muted)',
+            }}
+          >
+            ← Cambiar
+          </button>
         </div>
-      </button>
 
-      {/* ── Contenido expandido ── */}
-      {open && (
-        <div style={{ padding: isMobile ? '0 20px 20px' : '0 28px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <DetailLine label="Email" value={appointment.user_email} />
-            <DetailLine label="Fecha" value={scheduledDate} />
-          </div>
-
-          {/* Llamadas del proyecto (revisión de diseño / entrega) */}
-          {calls.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <p style={{ ...detailLabelStyle, marginBottom: 12 }}>Llamadas</p>
-              <CallsTimeline calls={calls} />
+        {/* Proyecto / producto + motivo */}
+        <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: isMobile ? '20px 18px' : '24px 26px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* Producto existente: seleccionarlo de sus proyectos */}
+          {mode === 'existing' && (
+            <div>
+              <label style={fieldLabel}>¿Cuál de tus proyectos?</label>
+              <select
+                value={projectChoice}
+                onChange={e => setProjectChoice(e.target.value)}
+                style={{ ...inputStyle, appearance: 'none' }}
+              >
+                <option value="">Selecciona un proyecto…</option>
+                {(projects ?? []).map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+              </select>
             </div>
           )}
 
-          {/* Formulario de proyecto */}
-          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-            <p style={{ ...detailLabelStyle, marginBottom: 12 }}>Formulario de proyecto</p>
-            {parsedDetails ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {detailFields.map(field => {
-                  const val = parsedDetails[field.key];
-                  const isEmpty = Array.isArray(val) ? val.length === 0 : !val;
-                  if (isEmpty) return null;
-                  const optLabels = OPTION_LABELS[field.key];
+          {/* Producto nuevo: selección con tarjetas (mismo estilo que /comprar) */}
+          {mode === 'new' && (
+            <div>
+              <label style={fieldLabel}>¿Qué producto te interesa?</label>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>
+                {copy.services.list.map(svc => {
+                  const accent   = ACCENT[svc.code] || ACCENT['01'];
+                  const selected = serviceChoice === svc.name;
                   return (
-                    <div key={field.key} style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', lineHeight: 1.5 }}>
-                      <span style={detailLabelStyle}>{field.label.replace(' (opcional)', '')}: </span>
-                      {field.type === 'link-list' ? (
-                        <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, verticalAlign: 'top' }}>
-                          {(Array.isArray(val) ? val : [val]).map((url, idx) => (
-                            <a key={idx} href={url} target="_blank" rel="noopener noreferrer"
-                               style={{ color: 'var(--type-soft)', fontSize: 13, wordBreak: 'break-all' }}>
-                              {url}
-                            </a>
-                          ))}
+                    <button
+                      key={svc.code}
+                      type="button"
+                      onClick={() => setServiceChoice(svc.name)}
+                      style={{
+                        textAlign: 'left', cursor: 'pointer', padding: 0,
+                        background: selected ? 'var(--bg-2)' : 'transparent',
+                        border: selected ? `1px solid ${accent}` : '1px solid var(--line)',
+                        borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                        display: 'flex', flexDirection: 'column',
+                        transition: 'background 0.2s, border-color 0.2s',
+                      }}
+                      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'var(--bg-2)'; }}
+                      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <div style={{ height: 3, background: accent, width: '100%' }} />
+                      <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.26em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
+                            {svc.code}
+                          </span>
+                          {selected && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </div>
+                        <span style={{ fontFamily: 'var(--display)', fontSize: 24, letterSpacing: '-0.025em', color: 'var(--type)', lineHeight: 1.1 }}>
+                          {svc.name}
                         </span>
-                      ) : (
-                        optLabels ? (optLabels[val] || val) : val
-                      )}
-                    </div>
+                        <p style={{ fontFamily: 'var(--body)', fontSize: 12, lineHeight: 1.55, color: 'var(--type-soft)', margin: 0 }}>
+                          {svc.lead}
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)' }}>
+                            {svc.price}
+                          </span>
+                          <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
+                            {svc.time}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
                   );
                 })}
-              </div>
-            ) : appointment.project_details ? (
-              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
-                {appointment.project_details}
-              </p>
-            ) : formReleased ? (
-              <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: 0 }}>
-                Formulario liberado — esperando respuesta del cliente.
-              </p>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+
+                {/* Otro */}
                 <button
-                  onClick={handleReleaseForm}
-                  disabled={releasingForm}
+                  type="button"
+                  onClick={() => setServiceChoice('__otro__')}
                   style={{
-                    padding: '11px 22px',
-                    background: accent, color: 'var(--bg)',
-                    border: 0, borderRadius: 'var(--radius-pill)',
-                    fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-                    cursor: releasingForm ? 'not-allowed' : 'pointer',
-                    opacity: releasingForm ? 0.6 : 1,
+                    textAlign: 'left', cursor: 'pointer', padding: 0,
+                    background: serviceChoice === '__otro__' ? 'var(--bg-2)' : 'transparent',
+                    border: serviceChoice === '__otro__' ? '1px solid var(--type)' : '1px solid var(--line)',
+                    borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                    display: 'flex', flexDirection: 'column',
+                    transition: 'background 0.2s, border-color 0.2s',
                   }}
+                  onMouseEnter={e => { if (serviceChoice !== '__otro__') e.currentTarget.style.background = 'var(--bg-2)'; }}
+                  onMouseLeave={e => { if (serviceChoice !== '__otro__') e.currentTarget.style.background = 'transparent'; }}
                 >
-                  {releasingForm ? 'Liberando…' : 'Liberar formulario'}
+                  <div style={{ height: 3, background: 'var(--type-soft)', width: '100%' }} />
+                  <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.26em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
+                        04
+                      </span>
+                      {serviceChoice === '__otro__' && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--type)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                    <span style={{ fontFamily: 'var(--display)', fontSize: 24, letterSpacing: '-0.025em', color: 'var(--type)', lineHeight: 1.1 }}>
+                      Otro
+                    </span>
+                    <p style={{ fontFamily: 'var(--body)', fontSize: 12, lineHeight: 1.55, color: 'var(--type-soft)', margin: 0 }}>
+                      ¿Tienes algo distinto en mente? Cuéntanoslo y lo revisamos contigo en la llamada.
+                    </p>
+                  </div>
                 </button>
-                {releaseError && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 12, margin: 0 }}>{releaseError}</p>}
               </div>
-            )}
-          </div>
 
-          {/* Encuesta del cliente (si ya la respondió) */}
-          {appointment.feedback && (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <p style={{ ...detailLabelStyle, marginBottom: 12 }}>Encuesta del cliente</p>
-              <AdminFeedbackView feedback={appointment.feedback} />
-            </div>
-          )}
-
-          {/* Pago */}
-          {isPaid ? (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <p style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: '#63C44D', margin: 0 }}>
-                Pagado — {Number(appointment.amount || 0).toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </p>
-            </div>
-          ) : !enabled ? (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16, display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div>
-                <label style={{ ...detailLabelStyle, display: 'block', marginBottom: 6 }}>Monto (MXN)</label>
+              {serviceChoice === '__otro__' && (
                 <input
-                  type="number"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  min="1"
-                  step="1"
-                  style={{
-                    padding: '10px 12px', width: 160, boxSizing: 'border-box',
-                    background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--radius)',
-                    fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)', outline: 'none',
-                  }}
+                  value={customProject}
+                  onChange={e => setCustomProject(e.target.value)}
+                  placeholder="Cuéntanos qué tienes en mente…"
+                  style={{ ...inputStyle, marginTop: 12 }}
                 />
-              </div>
-              <button
-                onClick={handleEnablePayment}
-                disabled={enabling}
-                style={{
-                  padding: '11px 22px',
-                  background: accent, color: 'var(--bg)',
-                  border: 0, borderRadius: 'var(--radius-pill)',
-                  fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-                  cursor: enabling ? 'not-allowed' : 'pointer',
-                  opacity: enabling ? 0.6 : 1,
-                }}
-              >
-                {enabling ? 'Habilitando…' : 'Habilitar pago'}
-              </button>
-              {enableError && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 12, margin: 0, width: '100%' }}>{enableError}</p>}
-            </div>
-          ) : (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <p style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: '#63C44D', margin: 0 }}>
-                Pago habilitado — {Number(appointment.amount || parseFloat(amount) || 0).toLocaleString('es-MX', {
-                  style: 'currency', currency: 'MXN', minimumFractionDigits: 0, maximumFractionDigits: 0,
-                })}
-              </p>
-            </div>
-          )}
-
-          {/* Agendar entrega — solo una vez pagado */}
-          {isPaid && !isCompleted && (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <p style={{ ...detailLabelStyle, marginBottom: 12 }}>Entrega</p>
-              {deliveryCall ? (
-                <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0 }}>
-                  Entrega agendada — {deliveryCall.scheduled_at
-                    ? new Date(deliveryCall.scheduled_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' })
-                    : 'sin fecha'}
-                </p>
-              ) : showDeliveryScheduler ? (
-                <CallScheduler
-                  namespace="delivery"
-                  calLink={CAL_LINK}
-                  metadata={{
-                    callType: 'delivery', projectId: appointment.id, userId: appointment.user_id,
-                    serviceCode: appointment.service_code, service: appointment.service,
-                  }}
-                  attendee={{ name: appointment.user_name, email: appointment.user_email }}
-                  theme={theme}
-                  onBookingSuccess={handleDeliveryBooked}
-                  style={{ minHeight: 500 }}
-                />
-              ) : (
-                <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '0 0 12px', lineHeight: 1.6 }}>
-                  Una vez confirmado el día y la hora por WhatsApp con el cliente, agenda aquí la llamada de entrega.
-                </p>
-              )}
-              {!deliveryCall && !showDeliveryScheduler && (
-                <button
-                  onClick={() => setShowDeliveryScheduler(true)}
-                  style={{
-                    padding: '11px 22px',
-                    background: 'transparent', color: 'var(--type)',
-                    border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)',
-                    fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Agendar entrega
-                </button>
               )}
             </div>
           )}
 
-          {/* Marcar como completado */}
-          {isPaid && !isCompleted && (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <button
-                onClick={handleComplete}
-                disabled={completing}
-                style={{
-                  padding: '11px 22px',
-                  background: 'transparent',
-                  color: '#63C44D',
-                  border: '1px solid #63C44D',
-                  borderRadius: 'var(--radius-pill)',
-                  fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-                  cursor: completing ? 'not-allowed' : 'pointer',
-                  opacity: completing ? 0.6 : 1,
-                }}
-              >
-                {completing ? 'Guardando…' : 'Marcar proyecto como completado →'}
-              </button>
-              {completeError && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 12, margin: '8px 0 0' }}>{completeError}</p>}
-            </div>
-          )}
-
-          {isCompleted && (
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-              <p style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: '#63C44D', margin: 0 }}>
-                ★ Proyecto completado
-                {appointment.feedback ? ' · Encuesta recibida' : ' · Encuesta pendiente'}
-              </p>
-            </div>
-          )}
+          <div>
+            <label style={fieldLabel}>Motivo de la cita</label>
+            <textarea
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Cuéntanos brevemente para qué necesitas la reunión…"
+              rows={3}
+              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
+            />
+          </div>
         </div>
-      )}
-    </div>
-  );
-}
 
-function AdminFeedbackView({ feedback }) {
-  let data = null;
-  try { data = JSON.parse(feedback); } catch { /* data ya es null */ }
-  if (!data) return <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0 }}>{feedback}</p>;
-
-  const recommendLabels = { yes: 'Sí, sin duda', maybe: 'Tal vez', no: 'No por ahora' };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {data.satisfaction && (
-        <p style={{ margin: 0, fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)' }}>
-          <span style={detailLabelStyle}>Satisfacción: </span>
-          <RatingDots value={Number(data.satisfaction)} />
-        </p>
-      )}
-      {data.communication && (
-        <p style={{ margin: 0, fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)' }}>
-          <span style={detailLabelStyle}>Comunicación: </span>
-          <RatingDots value={Number(data.communication)} />
-        </p>
-      )}
-      {data.recommend && (
-        <p style={{ margin: 0, fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)' }}>
-          <span style={detailLabelStyle}>¿Nos recomendaría?: </span>
-          {recommendLabels[data.recommend] || data.recommend}
-        </p>
-      )}
-      {data.highlight && (
-        <p style={{ margin: 0, fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', lineHeight: 1.5 }}>
-          <span style={detailLabelStyle}>Lo mejor: </span>
-          {data.highlight}
-        </p>
-      )}
-      {data.improve && (
-        <p style={{ margin: 0, fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', lineHeight: 1.5 }}>
-          <span style={detailLabelStyle}>A mejorar: </span>
-          {data.improve}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function RatingDots({ value }) {
-  return (
-    <span style={{ display: 'inline-flex', gap: 4, verticalAlign: 'middle', marginLeft: 6 }}>
-      {[1,2,3,4,5].map(n => (
-        <span
-          key={n}
-          style={{
-            width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-            background: n <= value ? '#63C44D' : 'var(--line)',
-          }}
+        {/* Calendario propio (mismo que /agendar) */}
+        <BookingCalendar
+          locale={locale}
+          accent="var(--accent-blue)"
+          copy={bk.calendarStep}
+          isMobile={isMobile}
+          selectedSlot={slot}
+          onSelectSlot={setSlot}
         />
-      ))}
-      <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', marginLeft: 4 }}>
-        {value}/5
-      </span>
-    </span>
-  );
-}
 
-// ── Empty state ────────────────────────────────────────────────────────────
-
-function EmptyState({ isAdmin, onNavigate }) {
-  return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '40px 28px', textAlign: 'center' }}>
-      <p style={{ fontFamily: 'var(--body)', fontSize: 15, color: 'var(--type-soft)', margin: '0 0 20px' }}>
-        {isAdmin ? 'No hay citas registradas aún.' : 'Aún no tienes ninguna cita agendada.'}
-      </p>
-      {!isAdmin && (
-        <button
-          onClick={() => onNavigate('/comprar')}
-          style={{
-            padding: '12px 26px',
-            background: 'var(--type)', color: 'var(--bg)',
-            border: 0, borderRadius: 'var(--radius-pill)',
-            fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-            cursor: 'pointer',
-          }}
-        >
-          Agendar consulta →
-        </button>
+        {/* Resumen + confirmación */}
+        {slot && (
+          <div style={{
+            border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)',
+            padding: isMobile ? '20px 18px' : '22px 28px',
+            display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            justifyContent: 'space-between', gap: 18,
+          }}>
+            <div>
+              {mode && projectName && (
+                <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent-blue)', margin: '0 0 6px' }}>
+                  {TYPE_LABELS[mode]} · {projectName}
+                </p>
+              )}
+              <p style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 20 : 24, letterSpacing: '-0.02em', margin: 0, textTransform: 'capitalize' }}>
+                {dateFmt.format(slot)} · {timeFmt.format(slot)}
+              </p>
+              <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: '8px 0 0', lineHeight: 1.5 }}>
+                {canConfirm ? bk.calendarStep.confirmHint : 'Indica si es un producto nuevo o existente, elige el proyecto y escribe el motivo para confirmar.'}
+              </p>
+            </div>
+            <button
+              onClick={handleConfirm}
+              disabled={!canConfirm}
+              style={{
+                padding: '15px 28px', background: 'var(--type)', color: 'var(--bg)',
+                border: 0, borderRadius: 'var(--radius-pill)',
+                fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+                cursor: canConfirm ? 'pointer' : 'not-allowed',
+                opacity: canConfirm ? 1 : 0.5,
+                whiteSpace: 'nowrap', flexShrink: 0,
+                transition: 'opacity 0.2s',
+              }}
+            >
+              {bk.calendarStep.confirm}
+            </button>
+          </div>
+        )}
+      </div>
       )}
     </div>
   );
 }
-
-// ── Sub-componentes ────────────────────────────────────────────────────────
-
-function InfoRow({ label, children }) {
-  return (
-    <div style={{
-      padding: '18px 22px',
-      borderTop: '1px solid var(--line)',
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
-    }}>
-      <span style={detailLabelStyle}>{label}</span>
-      <span style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type)', textAlign: 'right' }}>{children}</span>
-    </div>
-  );
-}
-
-function DetailLine({ label, value }) {
-  return (
-    <p style={{ margin: 0, fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)' }}>
-      <span style={detailLabelStyle}>{label}: </span>{value}
-    </p>
-  );
-}
-
-// ── Estilos compartidos ────────────────────────────────────────────────────
-
-const eyebrowStyle = {
-  fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.22em',
-  textTransform: 'uppercase', color: 'var(--type)', margin: '0 0 14px',
-};
-
-const detailLabelStyle = {
-  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.16em',
-  textTransform: 'uppercase', color: 'var(--type-muted)',
-};

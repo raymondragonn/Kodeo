@@ -13,14 +13,24 @@ const ACCENT = {
   '03': 'var(--accent-yellow)',
 };
 
+
+const MSI_SURCHARGE = {
+  3:  0.05,
+  6:  0.075,
+  9:  0.10,
+  12: 0.125,
+  18: 0.175,
+  24: 0.225,
+};
+
 const MSI_OPTIONS = [
   { value: 0,  label: 'Pago de contado' },
-  { value: 3,  label: '3 meses sin intereses' },
-  { value: 6,  label: '6 meses sin intereses' },
-  { value: 9,  label: '9 meses sin intereses' },
-  { value: 12, label: '12 meses sin intereses' },
-  { value: 18, label: '18 meses sin intereses' },
-  { value: 24, label: '24 meses sin intereses' },
+  { value: 3,  label: '3 meses  (+5%)' },
+  { value: 6,  label: '6 meses  (+7.5%)' },
+  { value: 9,  label: '9 meses  (+10%)' },
+  { value: 12, label: '12 meses (+12.5%)' },
+  { value: 18, label: '18 meses (+17.5%)' },
+  { value: 24, label: '24 meses (+22.5%)' },
 ];
 
 const METHODS = [
@@ -111,13 +121,18 @@ export default function Checkout({
   }, [token, onNavigate]);
 
   const chargeAmount  = promoResult?.valid ? promoResult.final_cents : amount;
-  const displayAmount = (chargeAmount / 100).toLocaleString('es-MX', {
+
+  const msiRate      = (method === 'card' && installments > 0) ? (MSI_SURCHARGE[installments] ?? 0) : 0;
+  const msiSurcharge = Math.round(chargeAmount * msiRate);
+  const totalAmount  = chargeAmount + msiSurcharge;
+
+  const displayAmount = (totalAmount / 100).toLocaleString('es-MX', {
     style: 'currency', currency,
   });
 
   const monthlyAmount = (plan) =>
     plan > 0
-      ? (chargeAmount / 100 / plan).toLocaleString('es-MX', { style: 'currency', currency })
+      ? (totalAmount / 100 / plan).toLocaleString('es-MX', { style: 'currency', currency })
       : null;
 
   // ── Cargar Stripe.js ──────────────────────────────────────────────────────
@@ -221,7 +236,7 @@ export default function Checkout({
     }
     setLoading(true); clearResult();
     try {
-      const { clientSecret } = await postAPI('create-payment-intent.php', { amount: chargeAmount, installments });
+      const { clientSecret } = await postAPI('create-payment-intent.php', { amount: totalAmount, installments });
       const { paymentIntent, error } = await stripeRef.current.confirmCardPayment(clientSecret, {
         payment_method: { card: cardRef.current },
       });
@@ -335,6 +350,13 @@ export default function Checkout({
                 <Row label="Descuento">
                   <span style={{ fontFamily: 'var(--display)', fontSize: 14, letterSpacing: '-0.01em', color: '#63C44D' }}>
                     −{(promoResult.discount_cents / 100).toLocaleString('es-MX', { style: 'currency', currency })}
+                  </span>
+                </Row>
+              )}
+              {method === 'card' && installments > 0 && msiSurcharge > 0 && (
+                <Row label={`Cargo por cuotas (${installments} meses)`}>
+                  <span style={{ fontFamily: 'var(--display)', fontSize: 14, letterSpacing: '-0.01em', color: 'var(--type-muted)' }}>
+                    +{(msiSurcharge / 100).toLocaleString('es-MX', { style: 'currency', currency })}
                   </span>
                 </Row>
               )}
@@ -522,7 +544,7 @@ export default function Checkout({
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
-                    <p style={hintStyle}>Disponible en tarjetas de crédito mexicanas participantes.</p>
+                    <p style={hintStyle}>El cargo por cuotas se suma al total. Disponible en tarjetas de crédito mexicanas participantes.</p>
                   </div>
 
                   <SubmitBtn loading={loading} label="Pagar ahora" />

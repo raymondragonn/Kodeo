@@ -31,6 +31,8 @@ try {
     if ($user['password_hash'] === null) jsonError('Esta cuenta usa inicio de sesión con ' . ucfirst($user['oauth_provider'] ?? 'OAuth') . '. Usa el botón correspondiente.', 401);
     if (!password_verify($password, $user['password_hash'])) jsonError('Credenciales incorrectas', 401);
 
+    $user = ensureAdminRole($db, $user);
+
     $secret = getenv('JWT_SECRET') ?: 'kodeo_jwt_secret_dev';
     $now    = time();
 

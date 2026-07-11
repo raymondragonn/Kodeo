@@ -26,12 +26,6 @@ const CHANNEL_ES = {
   '(other)':         'Otros',
 };
 
-const SERVICE_ACCENT = {
-  'Landing Page':  '#63C44D',
-  'Sitio Web':     '#5170ff',
-  'Tienda Online': '#FFDE59',
-};
-
 // ── Utilidades ────────────────────────────────────────────────────────────────
 
 function fmt(n) {
@@ -750,27 +744,30 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
     else setLoadingMeta(true);
 
     try {
-      const [ordersJson, metaJson] = await Promise.all([
-        fetch(`${API_BASE_URL}/orders.php`,                { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      const [projectsJson, metaJson] = await Promise.all([
+        fetch(`${API_BASE_URL}/projects.php`,              { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
         fetch(`${API_BASE_URL}/analytics.php?action=meta`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       ]);
 
-      // orders.php ya filtra por user_id en el backend para clientes;
-      // para admins devuelve todos, por eso usamos user.id para quedarnos
-      // solo con los pedidos del propio usuario autenticado.
-      const userId = String(user?.id ?? '');
-      const userOrders = (ordersJson.orders ?? []).filter(
-        o => o.status !== 'cancelado' && (!userId || String(o.user_id) === userId),
-      );
-      const orderCards = userOrders.map(o => ({
-        id:          String(o.id),
-        serviceType: o.service,
-        accent:      SERVICE_ACCENT[o.service] ?? '#5170ff',
-      }));
+      // projects.php ya filtra en el backend: los clientes reciben solo sus
+      // proyectos; los administradores todos (para configurar/consultar la
+      // analítica de cualquier proyecto de cliente).
+      const statusAccent = {
+        en_diseno:     '#5170ff',
+        en_desarrollo: '#FFDE59',
+        completado:    '#63C44D',
+      };
+      const projectCards = (projectsJson.projects ?? [])
+        .filter(p => p.status !== 'cancelado')
+        .map(p => ({
+          id:          String(p.id),
+          serviceType: p.name,
+          accent:      statusAccent[p.status] ?? '#5170ff',
+        }));
 
       const isAdmin = user?.role === 'administrador';
       const base = isAdmin ? [{ id: 'kodeo', serviceType: 'Plataforma propia', accent: '#5170ff' }] : [];
-      setProjects([...base, ...orderCards]);
+      setProjects([...base, ...projectCards]);
       setMeta({ labels: metaJson.labels ?? {}, configured: metaJson.configured ?? {} });
     } catch {
       // Se ignora — el mosaico simplemente conserva los datos anteriores

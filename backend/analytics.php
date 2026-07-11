@@ -19,14 +19,19 @@ if ($method === 'PATCH') {
     $key   = $rawId === 'kodeo' ? 'kodeo' : ((int) $rawId ? strval((int) $rawId) : null);
     if (!$key) jsonError('order_id inválido', 400);
 
-    // kodeo.mx solo editable por admins; pedidos: debe ser el dueño
+    // kodeo.mx solo editable por admins; proyectos: el dueño o un admin
     if ($key === 'kodeo') {
         if ($user['role'] !== 'administrador') jsonError('Acceso denegado', 403);
     } else {
-        $db   = getDb();
-        $stmt = $db->prepare('SELECT id FROM orders WHERE id = ? AND user_id = ?');
-        $stmt->execute([(int) $key, $user['sub']]);
-        if (!$stmt->fetch()) jsonError('Pedido no encontrado', 404);
+        $db = getDb();
+        if ($user['role'] === 'administrador') {
+            $stmt = $db->prepare('SELECT id FROM projects WHERE id = ?');
+            $stmt->execute([(int) $key]);
+        } else {
+            $stmt = $db->prepare('SELECT id FROM projects WHERE id = ? AND user_id = ?');
+            $stmt->execute([(int) $key, $user['sub']]);
+        }
+        if (!$stmt->fetch()) jsonError('Proyecto no encontrado', 404);
     }
 
     $body  = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -111,19 +116,25 @@ if ($project === 'kodeo') {
     if (!$creds || empty($creds['private_key']) || empty($creds['client_email'])) jsonError('Credenciales GA4 inválidas', 500);
 
 } else {
-    $orderId = (int) $project;
-    if (!$orderId) jsonError('Proyecto inválido', 400);
+    $projectId = (int) $project;
+    if (!$projectId) jsonError('Proyecto inválido', 400);
 
-    $db   = getDb();
-    $stmt = $db->prepare('SELECT id FROM orders WHERE id = ? AND user_id = ?');
-    $stmt->execute([$orderId, $user['sub']]);
-    if (!$stmt->fetch()) jsonError('Pedido no encontrado', 404);
+    // Los proyectos de la tabla projects: el dueño ve el suyo, el admin cualquiera
+    $db = getDb();
+    if ($user['role'] === 'administrador') {
+        $stmt = $db->prepare('SELECT id FROM projects WHERE id = ?');
+        $stmt->execute([$projectId]);
+    } else {
+        $stmt = $db->prepare('SELECT id FROM projects WHERE id = ? AND user_id = ?');
+        $stmt->execute([$projectId, $user['sub']]);
+    }
+    if (!$stmt->fetch()) jsonError('Proyecto no encontrado', 404);
 
     $configFile = __DIR__ . '/ga4_projects.json';
     if (!file_exists($configFile)) jsonSuccess(['configured' => false, 'pending' => true]);
 
     $configs = json_decode(file_get_contents($configFile), true) ?? [];
-    $config  = $configs[strval($orderId)] ?? null;
+    $config  = $configs[strval($projectId)] ?? null;
 
     if (!$config || empty($config['property_id']) || empty($config['credentials_path'])) {
         jsonSuccess(['configured' => false, 'pending' => true]);

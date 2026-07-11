@@ -206,6 +206,41 @@ function setCorsHeaders(): void {
     }
 }
 
+// Recargo por Meses Sin Intereses — cubre la comisión que Stripe cobra por plan.
+// Debe coincidir con MSI_SURCHARGE en frontend (Checkout.jsx / OrderPaymentPage.jsx).
+const MSI_SURCHARGE_RATES = [
+    3  => 0.05,
+    6  => 0.075,
+    9  => 0.10,
+    12 => 0.125,
+    18 => 0.175,
+    24 => 0.225,
+];
+
+// Correo que recibe avisos internos (orden pagada, cargo extra aprobado)
+define('ADMIN_NOTIFY_EMAIL', getenv('ADMIN_NOTIFY_EMAIL') ?: SMTP_FROM_EMAIL);
+
+// Dominio cuyos correos reciben rol administrador automáticamente
+define('ADMIN_EMAIL_DOMAIN', getenv('ADMIN_EMAIL_DOMAIN') ?: 'kodeo.mx');
+
+function defaultRoleForEmail(string $email): string {
+    return str_ends_with(strtolower(trim($email)), '@' . ADMIN_EMAIL_DOMAIN)
+        ? 'administrador'
+        : 'cliente';
+}
+
+/**
+ * Sube a administrador en cada login/oauth si el correo es del dominio admin.
+ * Nunca degrada: un administrador ya asignado conserva su rol.
+ */
+function ensureAdminRole(PDO $db, array $user): array {
+    if ($user['role'] !== 'administrador' && defaultRoleForEmail($user['email']) === 'administrador') {
+        $db->prepare("UPDATE users SET role = 'administrador' WHERE id = ?")->execute([$user['id']]);
+        $user['role'] = 'administrador';
+    }
+    return $user;
+}
+
 // Días hábiles de desarrollo por servicio (debe coincidir con frontend/src/data/copy.js)
 const SERVICE_DEV_DAYS = [
     '01' => 8,  // Landing Page

@@ -12,6 +12,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/payment-order-helpers.php';
 
 \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
 
@@ -61,6 +62,9 @@ function handlePaymentSucceeded(\Stripe\PaymentIntent $pi): void {
     $installments = $pi->metadata['installments_plan'] ?? 'none';
 
     error_log("[STRIPE] Pago exitoso | ID: {$pi->id} | Método: {$method} | Monto: {$amount} {$currency} | MSI: {$installments}");
+
+    // Orden de pago personalizada: se liquida en payment_orders, no crea pedido legacy
+    if (settlePaymentOrder($pi)) return;
 
     $userId  = $pi->metadata['user_id']  ?? null;
     $service = $pi->metadata['service']  ?? null;

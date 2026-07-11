@@ -11,7 +11,8 @@ googleProvider.addScope('email');
 
 export default function RegisterPage({ copy, onNavigate }) {
   const location      = useLocation();
-  const redirectTo    = location.state?.from ?? '/citas';
+  // kodeo_redirect respalda el destino (p. ej. /pago/orden/:token) si el state se pierde
+  const redirectTo    = location.state?.from ?? localStorage.getItem('kodeo_redirect') ?? '/citas';
   const redirectState = location.state?.returnState ?? undefined;
   const [name, setName]         = useState('');
   const [username, setUsername] = useState('');
@@ -75,6 +76,7 @@ export default function RegisterPage({ copy, onNavigate }) {
       // Guardar token y redirigir a login o dashboard
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.removeItem('kodeo_redirect');
       setSuccess(true);
       // Reload completo para que App.jsx lea el usuario de localStorage, luego va al destino
       setTimeout(() => { window.location.href = redirectTo; }, 1000);

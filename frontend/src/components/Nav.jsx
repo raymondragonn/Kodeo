@@ -219,10 +219,10 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                 {/* Links del portal */}
                 <nav style={{ flex: 1, padding: '0 20px' }}>
                   {[
-                    { label: 'Inicio',    href: '/',        action: () => onLogoClick?.() },
-                    { label: 'Pedidos',   href: '/pedidos', action: () => onAuthClick?.('pedidos') },
-                    { label: 'Citas',     href: '/citas',   action: () => onAuthClick?.('citas') },
-                    { label: 'Cuenta',    href: '/cuenta',  action: () => onAuthClick?.('cuenta') },
+                    { label: 'Inicio',    href: '/',           action: () => onLogoClick?.() },
+                    { label: 'Proyectos', href: '/proyectos',  action: () => onAuthClick?.('proyectos') },
+                    { label: 'Citas',     href: '/citas',      action: () => onAuthClick?.('citas') },
+                    { label: 'Cuenta',    href: '/cuenta',     action: () => onAuthClick?.('cuenta') },
                   ].map(({ label, href, action }) => (
                     <a
                       key={href}

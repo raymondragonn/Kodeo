@@ -44,7 +44,10 @@ kodeo-editorial/
 │   ├── forgot-password.php  # POST — solicita reset de contraseña
 │   ├── reset-password.php   # POST — aplica nueva contraseña con token
 │   ├── orders.php       # GET/PATCH /orders
-│   ├── create-payment-intent.php  # POST — tarjeta + MSI
+│   ├── projects.php     # GET/POST/PATCH — proyectos de clientes (admin crea/edita)
+│   ├── payment-orders.php         # GET/POST/PATCH — órdenes de pago con link único
+│   ├── payment-order-helpers.php  # settlePaymentOrder() + emails (compartido webhook/confirm)
+│   ├── create-payment-intent.php  # POST — tarjeta + MSI (también órdenes: payment_order_token)
 │   ├── create-oxxo.php            # POST — pago OXXO
 │   ├── create-spei.php            # POST — transferencia SPEI
 │   ├── confirm-payment.php        # POST — respaldo síncrono del webhook
@@ -57,7 +60,8 @@ kodeo-editorial/
 ├── database/
 │   ├── init.sql         # Schema inicial (users + orders)
 │   ├── migration_oauth.sql  # Migración: columnas oauth_provider / oauth_id
-│   └── migration_password_reset.sql  # Migración: reset_token_hash / reset_token_expires
+│   ├── migration_password_reset.sql  # Migración: reset_token_hash / reset_token_expires
+│   └── migration_projects_payment_orders.sql  # Migración: tablas projects + payment_orders
 └── docker-compose.yml   # MySQL 8.4 (puerto 3307) + Backend PHP (puerto 8000)
 ```
 
@@ -119,6 +123,19 @@ El JWT tiene vigencia de 7 días y lleva `sub`, `name`, `username`, `email`, `ro
 
 Requiere header `Authorization: Bearer <token>`.
 
+### Proyectos y órdenes de pago (cierre de ventas / cargos extras)
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/projects.php` | Cliente ve sus proyectos; admin ve todos. Cada proyecto incluye sus `payment_orders` |
+| POST | `/projects.php` | Solo admin: crea proyecto `{name, user_email?, notes?}`. `user_email` vacío = prospecto sin cuenta (el proyecto se reclama al abrir el link de pago autenticado) |
+| PATCH | `/projects.php?id={id}` | Solo admin: `{name, status, notes, user_email}`. Estatus: `en_diseno`, `en_desarrollo`, `completado`, `cancelado` |
+| GET | `/payment-orders.php?token={t}` | Detalle de la orden por su `public_token` (requiere sesión). Si el proyecto no tiene dueño, lo asigna al usuario autenticado |
+| POST | `/payment-orders.php` | Solo admin: crea orden `{project_id, amount (pesos), descripcion, permite_msi, es_cargo_extra}` → devuelve `pay_url` (`/pago/orden/{token}`) y envía el link por email si el proyecto tiene cliente ligado |
+| PATCH | `/payment-orders.php?id={id}` | Solo admin: `{status}` — `pagado` marca pago por transferencia (fija `tipo_pago`/`paid_at` y notifica), `cancelado`, `pendiente` |
+
+Pago con Stripe de una orden: el frontend manda `payment_order_token` a `/create-payment-intent.php`; el monto se lee de la BD y el recargo MSI (`MSI_SURCHARGE_RATES` en `config.php`) se calcula en servidor — el total no es manipulable desde el navegador. Al confirmarse el pago (webhook o `confirm-payment.php`), `settlePaymentOrder()` marca la orden `pagado` y avisa por email al admin (`ADMIN_NOTIFY_EMAIL`) y al cliente; estos pagos NO crean fila en `orders`.
+
 ### Pagos Stripe
 
 | Método | Endpoint | Descripción |
@@ -152,6 +169,16 @@ Requiere header `Authorization: Bearer <token>`.
 - `stripe_payment_intent_id` (UNIQUE) — vincula el pedido al PaymentIntent de Stripe; evita pedidos duplicados entre el webhook y `confirm-payment.php`
 - `created_at`, `updated_at`
 
+**`projects`** — Proyectos de clientes (migración: `migration_projects_payment_orders.sql`)
+- `id`, `user_id` (FK → users, **nullable** para prospectos), `name`, `notes`
+- `status`: `en_diseno` | `en_desarrollo` | `completado` | `cancelado`
+
+**`payment_orders`** — Órdenes de pago personalizadas ligadas a un proyecto
+- `id`, `project_id` (FK → projects), `public_token` (CHAR(32) UNIQUE — link `/pago/orden/{token}`)
+- `descripcion`, `amount`, `currency`, `tipo_pago` (`transferencia` | `stripe`)
+- `status`: `pendiente` | `pagado` | `cancelado`; `permite_msi`, `es_cargo_extra` (booleans)
+- `stripe_payment_intent_id` (UNIQUE), `paid_at`
+
 El schema se aplica automáticamente al crear el contenedor MySQL (`database/init.sql`).
 
 ## Variables de Entorno del Backend
@@ -183,6 +210,10 @@ SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM_EMAIL=
 SMTP_FROM_NAME=Kodeo
+
+# Opcional: correo que recibe avisos internos (órdenes pagadas, cargos extras aprobados).
+# Si se omite, usa SMTP_FROM_EMAIL.
+ADMIN_NOTIFY_EMAIL=
 ```
 
 `setCorsHeaders()` (`backend/config.php`) ya acepta automáticamente cualquier origen `localhost:*`, así que `ALLOWED_ORIGIN` solo importa para producción — no hay que tocarlo al alternar entre desarrollo y producción localmente.
@@ -235,6 +266,8 @@ El routing usa **`react-router-dom`** (v7) con rutas reales por URL — ya no es
 | `/pedidos` | `OrdersPage` — historial de pedidos |
 | `/comprar` | `SelectProductPage` — elección de producto |
 | `/pago` | `Checkout` |
+| `/proyectos` | `ProjectsPage` — sección del Panel (usa `PortalLayout`; reemplazó a "Pedidos" en la navegación del portal): cliente ve avance y aprueba/paga cargos extras; admin crea proyectos, genera órdenes/links y marca transferencias pagadas. `/pedidos` sigue existiendo pero ya no aparece en el menú del portal |
+| `/pago/orden/:token` | `OrderPaymentPage` — pantalla de pago de una orden personalizada. Si no hay sesión, guarda el destino en `localStorage` (`kodeo_redirect`) y redirige a login/registro; al autenticarse vuelve solo |
 | `/pago-confirmado` | `PaymentConfirmedPage` — return_url de Stripe tras OXXO/SPEI/3DS |
 | `*` | Redirige a `/` |
 
@@ -265,6 +298,9 @@ Otros datos de estado en `App.jsx`:
 | `OrdersPage` | Historial de pedidos — vista kanban (desktop) o calendario (mobile) |
 | `SelectProductPage` | Selección de producto antes del checkout |
 | `Checkout` | Pago: tarjeta/MSI, OXXO, SPEI vía Stripe |
+| `ProjectsPage` | Sección Proyectos del Panel (cliente/admin): alerta de cargos extras pendientes, creación de proyectos y órdenes de pago con link único |
+| `BookingCalendar` | Calendario de agenda propio (L-V 9–18, sáb 10–14, slots de 30 min) usado en `/agendar` y en "Agendar cita" del Panel de citas; la cita se confirma por WhatsApp (`copy.booking.waMessage` en /agendar, `copy.booking.panelWaMessage` — nombre, tipo, proyecto, correo y motivo — en el Panel). Las citas del Panel se registran vía `POST /appointments.php` como `call_type='panel'` (migración: `migration_panel_appointments.sql`; `service_code` = `nuevo`/`existente`, `project_details` = motivo), aparecen en la sección Citas de cliente y admin, el backend las elimina automáticamente al pasar su fecha (limpieza en el GET) y solo el admin puede reprogramarlas (`PATCH ?action=reschedule`, envía email al cliente) |
+| `OrderPaymentPage` | Pago de orden personalizada (`/pago/orden/:token`) con MSI si `permite_msi` |
 | `PaymentConfirmedPage` | Confirmación de pago, llama a `/confirm-payment.php` como respaldo del webhook |
 | `LangToggle` | Selector de idioma ES/EN — **sin usar actualmente**: el componente existe pero `App.jsx` ya no lo monta (el idioma se autodetecta) |
 

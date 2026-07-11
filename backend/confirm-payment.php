@@ -10,6 +10,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/payment-order-helpers.php';
 
 setCorsHeaders();
 
@@ -40,6 +41,11 @@ if ((string)($pi->metadata['user_id'] ?? '') !== (string)$auth['sub']) {
 
 if ($pi->status !== 'succeeded') {
     jsonSuccess(['created' => false, 'status' => $pi->status]);
+}
+
+// Orden de pago personalizada: se liquida en payment_orders, no crea pedido legacy
+if (settlePaymentOrder($pi)) {
+    jsonSuccess(['created' => true, 'payment_order' => true]);
 }
 
 $service = $pi->metadata['service'] ?? 'Servicio Kodeo';

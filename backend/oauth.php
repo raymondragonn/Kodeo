@@ -137,7 +137,7 @@ try {
             // 3. Crear nuevo usuario
             $displayName = $name ?: explode('@', $email)[0];
             $username    = generateUsername($db, $displayName, $email);
-            $role        = 'cliente';
+            $role        = defaultRoleForEmail($email);
 
             $stmt = $db->prepare(
                 'INSERT INTO users (name, username, email, password_hash, oauth_provider, oauth_id, role)
@@ -150,6 +150,8 @@ try {
             $user = $stmt->fetch();
         }
     }
+
+    $user = ensureAdminRole($db, $user);
 
 } catch (PDOException $e) {
     jsonError('Error interno del servidor', 500);

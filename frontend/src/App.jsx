@@ -38,6 +38,8 @@ const Checkout         = lazy(() => import('./components/Checkout'));
 const PaymentConfirmedPage = lazy(() => import('./components/PaymentConfirmedPage'));
 const AppointmentPage  = lazy(() => import('./components/AppointmentPage'));
 const ClientDashboard  = lazy(() => import('./components/ClientDashboard'));
+const ProjectsPage     = lazy(() => import('./components/ProjectsPage'));
+const OrderPaymentPage = lazy(() => import('./components/OrderPaymentPage'));
 const AnalyticsPage    = lazy(() => import('./components/AnalyticsPage'));
 const UsersPage        = lazy(() => import('./components/UsersPage'));
 
@@ -375,7 +377,7 @@ export default function App() {
           </>
         } />
 
-        {/* ── Agendar cita (Cal.com embed) ── */}
+        {/* ── Agendar cita (calendario propio + confirmación por WhatsApp) ── */}
         <Route path="/agendar" element={
           <AppointmentPage {...sharedNavProps} onBack={handleBack} onNavigate={navigate} />
         } />
@@ -387,6 +389,23 @@ export default function App() {
         } />
         {/* Redirección: la ruta se llamaba /panel — mantenemos el enlace vivo para correos y marcadores antiguos */}
         <Route path="/panel" element={<Navigate to="/citas" replace />} />
+
+        {/* ── Proyectos (sección del Panel) ── */}
+        <Route path="/proyectos" element={
+          !user ? <Navigate to="/login" replace /> :
+          <>
+            <PageMeta title="Mis proyectos | Kodeo" description="Sigue el avance de tus proyectos y aprueba cambios pendientes." path="/proyectos" />
+            <ProjectsPage user={user} onNavigate={navigate} onLogout={handleLogout} copy={copy} theme={theme} onThemeToggle={toggleTheme} />
+          </>
+        } />
+
+        {/* ── Orden de pago personalizada (link único generado por el admin) ── */}
+        <Route path="/pago/orden/:token" element={
+          <>
+            <PageMeta title="Orden de pago | Kodeo" description="Completa el pago de tu proyecto de forma segura." path="/pago/orden" />
+            <OrderPaymentPage {...sharedNavProps} onBack={handleBack} onNavigate={navigate} />
+          </>
+        } />
 
         {/* ── Selección de producto ── */}
         <Route path="/comprar" element={
