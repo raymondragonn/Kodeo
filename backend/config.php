@@ -20,6 +20,9 @@ define('STRIPE_WEBHOOK_SECRET', getenv('STRIPE_WEBHOOK_SECRET')  ?: 'whsec_REEMP
 define('ALLOWED_ORIGIN',        getenv('ALLOWED_ORIGIN')        ?: 'http://localhost:5000');
 define('CAL_WEBHOOK_SECRET',    getenv('CAL_WEBHOOK_SECRET')    ?: '');
 define('KODEO_WHATSAPP',        getenv('KODEO_WHATSAPP')        ?: '522298483706');
+// Sesión persistente por dispositivo. Puede ajustarse sin cambiar código con
+// JWT_SESSION_DAYS; 30 días equilibra comodidad y exposición del token.
+define('JWT_TTL_SECONDS',        60 * 60 * 24 * max(1, (int)(getenv('JWT_SESSION_DAYS') ?: 30)));
 
 define('SMTP_HOST',       getenv('SMTP_HOST')       ?: 'smtp.zoho.com');
 define('SMTP_PORT',       (int)(getenv('SMTP_PORT') ?: 465));
@@ -272,4 +275,34 @@ function jsonSuccess(array $data): never {
     http_response_code(200);
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+/**
+ * Genera un username único a partir del nombre o del correo.
+ * Se prueba primero la base derivada del nombre; si viene vacío (p. ej. en el
+ * registro manual, donde el username se asigna automáticamente desde el correo)
+ * se deriva de la parte local del email. Garantiza unicidad añadiendo un sufijo
+ * numérico y, en el peor caso, un sufijo aleatorio.
+ */
+function generateUsername(PDO $db, string $name, ?string $email): string {
+    $base = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode(' ', $name)[0]));
+
+    if (!$base && $email) {
+        $base = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode('@', $email)[0]));
+    }
+
+    if (!$base) $base = 'usuario';
+
+    $stmt = $db->prepare('SELECT username FROM users WHERE username = ? LIMIT 1');
+    $stmt->execute([$base]);
+
+    if (!$stmt->fetch()) return $base;
+
+    for ($i = 2; $i <= 9999; $i++) {
+        $candidate = $base . $i;
+        $stmt->execute([$candidate]);
+        if (!$stmt->fetch()) return $candidate;
+    }
+
+    return $base . bin2hex(random_bytes(3));
 }

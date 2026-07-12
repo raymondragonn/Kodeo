@@ -50,7 +50,7 @@ function dayIsSelectable(date, maxDate) {
 
 export default function BookingCalendar({
   locale = 'es-MX', accent = 'var(--accent-green)', copy, isMobile,
-  selectedSlot, onSelectSlot,
+  selectedSlot, onSelectSlot, compact = false,
 }) {
   const today = new Date();
   const maxDate = useMemo(() => {
@@ -124,8 +124,8 @@ export default function BookingCalendar({
       gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.4fr) minmax(0, 1fr)',
     }}>
       {/* ─── Panel del mes ─────────────────────────────── */}
-      <div style={{ padding: isMobile ? '22px 18px' : '30px 32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
+      <div style={{ padding: isMobile ? (compact ? '14px 12px' : '22px 18px') : '30px 32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: compact && isMobile ? 10 : 22 }}>
           <div style={{
             fontFamily: 'var(--display)', fontSize: isMobile ? 20 : 24,
             letterSpacing: '-0.02em', textTransform: 'capitalize',
@@ -162,7 +162,7 @@ export default function BookingCalendar({
                 disabled={!selectable}
                 onClick={() => handleDayClick(date)}
                 style={{
-                  aspectRatio: '1', minHeight: 38,
+                  aspectRatio: '1', minHeight: compact && isMobile ? 32 : 38,
                   borderRadius: 'var(--radius-sm)',
                   border: isSelected ? `1px solid ${accent}` : '1px solid transparent',
                   background: isSelected ? 'var(--type)' : selectable ? 'var(--bg-2)' : 'transparent',
@@ -189,19 +189,19 @@ export default function BookingCalendar({
           })}
         </div>
 
-        <p style={{
+        {!compact && <p style={{
           fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em',
           textTransform: 'uppercase', color: 'var(--type-muted)', margin: '20px 0 0',
         }}>
           {copy.timezone}
-        </p>
+        </p>}
       </div>
 
       {/* ─── Panel de horarios ─────────────────────────── */}
       <div style={{
         borderLeft: isMobile ? 'none' : '1px solid var(--line)',
         borderTop: isMobile ? '1px solid var(--line)' : 'none',
-        padding: isMobile ? '22px 18px' : '30px 26px',
+        padding: isMobile ? (compact ? '14px 12px' : '22px 18px') : '30px 26px',
         display: 'flex', flexDirection: 'column',
         maxHeight: isMobile ? 'none' : 460,
       }}>
@@ -219,7 +219,9 @@ export default function BookingCalendar({
               </p>
             ) : (
               <div style={{
-                display: 'flex', flexDirection: 'column', gap: 8,
+                display: 'grid',
+                gridTemplateColumns: compact && isMobile ? 'repeat(3, minmax(0, 1fr))' : '1fr',
+                gap: compact && isMobile ? 6 : 8,
                 overflowY: 'auto', paddingRight: 4, flex: 1,
               }}>
                 {slots.map((slot) => {
@@ -229,7 +231,7 @@ export default function BookingCalendar({
                       key={slot.getTime()}
                       onClick={() => onSelectSlot?.(slot)}
                       style={{
-                        padding: '12px 16px',
+                        padding: compact && isMobile ? '10px 4px' : '12px 16px',
                         borderRadius: 'var(--radius-sm)',
                         border: isSelected ? `1px solid ${accent}` : '1px solid var(--line)',
                         background: isSelected ? 'var(--type)' : 'transparent',
@@ -252,7 +254,7 @@ export default function BookingCalendar({
         ) : (
           <div style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            minHeight: isMobile ? 120 : 0,
+            minHeight: isMobile ? (compact ? 64 : 120) : 0,
           }}>
             <p style={{
               fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)',

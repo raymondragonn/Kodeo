@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Footer from './Footer';
 import Nav from './Nav';
+import RevealButton from './RevealButton';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 const incupCover       = '/assets/projects/incup/incup-mockup-cover.png';
 const tudiCover        = '/assets/projects/tudi/tudi-mockup-cover.png';
@@ -173,44 +174,72 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
               display: 'grid',
               gridTemplateColumns: 'auto 1fr',
               gap: '12px 14px',
-              alignItems: 'center',
+              alignItems: 'start',
             }}>
               {[
-                [sp.specs.delivery,   service.time],
-                [sp.specs.investment, service.price],
-              ].map(([dt, dd]) => (
+                [sp.specs.delivery,   service.time,  copy.services.timeNote],
+                [sp.specs.investment, service.price, copy.services.priceNote],
+              ].map(([dt, dd, note]) => (
                 <>
                   <dt key={`dt-${dt}`} style={{ color: 'var(--type-soft)' }}>{dt}</dt>
-                  <dd key={`dd-${dt}`} style={{ margin: 0, color: 'var(--type)' }}>{dd}</dd>
+                  <dd key={`dd-${dt}`} style={{ margin: 0, color: 'var(--type)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {dd}
+                    <span style={{ fontSize: 8, letterSpacing: '.12em', opacity: 0.6, color: 'var(--type-soft)' }}>{note}</span>
+                  </dd>
                 </>
               ))}
             </dl>
-            {PDF_MAP[service.code] && (
-              <a
-                href={PDF_MAP[service.code]}
-                download
+            <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                className="cta-breathe"
+                onClick={handleCheckout}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 6,
-                  marginTop: 20,
                   fontFamily: 'var(--ui)',
                   fontSize: 11,
                   letterSpacing: '.18em',
                   textTransform: 'uppercase',
-                  color: 'var(--type-soft)',
-                  border: '1px solid var(--line)',
+                  background: 'var(--type)',
+                  color: 'var(--bg)',
+                  border: 0,
                   borderRadius: 'var(--radius-pill)',
-                  padding: '10px 16px',
-                  textDecoration: 'none',
-                  transition: 'border-color 0.2s, color 0.2s',
+                  padding: '10px 18px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s ease',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
               >
-                ↓ {sp.downloadPdf ?? 'Descargar PDF'}
-              </a>
-            )}
+                {sp.ctaStart} {service.name} →
+              </button>
+              {PDF_MAP[service.code] && (
+                <a
+                  href={PDF_MAP[service.code]}
+                  download
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontFamily: 'var(--ui)',
+                    fontSize: 11,
+                    letterSpacing: '.18em',
+                    textTransform: 'uppercase',
+                    color: 'var(--type-soft)',
+                    border: '1px solid var(--line)',
+                    borderRadius: 'var(--radius-pill)',
+                    padding: '10px 16px',
+                    textDecoration: 'none',
+                    transition: 'border-color 0.2s, color 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
+                >
+                  ↓ {sp.downloadPdf ?? 'Descargar PDF'}
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -463,6 +492,29 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
             <span style={{ color: 'var(--type)' }}>{service.price}</span> · {service.time}
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+            <RevealButton
+              className="cta-breathe"
+              onActivate={handleCheckout}
+              style={{
+                background: 'var(--type)',
+                color: 'var(--bg)',
+                padding: '16px 22px',
+                borderRadius: 'var(--radius-pill)',
+                fontFamily: 'var(--ui)',
+                fontSize: 12,
+                letterSpacing: '.2em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                transition: 'transform 0.2s ease',
+                flex: isMobile ? 1 : 'none',
+                border: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {sp.ctaStart} {service.name} →
+            </RevealButton>
             {PDF_MAP[service.code] && (
               <a
                 href={PDF_MAP[service.code]}
@@ -491,49 +543,6 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
                 ↓ {sp.downloadPdf ?? 'Descargar PDF'}
               </a>
             )}
-            <a href={`mailto:${copy.cta.email}`} style={{
-              fontFamily: 'var(--ui)',
-              fontSize: 12,
-              letterSpacing: '.18em',
-              textTransform: 'uppercase',
-              color: 'var(--type-soft)',
-              padding: '16px 20px',
-              border: '1px solid var(--line)',
-              borderRadius: 'var(--radius-pill)',
-              transition: 'border-color 0.2s, color 0.2s',
-              flex: isMobile ? 1 : 'none',
-              textAlign: 'center',
-              textDecoration: 'none',
-            }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
-            >
-              {copy.cta.email}
-            </a>
-            <button
-              onClick={handleCheckout}
-              style={{
-                background: 'var(--type)',
-                color: 'var(--bg)',
-                padding: '16px 22px',
-                borderRadius: 'var(--radius-pill)',
-                fontFamily: 'var(--ui)',
-                fontSize: 12,
-                letterSpacing: '.2em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease',
-                flex: isMobile ? 1 : 'none',
-                border: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-            >
-              {sp.ctaStart} →
-            </button>
           </div>
         </div>
       </section>

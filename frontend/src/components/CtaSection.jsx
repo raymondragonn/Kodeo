@@ -5,6 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useMagneticCursor } from '../hooks/useMagneticCursor';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { trackCtaClick } from '../lib/analytics';
+import RevealButton from './RevealButton';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -125,8 +126,9 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
             </span>
           </a>
 
-          <button
-            onClick={() => {
+          <RevealButton
+            className="cta-breathe"
+            onActivate={() => {
               trackCtaClick({ cta_id: 'cta_contratar', cta_text: copy.cta.btn, section: 'cta', destination: '/comprar' });
               navigate('/comprar');
             }}
@@ -147,11 +149,9 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
               alignItems: 'center',
               justifyContent: 'center',
             }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
           >
             {copy.cta.btn} →
-          </button>
+          </RevealButton>
         </div>
       </div>
     </section>

@@ -13,15 +13,24 @@ export default function RegisterPage({ copy, onNavigate }) {
   const location      = useLocation();
   // kodeo_redirect respalda el destino (p. ej. /pago/orden/:token) si el state se pierde
   const redirectTo    = location.state?.from ?? localStorage.getItem('kodeo_redirect') ?? '/citas';
-  const redirectState = location.state?.returnState ?? undefined;
   const [name, setName]         = useState('');
-  const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showManual, setShowManual] = useState(false); // form de correo oculto hasta pedirlo
+
+  // Requisitos de contraseña — deben coincidir con las validaciones de register.php
+  const passwordChecks = [
+    { label: 'Al menos 8 caracteres', ok: password.length >= 8 },
+    { label: 'Una letra minúscula',   ok: /[a-z]/.test(password) },
+    { label: 'Una letra mayúscula',   ok: /[A-Z]/.test(password) },
+    { label: 'Un número',             ok: /[0-9]/.test(password) },
+    { label: 'Un carácter especial',  ok: /[^A-Za-z0-9]/.test(password) },
+  ];
+  const passwordValid = passwordChecks.every(c => c.ok);
 
   const fieldStyle = {
     width: '100%',
@@ -178,16 +187,73 @@ export default function RegisterPage({ copy, onNavigate }) {
             </div>
           )}
 
+          {/* Google — método principal */}
+          <button
+            type="button"
+            disabled={loading || success}
+            onClick={handleGoogleRegister}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              width: '100%', height: 48,
+              background: '#ffffff', border: '1px solid var(--line-2)',
+              borderRadius: 'var(--radius-pill)', cursor: loading ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--ui)', fontSize: 12, letterSpacing: '.14em',
+              textTransform: 'uppercase', color: '#1f1f1f',
+              transition: 'opacity 0.2s', opacity: loading || success ? 0.6 : 1,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+            Registrarse con Google
+          </button>
+
+          {!showManual && (
+            <button
+              type="button"
+              onClick={() => setShowManual(true)}
+              style={{
+                width: '100%', height: 48, marginTop: 10,
+                background: 'transparent', color: 'var(--type)',
+                border: '1px solid var(--line-2)',
+                borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+                fontFamily: 'var(--ui)', fontSize: 12, letterSpacing: '.14em',
+                textTransform: 'uppercase',
+                transition: 'opacity 0.2s, border-color 0.2s',
+              }}
+            >
+              Continuar con correo
+            </button>
+          )}
+
+          {showManual && (
+          <>
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0 20px' }}>
+            <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+            <span style={{
+              fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em',
+              textTransform: 'uppercase', color: 'var(--type-muted)', whiteSpace: 'nowrap',
+            }}>
+              O con tu correo
+            </span>
+            <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+          </div>
+
           <form onSubmit={async e => {
             e.preventDefault();
-            if (password.length < 8) return;
+            if (!passwordValid) return;
             setError('');
             setLoading(true);
             try {
               const res = await fetch(`${API}/register.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, username, email, password }),
+                body: JSON.stringify({ name, email, password }),
               });
               const data = await res.json();
               if (!res.ok) { setError(data.error ?? 'Error al registrar'); return; }
@@ -206,19 +272,6 @@ export default function RegisterPage({ copy, onNavigate }) {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="Tu nombre"
-                style={fieldStyle}
-                onFocus={e => e.target.style.borderColor = 'var(--line-2)'}
-                onBlur={e => e.target.style.borderColor = 'var(--line)'}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Usuario</label>
-              <input
-                type="text"
-                value={username}
-                onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                placeholder="solo letras, números y _"
                 style={fieldStyle}
                 onFocus={e => e.target.style.borderColor = 'var(--line-2)'}
                 onBlur={e => e.target.style.borderColor = 'var(--line)'}
@@ -245,7 +298,8 @@ export default function RegisterPage({ copy, onNavigate }) {
                   type={showPass ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Crea una contraseña segura"
+                  maxLength={64}
                   style={{ ...fieldStyle, paddingRight: 44 }}
                   onFocus={e => e.target.style.borderColor = 'var(--line-2)'}
                   onBlur={e => e.target.style.borderColor = 'var(--line)'}
@@ -273,68 +327,55 @@ export default function RegisterPage({ copy, onNavigate }) {
                   )}
                 </button>
               </div>
-              {password.length > 0 && password.length < 8 && (
-                <p style={{ fontFamily: 'var(--body)', fontSize: 11, color: '#e05050', margin: '6px 0 0' }}>
-                  Mínimo 8 caracteres
-                </p>
+              {password.length > 0 && (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {passwordChecks.map((c, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: c.ok ? 'none' : '1px solid var(--line-2)',
+                        background: c.ok ? '#22c55e' : 'transparent',
+                        transition: 'background 0.2s, border-color 0.2s',
+                      }}>
+                        {c.ok && (
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </span>
+                      <span style={{
+                        fontFamily: 'var(--body)', fontSize: 12,
+                        color: c.ok ? 'var(--type-soft)' : 'var(--type-muted)',
+                        transition: 'color 0.2s',
+                      }}>
+                        {c.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
             <button
               type="submit"
-              disabled={loading || success}
+              disabled={loading || success || !passwordValid}
               style={{
-                background: 'var(--type)', color: 'var(--bg)', border: 0,
+                background: 'transparent', color: 'var(--type)',
+                border: '1px solid var(--line-2)',
                 padding: '13px 18px', borderRadius: 'var(--radius-pill)',
                 fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
-                textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'opacity 0.2s', width: '100%', marginTop: 4,
-                opacity: loading || success ? 0.6 : 1,
+                textTransform: 'uppercase',
+                cursor: (loading || success || !passwordValid) ? 'not-allowed' : 'pointer',
+                transition: 'opacity 0.2s, border-color 0.2s', width: '100%', marginTop: 4,
+                opacity: (loading || success || !passwordValid) ? 0.6 : 1,
               }}
             >
               {loading ? 'Creando cuenta...' : 'Crear cuenta →'}
             </button>
           </form>
-
-          {/* OAuth divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '28px 0 20px' }}>
-            <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
-            <span style={{
-              fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em',
-              textTransform: 'uppercase', color: 'var(--type-muted)', whiteSpace: 'nowrap',
-            }}>
-              O registrate con
-            </span>
-            <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
-          </div>
-
-          {/* OAuth buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {/* Google */}
-            <button
-              type="button"
-              disabled={loading}
-              onClick={handleGoogleRegister}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                width: '100%', height: 46,
-                background: 'var(--bg-2)', border: '1px solid var(--line)',
-                borderRadius: 'var(--radius-pill)', cursor: loading ? 'not-allowed' : 'pointer',
-                fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
-                textTransform: 'uppercase', color: 'var(--type)',
-                transition: 'opacity 0.2s', opacity: loading ? 0.6 : 1,
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 48 48">
-                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                <path fill="none" d="M0 0h48v48H0z"/>
-              </svg>
-              Registrarse con Google
-            </button>
-          </div>
+          </>
+          )}
 
           <p style={{
             fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)',

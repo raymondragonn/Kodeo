@@ -7,9 +7,24 @@ import { useBreakpoint } from '../hooks/useBreakpoint';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const PERIOD_VALUES = ['7daysAgo', '28daysAgo', '90daysAgo'];
+const PERIODS = [
+  { value: '7daysAgo',  label: '7 días'  },
+  { value: '28daysAgo', label: '28 días' },
+  { value: '90daysAgo', label: '90 días' },
+];
 
 const CHART_COLORS = ['#5170ff', '#63C44D', '#FFDE59', '#ff6b6b', '#a78bfa', '#fb923c'];
+
+const CHANNEL_ES = {
+  'Organic Search':  'Búsqueda orgánica',
+  'Direct':          'Directo',
+  'Referral':        'Referencia',
+  'Organic Social':  'Redes sociales',
+  'Paid Search':     'Búsqueda pagada',
+  'Email':           'Email',
+  'Unassigned':      'Sin asignar',
+  '(other)':         'Otros',
+};
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 
@@ -24,14 +39,14 @@ function trendPct(current, previous) {
   return Math.round(((current - previous) / previous) * 100);
 }
 
-function fmtDate(dateStr, locale) {
+function fmtDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
 }
 
 // ── Tarjeta de proyecto ───────────────────────────────────────────────────────
 
-function ProjectCard({ project, label, isConfigured, onView, onSaveLabel, A }) {
+function ProjectCard({ project, label, isConfigured, onView, onSaveLabel }) {
   const [editing,   setEditing]   = useState(false);
   const [editValue, setEditValue] = useState('');
   const [saving,    setSaving]    = useState(false);
@@ -97,7 +112,7 @@ function ProjectCard({ project, label, isConfigured, onView, onSaveLabel, A }) {
               width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
               background: isConfigured ? '#16a34a' : 'var(--line-2)',
             }} />
-            {isConfigured ? A.configured : A.configuring}
+            {isConfigured ? 'Configurado' : 'En configuración'}
           </span>
         </div>
 
@@ -170,7 +185,7 @@ function ProjectCard({ project, label, isConfigured, onView, onSaveLabel, A }) {
             e.currentTarget.style.color = 'var(--type-soft)';
           }}
         >
-          <span>{A.viewAnalytics}</span>
+          <span>Ver analíticas</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12" />
             <polyline points="12 5 19 12 12 19" />
@@ -193,17 +208,17 @@ const tdStyle = {
   padding: '14px 16px', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)',
 };
 
-function ProjectsTable({ projects, getLabel, meta, onView, isMobile, A }) {
+function ProjectsTable({ projects, getLabel, meta, onView, isMobile }) {
   return (
     <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 520 : 'auto' }}>
           <thead>
             <tr style={{ background: 'var(--bg-2)', borderBottom: '1px solid var(--line)' }}>
-              <th style={thStyle}>{A.thService}</th>
-              <th style={thStyle}>{A.thLabel}</th>
-              <th style={thStyle}>{A.thStatus}</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>{A.thAction}</th>
+              <th style={thStyle}>Servicio</th>
+              <th style={thStyle}>Etiqueta</th>
+              <th style={thStyle}>Estado</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Acción</th>
             </tr>
           </thead>
           <tbody>
@@ -214,7 +229,6 @@ function ProjectsTable({ projects, getLabel, meta, onView, isMobile, A }) {
                 label={getLabel(project)}
                 isConfigured={meta.configured[project.id] ?? false}
                 onView={onView}
-                A={A}
               />
             ))}
           </tbody>
@@ -224,7 +238,7 @@ function ProjectsTable({ projects, getLabel, meta, onView, isMobile, A }) {
   );
 }
 
-function ProjectsTableRow({ project, label, isConfigured, onView, A }) {
+function ProjectsTableRow({ project, label, isConfigured, onView }) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -247,7 +261,7 @@ function ProjectsTableRow({ project, label, isConfigured, onView, A }) {
           color: isConfigured ? '#16a34a' : 'var(--type-muted)',
         }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: isConfigured ? '#16a34a' : 'var(--line-2)' }} />
-          {isConfigured ? A.configured : A.configuring}
+          {isConfigured ? 'Configurado' : 'En configuración'}
         </span>
       </td>
       <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -263,7 +277,7 @@ function ProjectsTableRow({ project, label, isConfigured, onView, A }) {
           onMouseEnter={e => { e.currentTarget.style.borderColor = project.accent; e.currentTarget.style.color = 'var(--type)'; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
         >
-          {A.viewAnalytics}
+          Ver analíticas
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
           </svg>
@@ -275,11 +289,11 @@ function ProjectsTableRow({ project, label, isConfigured, onView, A }) {
 
 // ── Gráfico de área (SVG) ─────────────────────────────────────────────────────
 
-function AreaChart({ data, metric = 'sessions', A, locale }) {
+function AreaChart({ data, metric = 'sessions' }) {
   if (!data || data.length < 2) return (
     <div style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: 'var(--type-muted)', letterSpacing: '.12em', textTransform: 'uppercase' }}>
-        {A.insufficientData}
+        Sin datos suficientes
       </span>
     </div>
   );
@@ -317,7 +331,7 @@ function AreaChart({ data, metric = 'sessions', A, locale }) {
         const idx = data.indexOf(d);
         return (
           <text key={i} x={px(idx)} y={H - 3} textAnchor="middle" style={{ fontFamily: 'sans-serif', fontSize: 9, fill: 'var(--type-muted, #666)' }}>
-            {fmtDate(d.date, locale)}
+            {fmtDate(d.date)}
           </text>
         );
       })}
@@ -327,7 +341,7 @@ function AreaChart({ data, metric = 'sessions', A, locale }) {
 
 // ── Gráfico de dona (SVG) ─────────────────────────────────────────────────────
 
-function DonutChart({ sources, total, A }) {
+function DonutChart({ sources, total }) {
   const r = 36, cx = 50, cy = 50, circ = 2 * Math.PI * r, gap = 2;
 
   const pcts = sources.map(s => total > 0 ? s.sessions / total : 0);
@@ -356,14 +370,14 @@ function DonutChart({ sources, total, A }) {
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ fontFamily: 'var(--display)', fontSize: 18, fontWeight: 400, color: 'var(--type)', letterSpacing: '-0.03em', lineHeight: 1 }}>{fmt(total)}</span>
-          <span style={{ fontFamily: 'var(--ui)', fontSize: 9, color: 'var(--type-muted)', letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 2 }}>{A.donutSessions}</span>
+          <span style={{ fontFamily: 'var(--ui)', fontSize: 9, color: 'var(--type-muted)', letterSpacing: '.14em', textTransform: 'uppercase', marginTop: 2 }}>sesiones</span>
         </div>
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
         {segs.slice(0, 5).map((s, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-            <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{A.channels[s.channel] || s.channel}</span>
+            <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{CHANNEL_ES[s.channel] || s.channel}</span>
             <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: 'var(--type)', flexShrink: 0 }}>{Math.round(s.pct * 100)}%</span>
           </div>
         ))}
@@ -374,7 +388,7 @@ function DonutChart({ sources, total, A }) {
 
 // ── Realtime Card ─────────────────────────────────────────────────────────────
 
-function RealtimeCard({ realtime, isMobile, A }) {
+function RealtimeCard({ realtime, isMobile }) {
   const { activeUsers, pages = [], events = [] } = realtime;
   const maxUsers  = pages[0]?.users  || 1;
   const maxEvents = events[0]?.count || 1;
@@ -388,10 +402,10 @@ function RealtimeCard({ realtime, isMobile, A }) {
       }}>
         <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', animation: 'kd-pulse 2s ease-in-out infinite', flexShrink: 0 }} />
         <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', flex: 1 }}>
-          {A.rtNow}
+          Ahora mismo
         </span>
         <span style={{ fontFamily: 'var(--ui)', fontSize: 10, color: 'var(--type-muted)', letterSpacing: '.06em' }}>
-          {A.rtLast30}
+          Últimos 30 min
         </span>
       </div>
 
@@ -404,23 +418,23 @@ function RealtimeCard({ realtime, isMobile, A }) {
         {/* Usuarios activos */}
         <div style={{ padding: '20px 24px', borderRight: isMobile ? 'none' : '1px solid var(--line)', borderBottom: isMobile ? '1px solid var(--line)' : 'none' }}>
           <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', marginBottom: 6 }}>
-            {A.rtActiveUsers}
+            Usuarios activos
           </span>
           <span style={{ fontFamily: 'var(--display)', fontSize: 42, letterSpacing: '-0.03em', color: activeUsers > 0 ? '#16a34a' : 'var(--type)', lineHeight: 1 }}>
             {activeUsers}
           </span>
           <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', display: 'block', marginTop: 4 }}>
-            {activeUsers === 1 ? A.rtPersonOnSite : A.rtPeopleOnSite}
+            {activeUsers === 1 ? 'persona en el sitio' : 'personas en el sitio'}
           </span>
         </div>
 
         {/* Páginas activas */}
         <div style={{ padding: '20px 0', borderRight: isMobile ? 'none' : '1px solid var(--line)', borderBottom: isMobile ? '1px solid var(--line)' : 'none' }}>
           <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', padding: '0 24px', marginBottom: 10 }}>
-            {A.rtActivePages}
+            Páginas activas
           </span>
           {pages.length === 0
-            ? <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', padding: '0 24px' }}>{A.rtNoActivity}</span>
+            ? <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', padding: '0 24px' }}>Sin actividad</span>
             : pages.map((p, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 24px' }}>
                   <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.path}>
@@ -438,10 +452,10 @@ function RealtimeCard({ realtime, isMobile, A }) {
         {/* Eventos recientes */}
         <div style={{ padding: '20px 0' }}>
           <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', padding: '0 24px', marginBottom: 10 }}>
-            {A.rtRecentEvents}
+            Eventos recientes
           </span>
           {events.length === 0
-            ? <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', padding: '0 24px' }}>{A.rtNoEvents}</span>
+            ? <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', padding: '0 24px' }}>Sin eventos</span>
             : events.map((e, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 24px' }}>
                   <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.name}>
@@ -462,7 +476,7 @@ function RealtimeCard({ realtime, isMobile, A }) {
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, previous, suffix = '', format = fmt, A }) {
+function KpiCard({ label, value, previous, suffix = '', format = fmt }) {
   const pct = trendPct(value, previous);
   const up  = pct !== null && pct >= 0;
   return (
@@ -470,8 +484,8 @@ function KpiCard({ label, value, previous, suffix = '', format = fmt, A }) {
       <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>{label}</span>
       <span style={{ fontFamily: 'var(--display)', fontSize: 30, letterSpacing: '-0.03em', color: 'var(--type)', lineHeight: 1.1 }}>{format(value)}{suffix}</span>
       {pct !== null
-        ? <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: up ? '#16a34a' : '#dc2626', display: 'flex', alignItems: 'center', gap: 3 }}>{up ? '↑' : '↓'} {A.vsPrev.replace('{n}', Math.abs(pct))}</span>
-        : <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: 'var(--type-muted)' }}>{A.noPrev}</span>
+        ? <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: up ? '#16a34a' : '#dc2626', display: 'flex', alignItems: 'center', gap: 3 }}>{up ? '↑' : '↓'} {Math.abs(pct)}% vs período anterior</span>
+        : <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: 'var(--type-muted)' }}>Sin período anterior</span>
       }
     </div>
   );
@@ -506,7 +520,7 @@ function Card({ title, children }) {
   );
 }
 
-function Empty({ text }) {
+function Empty({ text = 'Sin datos para este período' }) {
   return (
     <div style={{ padding: '32px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <span style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)' }}>{text}</span>
@@ -533,7 +547,7 @@ function Skeleton({ isMobile }) {
 
 // ── Modal de exportación ──────────────────────────────────────────────────────
 
-function ExportModal({ defaultPeriod, onClose, onExport, loading, A }) {
+function ExportModal({ defaultPeriod, onClose, onExport, loading }) {
   const days     = parseInt(defaultPeriod) || 7;
   const todayStr = new Date().toISOString().slice(0, 10);
   const defStart = (() => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); })();
@@ -562,13 +576,13 @@ function ExportModal({ defaultPeriod, onClose, onExport, loading, A }) {
         onClick={e => e.stopPropagation()}
       >
         <h2 style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', margin: '0 0 20px' }}>
-          {A.exportTitle}
+          Exportar analíticas
         </h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
           {[
-            { label: A.from, value: start, onChange: setStart, max: end },
-            { label: A.to,   value: end,   onChange: setEnd,   min: start, max: todayStr },
+            { label: 'Desde', value: start, onChange: setStart, max: end },
+            { label: 'Hasta', value: end,   onChange: setEnd,   min: start, max: todayStr },
           ].map(({ label, value, onChange, min, max }) => (
             <div key={label}>
               <label style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', marginBottom: 6 }}>
@@ -581,10 +595,10 @@ function ExportModal({ defaultPeriod, onClose, onExport, loading, A }) {
 
         <div style={{ marginBottom: 24 }}>
           <label style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', display: 'block', marginBottom: 8 }}>
-            {A.format}
+            Formato
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
-            {[{ value: 'xls', label: A.formatExcel }, { value: 'pdf', label: A.formatPdf }].map(opt => (
+            {[{ value: 'xls', label: 'Excel (.csv)' }, { value: 'pdf', label: 'PDF' }].map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setFormat(opt.value)}
@@ -614,7 +628,7 @@ function ExportModal({ defaultPeriod, onClose, onExport, loading, A }) {
               color: 'var(--type-soft)', cursor: 'pointer',
             }}
           >
-            {A.cancel}
+            Cancelar
           </button>
           <button
             onClick={() => valid && !loading && onExport({ startDate: start, endDate: end, format })}
@@ -628,7 +642,7 @@ function ExportModal({ defaultPeriod, onClose, onExport, loading, A }) {
               transition: 'all .15s',
             }}
           >
-            {loading ? A.exporting : A.export}
+            {loading ? 'Exportando...' : 'Exportar'}
           </button>
         </div>
       </div>
@@ -638,21 +652,27 @@ function ExportModal({ defaultPeriod, onClose, onExport, loading, A }) {
 
 // ── Estado no configurado ─────────────────────────────────────────────────────
 
-function NotConfigured({ A }) {
+function NotConfigured() {
   return (
     <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <div style={{ background: 'var(--bg-2)', borderBottom: '1px solid var(--line)', padding: '14px 20px' }}>
-        <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>{A.ncTitle}</span>
+        <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>Configuración requerida</span>
       </div>
       <div style={{ background: 'var(--bg-2)', padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
-          <p style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', margin: '0 0 6px' }}>{A.ncHeading}</p>
+          <p style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', margin: '0 0 6px' }}>Conecta GA4 Data API</p>
           <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
-            {A.ncBody}
+            Para visualizar las estadísticas necesitas configurar una cuenta de servicio de Google con acceso a tu propiedad GA4.
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {A.ncSteps.map((text, i) => (
+          {[
+            'Activa la Google Analytics Data API en console.cloud.google.com',
+            'Crea una Cuenta de servicio y descarga el JSON de credenciales',
+            'En GA4 → Administrar → Administración de acceso → agrega el email de la cuenta de servicio como Lector',
+            'Coloca el JSON en backend/ga4_credentials.json (ya está en .gitignore)',
+            'Agrega GA4_PROPERTY_ID y GA4_CREDENTIALS_PATH al backend/.env',
+          ].map((text, i) => (
             <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-3)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                 <span style={{ fontFamily: 'var(--ui)', fontSize: 10, color: 'var(--type-soft)' }}>{i + 1}</span>
@@ -672,12 +692,11 @@ function NotConfigured({ A }) {
 
 // ── Estado pendiente (proyecto del cliente) ───────────────────────────────────
 
-function Pending({ projectLabel, A }) {
-  const [pendingBefore, pendingAfter] = A.pendingBody.split('{name}');
+function Pending({ projectLabel }) {
   return (
     <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <div style={{ background: 'var(--bg-2)', borderBottom: '1px solid var(--line)', padding: '14px 20px' }}>
-        <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>{A.pendingTitle}</span>
+        <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>En implementación</span>
       </div>
       <div style={{ background: 'var(--bg-2)', padding: '56px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, textAlign: 'center' }}>
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--line-2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -685,9 +704,9 @@ function Pending({ projectLabel, A }) {
           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
         </svg>
         <div>
-          <p style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)', margin: '0 0 8px' }}>{A.pendingHeading}</p>
+          <p style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)', margin: '0 0 8px' }}>Estamos configurando tus analíticas</p>
           <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: 0, lineHeight: 1.7, maxWidth: 400 }}>
-            {pendingBefore}<strong style={{ color: 'var(--type)', fontWeight: 500 }}>{projectLabel}</strong>{pendingAfter}
+            El equipo de Kodeo está integrando las analíticas para tu <strong style={{ color: 'var(--type)', fontWeight: 500 }}>{projectLabel}</strong>. Podrás ver los datos aquí una vez que esté listo.
           </p>
         </div>
       </div>
@@ -698,10 +717,6 @@ function Pending({ projectLabel, A }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme, onThemeToggle }) {
-  const A      = copy.portal.analytics;
-  const locale = copy.portal.locale;
-  const periods = PERIOD_VALUES.map((value, i) => ({ value, label: A.periodLabels[i] }));
-
   // Vista: 'grid' = mosaico de proyectos | 'detail' = dashboard de analíticas
   const [view,          setView]         = useState('grid');
   const [projectsView,  setProjectsView] = useState('mosaico'); // 'mosaico' | 'tabla'
@@ -751,7 +766,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
         }));
 
       const isAdmin = user?.role === 'administrador';
-      const base = isAdmin ? [{ id: 'kodeo', serviceType: A.ownPlatform, accent: '#5170ff' }] : [];
+      const base = isAdmin ? [{ id: 'kodeo', serviceType: 'Plataforma propia', accent: '#5170ff' }] : [];
       setProjects([...base, ...projectCards]);
       setMeta({ labels: metaJson.labels ?? {}, configured: metaJson.configured ?? {} });
     } catch {
@@ -760,7 +775,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
       setLoadingMeta(false);
       setRefreshingMeta(false);
     }
-  }, [user, A]);
+  }, [user]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -778,7 +793,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || A.errorLoad);
+      if (!res.ok) throw new Error(json.error || 'Error al cargar analíticas');
       setAnalytics(json);
       setLastUpdate(new Date());
     } catch (e) {
@@ -787,7 +802,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
       setLoading(false);
       setRefreshing(false);
     }
-  }, [A]);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -812,31 +827,31 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
     const cur = data.overview.current;
     const prv = data.overview.previous;
     const rows = [
-      [A.csvTitle.replace('{name}', label)],
-      [A.expPeriod, `${startDate} — ${endDate}`],
-      [A.expExported, new Date().toLocaleString(locale)],
+      [`ANALITICAS — ${label}`],
+      ['Periodo', `${startDate} — ${endDate}`],
+      ['Exportado', new Date().toLocaleString('es-MX')],
       [],
-      [A.csvSummary],
-      [A.expMetric, A.expValue, A.expPrevPeriod],
-      [A.expActiveUsers,   cur.users,      prv.users],
-      [A.expSessions,      cur.sessions,   prv.sessions],
-      [A.expPageViews,     cur.pageViews,  prv.pageViews],
-      [A.expBounceRateCsv, cur.bounceRate, prv.bounceRate],
+      ['RESUMEN'],
+      ['Metrica', 'Valor', 'Periodo anterior'],
+      ['Usuarios activos', cur.users,      prv.users],
+      ['Sesiones',         cur.sessions,   prv.sessions],
+      ['Vistas de pagina', cur.pageViews,  prv.pageViews],
+      ['Tasa de rebote %', cur.bounceRate, prv.bounceRate],
       [],
-      [A.csvTopPages],
-      [A.expPage, A.expViews],
+      ['PAGINAS MAS VISITADAS'],
+      ['Pagina', 'Vistas'],
       ...data.pages.map(p => [p.path, p.views]),
       [],
-      [A.csvSources],
-      [A.expChannel, A.expSessions],
-      ...data.sources.map(s => [A.channels[s.channel] || s.channel, s.sessions]),
+      ['FUENTES DE TRAFICO'],
+      ['Canal', 'Sesiones'],
+      ...data.sources.map(s => [CHANNEL_ES[s.channel] || s.channel, s.sessions]),
       [],
-      [A.csvEvents],
-      [A.expEvent, A.expCount],
+      ['EVENTOS'],
+      ['Evento', 'Conteo'],
       ...data.events.map(e => [e.name, e.count]),
       [],
-      [A.csvDaily],
-      [A.expDate, A.expUsers, A.expSessions],
+      ['DATOS DIARIOS'],
+      ['Fecha', 'Usuarios', 'Sesiones'],
       ...data.daily.map(d => [d.date, d.users, d.sessions]),
     ];
     const esc = c => { const s = String(c ?? ''); return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s; };
@@ -853,7 +868,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
   const generatePDF = (data, label, startDate, endDate) => {
     const cur = data.overview.current;
     const prv = data.overview.previous;
-    const now = new Date().toLocaleString(locale);
+    const now = new Date().toLocaleString('es-MX');
     const th  = `padding:8px 12px;background:#f5f5f5;border:1px solid #ddd;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#666;text-align:left;`;
     const td  = `padding:8px 12px;border:1px solid #ddd;font-size:12px;color:#333;`;
     const tbl = (headers, rows) =>
@@ -861,29 +876,29 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
         <thead><tr>${headers.map(h => `<th style="${th}">${h}</th>`).join('')}</tr></thead>
         <tbody>${rows.map(r => `<tr>${r.map(c => `<td style="${td}">${c ?? 0}</td>`).join('')}</tr>`).join('')}</tbody>
       </table>`;
-    const html = `<!DOCTYPE html><html lang="${locale.slice(0, 2)}"><head><meta charset="UTF-8">
-      <title>${A.pdfTitle.replace('{name}', label)}</title>
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+      <title>Analiticas — ${label}</title>
       <style>body{font-family:sans-serif;color:#333;margin:40px;font-size:13px}h1{font-size:22px;margin:0 0 4px}
       h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#666;margin:24px 0 8px}
       .meta{color:#666;font-size:12px;margin-bottom:28px}@media print{body{margin:20px}}</style>
     </head><body>
-      <h1>${A.pdfTitle.replace('{name}', label)}</h1>
-      <p class="meta">${A.expPeriod}: ${startDate} — ${endDate} &nbsp;·&nbsp; ${A.expExported}: ${now}</p>
-      <h2>${A.pdfSummary}</h2>
-      ${tbl([A.expMetric,A.expValue,A.expPrevPeriod],[
-        [A.expActiveUsers,cur.users,prv.users],
-        [A.expSessions,cur.sessions,prv.sessions],
-        [A.expPageViews,cur.pageViews,prv.pageViews],
-        [A.expBounceRatePdf,cur.bounceRate+'%',prv.bounceRate+'%'],
+      <h1>Analiticas — ${label}</h1>
+      <p class="meta">Periodo: ${startDate} — ${endDate} &nbsp;·&nbsp; Exportado: ${now}</p>
+      <h2>Resumen</h2>
+      ${tbl(['Metrica','Valor','Periodo anterior'],[
+        ['Usuarios activos',cur.users,prv.users],
+        ['Sesiones',cur.sessions,prv.sessions],
+        ['Vistas de pagina',cur.pageViews,prv.pageViews],
+        ['Tasa de rebote',cur.bounceRate+'%',prv.bounceRate+'%'],
       ])}
-      <h2>${A.pdfTopPages}</h2>
-      ${tbl([A.expPage,A.expViews],data.pages.map(p=>[p.path,p.views]))}
-      <h2>${A.pdfSources}</h2>
-      ${tbl([A.expChannel,A.expSessions],data.sources.map(s=>[A.channels[s.channel]||s.channel,s.sessions]))}
-      <h2>${A.pdfEvents}</h2>
-      ${tbl([A.expEvent,A.expCount],data.events.map(e=>[e.name,e.count]))}
-      <h2>${A.pdfDaily}</h2>
-      ${tbl([A.expDate,A.expUsers,A.expSessions],data.daily.map(d=>[d.date,d.users,d.sessions]))}
+      <h2>Paginas mas visitadas</h2>
+      ${tbl(['Pagina','Vistas'],data.pages.map(p=>[p.path,p.views]))}
+      <h2>Fuentes de trafico</h2>
+      ${tbl(['Canal','Sesiones'],data.sources.map(s=>[CHANNEL_ES[s.channel]||s.channel,s.sessions]))}
+      <h2>Eventos</h2>
+      ${tbl(['Evento','Conteo'],data.events.map(e=>[e.name,e.count]))}
+      <h2>Datos diarios</h2>
+      ${tbl(['Fecha','Usuarios','Sesiones'],data.daily.map(d=>[d.date,d.users,d.sessions]))}
       <script>window.onload=()=>window.print()</script>
     </body></html>`;
     const win = window.open('', '_blank');
@@ -900,13 +915,13 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await res.json();
-      if (!res.ok || !data.configured) throw new Error(data.error || A.errorExport);
+      if (!res.ok || !data.configured) throw new Error(data.error || 'Error al exportar');
       const label = selectedProject ? getLabel(selectedProject) : 'analytics';
       if (format === 'xls') generateCSV(data, label, startDate, endDate);
       else                   generatePDF(data, label, startDate, endDate);
       setExportOpen(false);
     } catch (e) {
-      alert(A.errorExport + ': ' + e.message);
+      alert('Error al exportar: ' + e.message);
     } finally {
       setExportLoading(false);
     }
@@ -932,7 +947,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
 
   const selectedProject = projects.find(p => p.id === selectedId);
 
-  const fmtTime = d => d ? d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : '';
+  const fmtTime = d => d ? d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '';
 
   // ── Datos del dashboard ──
   const ov  = analyticsData?.overview;
@@ -943,11 +958,11 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
   const totalSess = cur.sessions ?? 0;
   const evMap = Object.fromEntries((analyticsData?.events ?? []).map(e => [e.name, e.count]));
   const funnel = [
-    { key: 'page_view',   n: 1 },
-    { key: 'cta_click',   n: 2 },
-    { key: 'form_start',  n: 3 },
-    { key: 'form_submit', n: 4 },
-  ].map((s, i) => ({ ...s, label: A.funnelSteps[i], count: evMap[s.key] ?? 0 }));
+    { label: 'Visita',                key: 'page_view',   n: 1 },
+    { label: 'Clic en CTA',           key: 'cta_click',   n: 2 },
+    { label: 'Formulario iniciado',   key: 'form_start',  n: 3 },
+    { label: 'Formulario completado', key: 'form_submit', n: 4 },
+  ].map(s => ({ ...s, count: evMap[s.key] ?? 0 }));
   const funnelTop = funnel[0].count || 1;
 
   return (
@@ -966,10 +981,10 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
             <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
               <div>
                 <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 34, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-                  {A.title}
+                  Analíticas
                 </h1>
                 <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
-                  {A.subtitle}
+                  Selecciona un proyecto para ver sus analíticas. Haz clic en el nombre para añadir o editar una etiqueta.
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
@@ -978,8 +993,8 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                     value={projectsView}
                     onChange={setProjectsView}
                     options={[
-                      { id: 'mosaico', label: A.viewMosaic, icon: 'grid' },
-                      { id: 'tabla',   label: A.viewTable,  icon: 'list' },
+                      { id: 'mosaico', label: 'Mosaico', icon: 'grid' },
+                      { id: 'tabla',   label: 'Tabla',   icon: 'list' },
                     ]}
                   />
                 )}
@@ -996,9 +1011,9 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
               </div>
             ) : projects.length === 0 ? (
               <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '60px 24px', textAlign: 'center' }}>
-                <p style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--type)', margin: '0 0 8px' }}>{A.noProjectsTitle}</p>
+                <p style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--type)', margin: '0 0 8px' }}>Sin proyectos aún</p>
                 <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: '0 0 24px', lineHeight: 1.6 }}>
-                  {A.noProjectsBody}
+                  Cuando adquieras un servicio aparecerá aquí con sus analíticas.
                 </p>
                 <button
                   onClick={() => onNavigate?.('/comprar')}
@@ -1009,7 +1024,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                     textTransform: 'uppercase', cursor: 'pointer',
                   }}
                 >
-                  {A.viewServices}
+                  Ver servicios →
                 </button>
               </div>
             ) : projectsView === 'tabla' ? (
@@ -1019,7 +1034,6 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                 meta={meta}
                 onView={handleView}
                 isMobile={isMobile}
-                A={A}
               />
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 14 }}>
@@ -1031,7 +1045,6 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                     isConfigured={meta.configured[project.id] ?? false}
                     onView={handleView}
                     onSaveLabel={(label) => saveLabel(project.id, label)}
-                    A={A}
                   />
                 ))}
               </div>
@@ -1063,7 +1076,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                     <line x1="19" y1="12" x2="5" y2="12" />
                     <polyline points="12 19 5 12 12 5" />
                   </svg>
-                  {A.title}
+                  Analíticas
                 </button>
 
                 {selectedProject && (
@@ -1076,7 +1089,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                 </h1>
                 {lastUpdate && (
                   <p style={{ fontFamily: 'var(--ui)', fontSize: 10, color: 'var(--type-muted)', margin: '5px 0 0', letterSpacing: '.08em' }}>
-                    {A.updatedAt.replace('{n}', fmtTime(lastUpdate))}
+                    Actualizado a las {fmtTime(lastUpdate)}
                   </p>
                 )}
               </div>
@@ -1103,7 +1116,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                       <polyline points="7 10 12 15 17 10" />
                       <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    {A.export}
+                    Exportar
                   </button>
                 )}
 
@@ -1115,7 +1128,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
 
                 {/* Selector de período */}
                 <div style={{ display: 'flex', gap: 3, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)', padding: 3 }}>
-                  {periods.map(p => (
+                  {PERIODS.map(p => (
                     <button
                       key={p.value}
                       onClick={() => setPeriod(p.value)}
@@ -1146,11 +1159,11 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
 
             {/* En configuración */}
             {!loading && !error && analyticsData && !analyticsData.configured && analyticsData.pending && (
-              <Pending projectLabel={selectedProject ? getLabel(selectedProject) : A.projectFallback} A={A} />
+              <Pending projectLabel={selectedProject ? getLabel(selectedProject) : 'proyecto'} />
             )}
 
             {/* No configurado (kodeo.mx sin creds) */}
-            {!loading && !error && analyticsData && !analyticsData.configured && !analyticsData.pending && <NotConfigured A={A} />}
+            {!loading && !error && analyticsData && !analyticsData.configured && !analyticsData.pending && <NotConfigured />}
 
             {/* Modal exportar */}
             {exportOpen && (
@@ -1159,7 +1172,6 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                 onClose={() => setExportOpen(false)}
                 onExport={handleExport}
                 loading={exportLoading}
-                A={A}
               />
             )}
 
@@ -1167,31 +1179,31 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
             {!loading && !error && analyticsData?.configured && (
               <>
                 {analyticsData.realtime && (
-                  <RealtimeCard realtime={analyticsData.realtime} isMobile={isMobile} A={A} />
+                  <RealtimeCard realtime={analyticsData.realtime} isMobile={isMobile} />
                 )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 4}, 1fr)`, gap: 12 }}>
-                  <KpiCard label={A.kpiUsers}      value={cur.users}      previous={prv.users}      A={A} />
-                  <KpiCard label={A.kpiSessions}   value={cur.sessions}   previous={prv.sessions}   A={A} />
-                  <KpiCard label={A.kpiPageViews}  value={cur.pageViews}  previous={prv.pageViews}  A={A} />
-                  <KpiCard label={A.kpiBounceRate} value={cur.bounceRate} previous={prv.bounceRate} format={v => v} suffix="%" A={A} />
+                  <KpiCard label="Usuarios activos" value={cur.users}      previous={prv.users}     />
+                  <KpiCard label="Sesiones"          value={cur.sessions}   previous={prv.sessions}  />
+                  <KpiCard label="Vistas de página"  value={cur.pageViews}  previous={prv.pageViews} />
+                  <KpiCard label="Tasa de rebote"    value={cur.bounceRate} previous={prv.bounceRate} format={v => v} suffix="%" />
                 </div>
 
-                <Card title={`${A.dailySessions} — ${periods.find(p => p.value === period)?.label}`}>
+                <Card title={`Sesiones diarias — ${PERIODS.find(p => p.value === period)?.label}`}>
                   <div style={{ padding: '16px 20px 8px' }}>
-                    <AreaChart data={analyticsData.daily} metric="sessions" A={A} locale={locale} />
+                    <AreaChart data={analyticsData.daily} metric="sessions" />
                   </div>
                 </Card>
 
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
-                  <Card title={A.trafficSources}>
+                  <Card title="Fuentes de tráfico">
                     <div style={{ padding: '20px 20px 16px' }}>
-                      <DonutChart sources={analyticsData.sources} total={totalSess} A={A} />
+                      <DonutChart sources={analyticsData.sources} total={totalSess} />
                     </div>
                   </Card>
-                  <Card title={A.topPages}>
+                  <Card title="Páginas más visitadas">
                     {analyticsData.pages.length === 0
-                      ? <Empty text={A.noData} />
+                      ? <Empty />
                       : analyticsData.pages.map((p, i) => (
                           <BarRow key={i} label={p.path} value={p.views} max={maxViews}
                             badge={cur.pageViews ? `${Math.round((p.views / cur.pageViews) * 100)}%` : null}
@@ -1201,16 +1213,16 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                   </Card>
                 </div>
 
-                <Card title={A.eventsCard}>
+                <Card title="Eventos registrados">
                   {analyticsData.events.length === 0
-                    ? <Empty text={A.noData} />
+                    ? <Empty />
                     : analyticsData.events.map((e, i) => (
                         <BarRow key={i} label={e.name} value={e.count} max={maxEvents} color={CHART_COLORS[i % CHART_COLORS.length]} />
                       ))
                   }
                 </Card>
 
-                <Card title={A.funnelCard}>
+                <Card title="Embudo de conversión">
                   <div style={{ padding: '8px 0' }}>
                     {funnel.map((s, i) => {
                       const convPct = i === 0 ? 100 : funnelTop > 0 ? Math.round((s.count / funnelTop) * 100) : 0;
@@ -1226,7 +1238,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
                           </div>
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
                             <div style={{ fontFamily: 'var(--ui)', fontSize: 13, color: 'var(--type)' }}>{fmt(s.count)}</div>
-                            {stepPct !== null && <div style={{ fontFamily: 'var(--ui)', fontSize: 10, color: 'var(--type-muted)', marginTop: 1 }}>{A.ofPrevStep.replace('{n}', stepPct)}</div>}
+                            {stepPct !== null && <div style={{ fontFamily: 'var(--ui)', fontSize: 10, color: 'var(--type-muted)', marginTop: 1 }}>{stepPct}% del paso anterior</div>}
                           </div>
                           <div style={{ width: 42, textAlign: 'right', flexShrink: 0 }}>
                             <span style={{ fontFamily: 'var(--ui)', fontSize: 12, color: convPct === 100 ? '#16a34a' : 'var(--type-muted)' }}>{convPct}%</span>

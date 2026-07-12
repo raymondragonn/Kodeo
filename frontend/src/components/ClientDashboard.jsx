@@ -11,19 +11,13 @@ import { inputStyle } from '../data/projectFormFields';
 // WhatsApp de Kodeo al que llega la solicitud de cita (mismo número que /agendar)
 const WA_PHONE = '522298483706';
 
-const STATUS_LABELS = {
-  pending:        { label: 'Pendiente',    color: 'var(--type-muted)' },
-  confirmed:      { label: 'Confirmada',   color: '#63C44D' },
-  cancelled:      { label: 'Cancelada',    color: '#e05050' },
-  rescheduled:    { label: 'Reprogramada', color: '#FFDE59' },
-  form_submitted: { label: 'Confirmada',   color: '#63C44D' },
-  completado:     { label: 'Completada',   color: '#63C44D' },
-};
-
-const CALL_TYPE_LABELS = {
-  intro:         'Consulta inicial',
-  design_review: 'Revisión de diseño',
-  delivery:      'Entrega',
+const STATUS_COLORS = {
+  pending:        'var(--type-muted)',
+  confirmed:      '#63C44D',
+  cancelled:      '#e05050',
+  rescheduled:    '#FFDE59',
+  form_submitted: '#63C44D',
+  completado:     '#63C44D',
 };
 
 const CALL_TYPE_COLORS = {
@@ -46,19 +40,19 @@ function citaDayKey(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-CA', { timeZone: MX_TZ });
 }
 
-function citaTime(dateStr) {
-  return new Date(dateStr).toLocaleTimeString('es-MX', {
+function citaTime(dateStr, locale) {
+  return new Date(dateStr).toLocaleTimeString(locale, {
     hour: 'numeric', minute: '2-digit', hour12: true, timeZone: MX_TZ,
   });
 }
 
 // Etiqueta del asunto de la cita: para citas de panel, el tipo elegido;
 // para las llamadas del flujo Cal.com, el tipo de llamada
-function citaTipoLabel(cita) {
+function citaTipoLabel(cita, T) {
   if (cita.call_type === 'panel') {
-    return cita.service_code === 'existente' ? 'Proyecto existente' : 'Proyecto nuevo';
+    return cita.service_code === 'existente' ? T.typeExisting : T.typeNew;
   }
-  return CALL_TYPE_LABELS[cita.call_type] || 'Cita';
+  return T.callTypeLabels[cita.call_type] || T.citaFallback;
 }
 
 // ── Página principal ───────────────────────────────────────────────────────
@@ -66,6 +60,7 @@ function citaTipoLabel(cita) {
 export default function ClientDashboard({
   user, copy, onLogout, theme, onThemeToggle, onNavigate,
 }) {
+  const T            = copy.portal.appointments;
   const navigate     = useNavigate();
   const location     = useLocation();
   const { isMobile } = useBreakpoint();
@@ -142,23 +137,23 @@ export default function ClientDashboard({
   return (
     <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
       <PageMeta
-        title="Citas | Kodeo"
-        description="Consulta el calendario de tus citas con Kodeo."
+        title={T.metaTitle}
+        description={T.metaDescription}
         path="/citas"
       />
 
-      <div style={{ maxWidth: 960, width: '100%', margin: '0 auto', padding: isMobile ? '32px 16px 60px' : '44px 28px 80px' }}>
+      <div style={{ maxWidth: 960, width: '100%', margin: '0 auto', padding: isMobile ? '20px 12px 40px' : '44px 28px 80px' }}>
         {view === 'calendar' && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
               <div>
                 {isAdmin && (
                   <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
-                    Panel de gestión
+                    {T.adminPanelLabel}
                   </p>
                 )}
                 <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-                  Citas
+                  {T.title}
                 </h1>
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
@@ -173,7 +168,7 @@ export default function ClientDashboard({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    + Agendar cita
+                    {T.bookCta}
                   </button>
                 )}
                 <RefreshButton onClick={handleRefresh} loading={refreshing} />
@@ -181,8 +176,10 @@ export default function ClientDashboard({
             </div>
             <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
               {isAdmin
-                ? `Calendario de citas agendadas por tus clientes${upcoming.length ? ` — ${upcoming.length} próxima${upcoming.length !== 1 ? 's' : ''}` : ''}.`
-                : 'Tu calendario de citas con Kodeo. Las citas pasadas se retiran automáticamente.'}
+                ? T.adminSubtitle.replace('{upcoming}', upcoming.length
+                    ? (upcoming.length === 1 ? T.adminUpcomingOne : T.adminUpcomingMany).replace('{n}', upcoming.length)
+                    : '')
+                : T.clientSubtitle}
             </p>
           </div>
         )}
@@ -198,13 +195,13 @@ export default function ClientDashboard({
           />
         ) : (
           <>
-            {loading && <p style={{ color: 'var(--type-muted)', fontFamily: 'var(--body)', fontSize: 14 }}>Cargando…</p>}
+            {loading && <p style={{ color: 'var(--type-muted)', fontFamily: 'var(--body)', fontSize: 14 }}>{T.loading}</p>}
             {error   && <p style={{ color: '#e05050', fontFamily: 'var(--body)', fontSize: 14 }}>{error}</p>}
 
             {!loading && !error && upcoming.length === 0 && (
               <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '40px 28px', textAlign: 'center' }}>
                 <p style={{ fontFamily: 'var(--body)', fontSize: 15, color: 'var(--type-soft)', margin: 0 }}>
-                  {isAdmin ? 'No hay citas generadas.' : 'No tienes citas generadas.'}
+                  {isAdmin ? T.emptyAdmin : T.emptyClient}
                 </p>
               </div>
             )}
@@ -216,6 +213,8 @@ export default function ClientDashboard({
                 token={token}
                 onRefresh={() => fetchAppointments(true)}
                 isMobile={isMobile}
+                T={T}
+                locale={copy.portal.locale}
               />
             )}
           </>
@@ -227,7 +226,7 @@ export default function ClientDashboard({
 
 // ── Calendario mensual de citas (estilo Google Calendar) ───────────────────
 
-function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile }) {
+function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile, T, locale }) {
   const today = new Date();
 
   // Citas agrupadas por día (horario del centro de México)
@@ -246,19 +245,19 @@ function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile }) {
   );
   const [selectedKey, setSelectedKey] = useState(() => citaDayKey(citas[0].scheduled_at));
 
-  const monthFmt = useMemo(() => new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }), []);
-  const dayFmt   = useMemo(() => new Intl.DateTimeFormat('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }), []);
+  const monthFmt = useMemo(() => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }), [locale]);
+  const dayFmt   = useMemo(() => new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }), [locale]);
 
   // Encabezados lun→dom (la cuadrícula arranca en lunes)
   const weekdayLabels = useMemo(() => {
     const base = new Date(2026, 5, 1); // 1 jun 2026 = lunes
-    const fmt  = new Intl.DateTimeFormat('es-MX', { weekday: 'short' });
+    const fmt  = new Intl.DateTimeFormat(locale, { weekday: 'short' });
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(base);
       d.setDate(base.getDate() + i);
       return fmt.format(d).replace('.', '');
     });
-  }, []);
+  }, [locale]);
 
   // Celdas del mes visible (null = hueco antes del día 1)
   const cells = useMemo(() => {
@@ -299,8 +298,8 @@ function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile }) {
             {monthFmt.format(viewMonth)}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button aria-label="Mes anterior" onClick={() => changeMonth(-1)} style={navBtn}>←</button>
-            <button aria-label="Mes siguiente" onClick={() => changeMonth(1)} style={navBtn}>→</button>
+            <button aria-label={T.prevMonth} onClick={() => changeMonth(-1)} style={navBtn}>←</button>
+            <button aria-label={T.nextMonth} onClick={() => changeMonth(1)} style={navBtn}>→</button>
           </div>
         </div>
 
@@ -382,12 +381,12 @@ function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile }) {
                             width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
                             background: CALL_TYPE_COLORS[c.call_type] || 'var(--accent-blue)',
                           }} />
-                          {citaTime(c.scheduled_at)}
+                          {citaTime(c.scheduled_at, locale)}
                         </span>
                       ))}
                       {dayCitas.length > 2 && (
                         <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: 'var(--type-muted)' }}>
-                          +{dayCitas.length - 2} más
+                          {T.moreCount.replace('{n}', dayCitas.length - 2)}
                         </span>
                       )}
                     </span>
@@ -407,17 +406,17 @@ function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile }) {
             color: 'var(--type-muted)', margin: '0 0 12px',
           }}>
             {selectedCitas.length > 0
-              ? `Citas del ${dayFmt.format(selectedDate)}`
+              ? T.dayCitasTitle.replace('{date}', dayFmt.format(selectedDate))
               : dayFmt.format(selectedDate)}
           </p>
           {selectedCitas.length === 0 ? (
             <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: 0 }}>
-              Sin citas este día.
+              {T.noCitasDay}
             </p>
           ) : (
             <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               {selectedCitas.map((cita, i) => (
-                <CitaRow key={cita.id} cita={cita} first={i === 0} isAdmin={isAdmin} token={token} onRefresh={onRefresh} />
+                <CitaRow key={cita.id} cita={cita} first={i === 0} isAdmin={isAdmin} token={token} onRefresh={onRefresh} T={T} locale={locale} />
               ))}
             </div>
           )}
@@ -429,13 +428,16 @@ function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile }) {
 
 // ── Fila de cita (solo información; el admin puede reprogramar las de panel) ─
 
-function CitaRow({ cita, first, isAdmin, token, onRefresh }) {
+function CitaRow({ cita, first, isAdmin, token, onRefresh, T, locale }) {
   const [editing, setEditing] = useState(false);
   const [when, setWhen]       = useState('');
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState(null);
 
-  const info  = STATUS_LABELS[cita.status] || { label: cita.status, color: 'var(--type-muted)' };
+  const info  = {
+    label: T.statusLabels[cita.status] || cita.status,
+    color: STATUS_COLORS[cita.status] || 'var(--type-muted)',
+  };
   const color = CALL_TYPE_COLORS[cita.call_type] || 'var(--accent-blue)';
   // project_details solo es texto legible en citas de panel (en el flujo
   // Cal.com guarda el JSON del formulario de proyecto — no se muestra aquí)
@@ -478,16 +480,16 @@ function CitaRow({ cita, first, isAdmin, token, onRefresh }) {
           fontFamily: 'var(--display)', fontSize: 18, letterSpacing: '-0.02em',
           color: 'var(--type)', flexShrink: 0, minWidth: 82,
         }}>
-          {citaTime(cita.scheduled_at)}
+          {citaTime(cita.scheduled_at, locale)}
         </span>
 
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
 
         <div style={{ flex: 1, minWidth: 180 }}>
           <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', margin: '0 0 2px' }}>
-            {cita.service || 'Cita'}
+            {cita.service || T.citaFallback}
             <span style={{ marginLeft: 10, fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
-              {citaTipoLabel(cita)}
+              {citaTipoLabel(cita, T)}
             </span>
           </p>
           {isAdmin && cita.user_name && (
@@ -497,7 +499,7 @@ function CitaRow({ cita, first, isAdmin, token, onRefresh }) {
           )}
           {motivo && (
             <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-soft)', margin: '4px 0 0', lineHeight: 1.5 }}>
-              Motivo: {motivo}
+              {T.reasonLabel.replace('{reason}', motivo)}
             </p>
           )}
         </div>
@@ -520,7 +522,7 @@ function CitaRow({ cita, first, isAdmin, token, onRefresh }) {
               whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >
-            Cambiar horario
+            {T.reschedule}
           </button>
         )}
       </div>
@@ -547,7 +549,7 @@ function CitaRow({ cita, first, isAdmin, token, onRefresh }) {
               cursor: saving || !when ? 'not-allowed' : 'pointer', opacity: saving || !when ? 0.6 : 1,
             }}
           >
-            {saving ? 'Guardando…' : 'Guardar'}
+            {saving ? T.saving : T.save}
           </button>
           <button
             onClick={() => setEditing(false)}
@@ -557,7 +559,7 @@ function CitaRow({ cita, first, isAdmin, token, onRefresh }) {
               fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
             }}
           >
-            Cancelar
+            {T.cancel}
           </button>
         </div>
       )}
@@ -574,6 +576,7 @@ function CitaRow({ cita, first, isAdmin, token, onRefresh }) {
 
 function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
   const bk     = copy.booking;
+  const T      = copy.portal.appointments;
   const locale = navigator.language || 'es-MX';
 
   const [projects, setProjects]           = useState(null);
@@ -582,8 +585,10 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
   const [serviceChoice, setServiceChoice] = useState('');
   const [customProject, setCustomProject] = useState('');
   const [reason, setReason]               = useState('');
+  const [reasonError, setReasonError]     = useState(false);
   const [slot, setSlot]                   = useState(null);
   const [sent, setSent]                   = useState(false);
+  const reasonRef = useRef(null);
 
   // Proyectos del cliente — para seleccionar uno cuando la cita es de un proyecto existente
   useEffect(() => {
@@ -593,13 +598,14 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
       .catch(() => setProjects([]));
   }, [token]);
 
-  const TYPE_LABELS = { new: 'Proyecto nuevo', existing: 'Proyecto existente' };
+  const TYPE_LABELS = { new: T.typeNew, existing: T.typeExisting };
 
   const hasProjects = (projects?.length ?? 0) > 0;
   const projectName = mode === 'existing'
     ? projectChoice
     : serviceChoice === '__otro__' ? customProject.trim() : serviceChoice;
   const canConfirm  = !!mode && !!projectName && !!reason.trim() && !!slot;
+  const canAttemptConfirm = !!mode && !!projectName && !!slot;
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
@@ -623,6 +629,13 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
   };
 
   const handleConfirm = () => {
+    if (!reason.trim()) {
+      setReasonError(true);
+      reasonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.setTimeout(() => reasonRef.current?.focus({ preventScroll: true }), 350);
+      return;
+    }
+    if (!canConfirm) return;
     window.open(buildWaLink(), '_blank', 'noopener');
     // Registra la cita en el backend para que aparezca en la sección de citas
     // (si falla, la solicitud igual llegó por WhatsApp)
@@ -685,7 +698,7 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
               fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer',
             }}
           >
-            Volver a citas
+            {T.backToCitas}
           </button>
         </div>
       </div>
@@ -695,7 +708,7 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
   return (
     <div>
       {/* Encabezado con regreso */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: isMobile ? 14 : 24 }}>
         <button
           onClick={onBack}
           style={{
@@ -711,21 +724,19 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
-          Citas
+          {T.title}
         </button>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-          Agendar cita
+          {T.bookTitle}
         </h1>
-        <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
-          {mode === null
-            ? '¿Tu cita es sobre un producto nuevo o sobre uno que ya tienes?'
-            : 'Cuéntanos el motivo, elige el horario y confirma por WhatsApp.'}
+        <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '6px 0 0', lineHeight: 1.4 }}>
+          {mode === null ? T.bookIntro : T.bookSteps}
         </p>
       </div>
 
       {mode === null ? (
         /* Paso 1: elección en grande — producto nuevo (izquierda) o existente (derecha) */
-        <div style={{ padding: isMobile ? '24px 0 40px' : '48px 0 64px' }}>
+        <div style={{ padding: isMobile ? '8px 0 20px' : '48px 0 64px' }}>
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
@@ -735,18 +746,18 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
             {[
               {
                 id: 'new',
-                title: 'Un producto nuevo',
-                desc: 'Quiero cotizar o arrancar un proyecto nuevo.',
+                title: T.optNewTitle,
+                desc: T.optNewDesc,
                 disabled: false,
               },
               {
                 id: 'existing',
-                title: 'Un producto que ya tengo',
+                title: T.optExistingTitle,
                 desc: projects === null
-                  ? 'Cargando tus proyectos…'
+                  ? T.loadingProjects
                   : hasProjects
-                    ? 'Es sobre uno de mis proyectos actuales.'
-                    : 'Aún no tienes proyectos activos.',
+                    ? T.optExistingDesc
+                    : T.noProjects,
                 disabled: !hasProjects,
               },
             ].map(opt => (
@@ -760,9 +771,9 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
                   background: 'transparent',
                   border: '1px solid var(--line)',
                   borderRadius: 'var(--radius-lg)',
-                  padding: isMobile ? '36px 24px' : '60px 32px',
+                  padding: isMobile ? '18px 16px' : '60px 32px',
                   opacity: opt.disabled ? 0.45 : 1,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 6 : 12,
                   textAlign: 'center',
                   transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
                 }}
@@ -785,14 +796,14 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
                   {opt.desc}
                 </span>
                 <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', marginTop: 6 }}>
-                  Elegir →
+                  {T.choose}
                 </span>
               </button>
             ))}
           </div>
         </div>
       ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 24 }}>
         {/* Tipo elegido + opción de cambiar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{
@@ -811,22 +822,22 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
               textTransform: 'uppercase', color: 'var(--type-muted)',
             }}
           >
-            ← Cambiar
+            {T.changeType}
           </button>
         </div>
 
         {/* Proyecto / producto + motivo */}
-        <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: isMobile ? '20px 18px' : '24px 26px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: isMobile ? '14px 12px' : '24px 26px', display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 18 }}>
           {/* Producto existente: seleccionarlo de sus proyectos */}
           {mode === 'existing' && (
             <div>
-              <label style={fieldLabel}>¿Cuál de tus proyectos?</label>
+              <label style={fieldLabel}>{T.whichProject}</label>
               <select
                 value={projectChoice}
                 onChange={e => setProjectChoice(e.target.value)}
                 style={{ ...inputStyle, appearance: 'none' }}
               >
-                <option value="">Selecciona un proyecto…</option>
+                <option value="">{T.selectProject}</option>
                 {(projects ?? []).map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
               </select>
             </div>
@@ -835,8 +846,8 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
           {/* Producto nuevo: selección con tarjetas (mismo estilo que /comprar) */}
           {mode === 'new' && (
             <div>
-              <label style={fieldLabel}>¿Qué producto te interesa?</label>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>
+              <label style={fieldLabel}>{T.whichProduct}</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: isMobile ? 8 : 12 }}>
                 {copy.services.list.map(svc => {
                   const accent   = ACCENT[svc.code] || ACCENT['01'];
                   const selected = serviceChoice === svc.name;
@@ -857,7 +868,7 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
                       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
                     >
                       <div style={{ height: 3, background: accent, width: '100%' }} />
-                      <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box' }}>
+                      <div style={{ padding: isMobile ? '12px 10px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                           <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.26em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
                             {svc.code}
@@ -868,20 +879,20 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
                             </svg>
                           )}
                         </div>
-                        <span style={{ fontFamily: 'var(--display)', fontSize: 24, letterSpacing: '-0.025em', color: 'var(--type)', lineHeight: 1.1 }}>
+                        <span style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 18 : 24, letterSpacing: '-0.025em', color: 'var(--type)', lineHeight: 1.1 }}>
                           {svc.name}
                         </span>
-                        <p style={{ fontFamily: 'var(--body)', fontSize: 12, lineHeight: 1.55, color: 'var(--type-soft)', margin: 0 }}>
+                        {!isMobile && <p style={{ fontFamily: 'var(--body)', fontSize: 12, lineHeight: 1.55, color: 'var(--type-soft)', margin: 0 }}>
                           {svc.lead}
-                        </p>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+                        </p>}
+                        {!isMobile && <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
                           <span style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)' }}>
                             {svc.price}
                           </span>
                           <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
                             {svc.time}
                           </span>
-                        </div>
+                        </div>}
                       </div>
                     </button>
                   );
@@ -903,7 +914,7 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
                   onMouseLeave={e => { if (serviceChoice !== '__otro__') e.currentTarget.style.background = 'transparent'; }}
                 >
                   <div style={{ height: 3, background: 'var(--type-soft)', width: '100%' }} />
-                  <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', flex: 1 }}>
+                  <div style={{ padding: isMobile ? '12px 10px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.26em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
                         04
@@ -914,12 +925,12 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
                         </svg>
                       )}
                     </div>
-                    <span style={{ fontFamily: 'var(--display)', fontSize: 24, letterSpacing: '-0.025em', color: 'var(--type)', lineHeight: 1.1 }}>
-                      Otro
+                    <span style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 18 : 24, letterSpacing: '-0.025em', color: 'var(--type)', lineHeight: 1.1 }}>
+                      {T.other}
                     </span>
-                    <p style={{ fontFamily: 'var(--body)', fontSize: 12, lineHeight: 1.55, color: 'var(--type-soft)', margin: 0 }}>
-                      ¿Tienes algo distinto en mente? Cuéntanoslo y lo revisamos contigo en la llamada.
-                    </p>
+                    {!isMobile && <p style={{ fontFamily: 'var(--body)', fontSize: 12, lineHeight: 1.55, color: 'var(--type-soft)', margin: 0 }}>
+                      {T.otherDesc}
+                    </p>}
                   </div>
                 </button>
               </div>
@@ -928,7 +939,7 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
                 <input
                   value={customProject}
                   onChange={e => setCustomProject(e.target.value)}
-                  placeholder="Cuéntanos qué tienes en mente…"
+                  placeholder={T.otherPlaceholder}
                   style={{ ...inputStyle, marginTop: 12 }}
                 />
               )}
@@ -936,14 +947,27 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
           )}
 
           <div>
-            <label style={fieldLabel}>Motivo de la cita</label>
+            <label style={fieldLabel}>{T.reasonFieldLabel}</label>
             <textarea
+              ref={reasonRef}
               value={reason}
-              onChange={e => setReason(e.target.value)}
-              placeholder="Cuéntanos brevemente para qué necesitas la reunión…"
-              rows={3}
-              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
+              onChange={e => {
+                setReason(e.target.value);
+                if (e.target.value.trim()) setReasonError(false);
+              }}
+              placeholder={T.reasonPlaceholder}
+              required
+              aria-required="true"
+              aria-invalid={reasonError}
+              aria-describedby={reasonError ? 'appointment-reason-error' : undefined}
+              rows={isMobile ? 2 : 3}
+              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6, borderColor: reasonError ? '#e05050' : 'var(--line)' }}
             />
+            {reasonError && (
+              <p id="appointment-reason-error" role="alert" style={{ fontFamily: 'var(--body)', fontSize: 12, lineHeight: 1.5, color: '#e05050', margin: '8px 0 0' }}>
+                {T.reasonRequiredError}
+              </p>
+            )}
           </div>
         </div>
 
@@ -955,16 +979,17 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
           isMobile={isMobile}
           selectedSlot={slot}
           onSelectSlot={setSlot}
+          compact
         />
 
         {/* Resumen + confirmación */}
         {slot && (
           <div style={{
             border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)',
-            padding: isMobile ? '20px 18px' : '22px 28px',
+            padding: isMobile ? '14px 12px' : '22px 28px',
             display: 'flex', flexDirection: isMobile ? 'column' : 'row',
             alignItems: isMobile ? 'stretch' : 'center',
-            justifyContent: 'space-between', gap: 18,
+            justifyContent: 'space-between', gap: isMobile ? 10 : 18,
           }}>
             <div>
               {mode && projectName && (
@@ -976,18 +1001,18 @@ function PanelBooking({ user, copy, isMobile, token, onBack, onRefresh }) {
                 {dateFmt.format(slot)} · {timeFmt.format(slot)}
               </p>
               <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', margin: '8px 0 0', lineHeight: 1.5 }}>
-                {canConfirm ? bk.calendarStep.confirmHint : 'Indica si es un producto nuevo o existente, elige el proyecto y escribe el motivo para confirmar.'}
+                {canConfirm ? bk.calendarStep.confirmHint : T.confirmIncomplete}
               </p>
             </div>
             <button
               onClick={handleConfirm}
-              disabled={!canConfirm}
+              disabled={!canAttemptConfirm}
               style={{
                 padding: '15px 28px', background: 'var(--type)', color: 'var(--bg)',
                 border: 0, borderRadius: 'var(--radius-pill)',
                 fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
-                cursor: canConfirm ? 'pointer' : 'not-allowed',
-                opacity: canConfirm ? 1 : 0.5,
+                cursor: canAttemptConfirm ? 'pointer' : 'not-allowed',
+                opacity: canAttemptConfirm ? 1 : 0.5,
                 whiteSpace: 'nowrap', flexShrink: 0,
                 transition: 'opacity 0.2s',
               }}

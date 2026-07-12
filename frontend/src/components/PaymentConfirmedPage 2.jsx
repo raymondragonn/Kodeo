@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logoSvg from '../assets/logo_black_transparent.svg';
 
@@ -27,15 +27,13 @@ const STATUS_COPY = {
 
 export default function PaymentConfirmedPage() {
   const navigate = useNavigate();
-  const [info, setInfo] = useState({ paymentIntentId: null, status: null });
-
-  useEffect(() => {
+  const [info] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    setInfo({
+    return {
       paymentIntentId: params.get('payment_intent'),
       status: params.get('redirect_status'),
-    });
-  }, []);
+    };
+  });
 
   const status = STATUS_COPY[info.status] ?? STATUS_COPY.default;
 

@@ -11,6 +11,68 @@ if ($auth['role'] !== 'administrador') jsonError('Acceso denegado', 403);
 
 $db = getDb();
 
+// ── GET — detalle de un usuario (con historial) ────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && (int) ($_GET['id'] ?? 0) > 0) {
+    $id = (int) $_GET['id'];
+
+    $stmt = $db->prepare(
+        'SELECT id, name, username, email, role, oauth_provider, verified_at, created_at
+         FROM users WHERE id = ? LIMIT 1'
+    );
+    $stmt->execute([$id]);
+    $u = $stmt->fetch();
+    if (!$u) jsonError('Usuario no encontrado', 404);
+
+    // Pedidos (compras vía checkout)
+    $orders = [];
+    try {
+        $stmt = $db->prepare(
+            'SELECT id, service, amount, status, notes, start_date, delivery_date, created_at
+             FROM orders WHERE user_id = ? ORDER BY created_at DESC'
+        );
+        $stmt->execute([$id]);
+        $orders = $stmt->fetchAll();
+    } catch (Throwable $e) { $orders = []; }
+
+    // Proyectos + sus órdenes de pago
+    $projects = [];
+    try {
+        $stmt = $db->prepare(
+            'SELECT id, name, status, notes, created_at
+             FROM projects WHERE user_id = ? ORDER BY created_at DESC'
+        );
+        $stmt->execute([$id]);
+        $projects = $stmt->fetchAll();
+        foreach ($projects as &$p) {
+            $ps = $db->prepare(
+                'SELECT id, descripcion, amount, currency, tipo_pago, status, permite_msi, es_cargo_extra, paid_at, created_at
+                 FROM payment_orders WHERE project_id = ? ORDER BY created_at DESC'
+            );
+            $ps->execute([$p['id']]);
+            $p['payment_orders'] = $ps->fetchAll();
+        }
+        unset($p);
+    } catch (Throwable $e) { $projects = []; }
+
+    // Citas agendadas
+    $appointments = [];
+    try {
+        $stmt = $db->prepare(
+            'SELECT id, service, service_code, call_type, scheduled_at, status, project_details, amount, payment_enabled, created_at
+             FROM appointments WHERE user_id = ? ORDER BY scheduled_at DESC'
+        );
+        $stmt->execute([$id]);
+        $appointments = $stmt->fetchAll();
+    } catch (Throwable $e) { $appointments = []; }
+
+    jsonSuccess([
+        'user'         => $u,
+        'orders'       => $orders,
+        'projects'     => $projects,
+        'appointments' => $appointments,
+    ]);
+}
+
 // ── GET — listar usuarios ──────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt = $db->query(

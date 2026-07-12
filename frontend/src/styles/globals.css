@@ -175,3 +175,19 @@ button { font-family: inherit; cursor: pointer; }
   0%, 100% { opacity: 0.5; }
   50%       { opacity: 1; }
 }
+
+/* Botón CTA "respirando": crece y encoge suave alrededor de su tamaño base */
+@keyframes cta-breathe {
+  0%, 100% { transform: scale(0.96); }
+  50%      { transform: scale(1.06); }
+}
+.cta-breathe {
+  animation: cta-breathe 3s ease-in-out infinite;
+}
+/* En hover se detiene la respiración para que el scale del hover tome control */
+.cta-breathe:hover {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta-breathe { animation: none; }
+}

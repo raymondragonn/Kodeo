@@ -50,7 +50,7 @@ try {
     $token = JWT::encode([
         'iss'      => 'kodeo-api',
         'iat'      => $now,
-        'exp'      => $now + 60 * 60 * 24 * 7,
+        'exp'      => $now + JWT_TTL_SECONDS,
         'sub'      => $user['id'],
         'name'     => $user['name'],
         'username' => $user['username'],

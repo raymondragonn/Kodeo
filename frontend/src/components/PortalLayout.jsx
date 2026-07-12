@@ -3,7 +3,6 @@ import Nav from './Nav';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 
 const DESKTOP_NAV_H = 84;
-const MOBILE_NAV_H  = 60;
 
 function Avatar({ name }) {
   const initial = (name || '?')[0].toUpperCase();
@@ -45,21 +44,22 @@ function SidebarLink({ label, active, onClick }) {
   );
 }
 
-function PortalSidebar({ user, onNavigate, onLogout }) {
+function PortalSidebar({ user, onNavigate, onLogout, copy }) {
   const { pathname } = useLocation();
   const isAdmin = user?.role === 'administrador';
+  const L = copy.portal.layout;
 
   const links = isAdmin ? [
-    { label: 'Proyectos',  href: '/proyectos'  },
-    { label: 'Citas',      href: '/citas'      },
-    { label: 'Analíticas', href: '/analiticas' },
-    { label: 'Usuarios',   href: '/usuarios'   },
-    { label: 'Cuenta',     href: '/cuenta'     },
+    { label: L.proyectos,  href: '/proyectos'  },
+    { label: L.citas,      href: '/citas'      },
+    { label: L.analiticas, href: '/analiticas' },
+    { label: L.usuarios,   href: '/usuarios'   },
+    { label: L.cuenta,     href: '/cuenta'     },
   ] : [
-    { label: 'Proyectos',  href: '/proyectos'  },
-    { label: 'Citas',      href: '/citas'      },
-    { label: 'Analíticas', href: '/analiticas' },
-    { label: 'Cuenta',     href: '/cuenta'     },
+    { label: L.proyectos,  href: '/proyectos'  },
+    { label: L.citas,      href: '/citas'      },
+    { label: L.analiticas, href: '/analiticas' },
+    { label: L.cuenta,     href: '/cuenta'     },
   ];
 
   return (
@@ -101,7 +101,7 @@ function PortalSidebar({ user, onNavigate, onLogout }) {
             borderRadius: 'var(--radius-pill)', padding: '3px 9px',
             display: 'inline-block',
           }}>
-            Administrador
+            {L.adminBadge}
           </span>
         )}
       </div>
@@ -133,7 +133,7 @@ function PortalSidebar({ user, onNavigate, onLogout }) {
           onMouseEnter={e => e.currentTarget.style.opacity = '.7'}
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}
         >
-          Cerrar sesión
+          {L.logout}
           <span style={{ fontSize: 10 }}>→</span>
         </button>
       </div>
@@ -188,21 +188,22 @@ function IconCalendar() {
 
 const BOTTOM_NAV_H = 64;
 
-function MobileBottomNav({ user, onNavigate }) {
+function MobileBottomNav({ user, onNavigate, copy }) {
   const { pathname } = useLocation();
   const isAdmin = user?.role === 'administrador';
+  const L = copy.portal.layout;
 
   const tabs = isAdmin ? [
-    { label: 'Proyectos',  href: '/proyectos',  Icon: IconOrders    },
-    { label: 'Citas',      href: '/citas',      Icon: IconCalendar  },
-    { label: 'Analíticas', href: '/analiticas', Icon: IconChart     },
-    { label: 'Usuarios',   href: '/usuarios',   Icon: IconUsers     },
-    { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson    },
+    { label: L.proyectos,  href: '/proyectos',  Icon: IconOrders    },
+    { label: L.citas,      href: '/citas',      Icon: IconCalendar  },
+    { label: L.analiticas, href: '/analiticas', Icon: IconChart     },
+    { label: L.usuarios,   href: '/usuarios',   Icon: IconUsers     },
+    { label: L.cuenta,     href: '/cuenta',     Icon: IconPerson    },
   ] : [
-    { label: 'Proyectos',  href: '/proyectos',  Icon: IconOrders    },
-    { label: 'Citas',      href: '/citas',      Icon: IconCalendar  },
-    { label: 'Analíticas', href: '/analiticas', Icon: IconChart     },
-    { label: 'Cuenta',     href: '/cuenta',     Icon: IconPerson    },
+    { label: L.proyectos,  href: '/proyectos',  Icon: IconOrders    },
+    { label: L.citas,      href: '/citas',      Icon: IconCalendar  },
+    { label: L.analiticas, href: '/analiticas', Icon: IconChart     },
+    { label: L.cuenta,     href: '/cuenta',     Icon: IconPerson    },
   ];
 
   return (
@@ -213,11 +214,13 @@ function MobileBottomNav({ user, onNavigate }) {
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     }}>
       {tabs.map(({ label, href, Icon }) => {
-        const active = pathname === href;
+        const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
           <button
             key={href}
             onClick={() => onNavigate(href)}
+            aria-label={label}
+            aria-current={active ? 'page' : undefined}
             style={{
               flex: 1, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 5,
@@ -269,11 +272,11 @@ export default function PortalLayout({ user, onNavigate, onLogout, copy, theme, 
           <div style={{ paddingBottom: `calc(${BOTTOM_NAV_H}px + env(safe-area-inset-bottom, 0px))` }}>
             {children}
           </div>
-          <MobileBottomNav user={user} onNavigate={onNavigate} />
+          <MobileBottomNav user={user} onNavigate={onNavigate} copy={copy} />
         </>
       ) : (
         <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-          <PortalSidebar user={user} onNavigate={onNavigate} onLogout={onLogout} />
+          <PortalSidebar user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} />
           <div style={{ flex: 1, minWidth: 0 }}>
             {children}
           </div>

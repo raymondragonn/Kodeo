@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 're
 import { useContentProtection } from './hooks/useContentProtection';
 import { useScrollDepth } from './hooks/useScrollDepth';
 import { initAnalytics, trackPageView, trackCtaClick } from './lib/analytics';
+import { useLang } from './lib/lang';
 import { COPY } from './data/copy';
 
 // Critical path — loaded eagerly (above the fold)
@@ -42,6 +43,7 @@ const ProjectsPage     = lazy(() => import('./components/ProjectsPage'));
 const OrderPaymentPage = lazy(() => import('./components/OrderPaymentPage'));
 const AnalyticsPage    = lazy(() => import('./components/AnalyticsPage'));
 const UsersPage        = lazy(() => import('./components/UsersPage'));
+const UserDetailPage   = lazy(() => import('./components/UserDetailPage'));
 
 const NAV_SECTION_MAP = {
   'Servicios': 'services', 'Services': 'services',
@@ -77,7 +79,25 @@ function getInitialTheme() {
 }
 
 function getStoredUser() {
-  try { return JSON.parse(localStorage.getItem('user')) || null; } catch { return null; }
+  try {
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!token || !user) return null;
+
+    const encodedPayload = token.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/');
+    if (!encodedPayload) throw new Error('Token inválido');
+    const payload = JSON.parse(atob(encodedPayload.padEnd(Math.ceil(encodedPayload.length / 4) * 4, '=')));
+    if (!payload.exp || payload.exp * 1000 <= Date.now()) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      return null;
+    }
+    return user;
+  } catch {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return null;
+  }
 }
 
 export default function App() {
@@ -104,9 +124,8 @@ export default function App() {
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
-  const browserLang = navigator.language || navigator.languages?.[0] || 'es';
-  const lang        = browserLang.toLowerCase().startsWith('es') ? 'es' : 'en';
-  const copy        = COPY[lang] || COPY.es;
+  const lang = useLang();
+  const copy = COPY[lang] || COPY.es;
 
   const scrollToSection = (id) =>
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -190,7 +209,7 @@ export default function App() {
         <Route path="/" element={
           <>
             <PageMeta
-              title="Kodeo | Agencia Digital Veracruzana"
+              title="Kodeo | Agencia Digital"
               description="Diseñamos, programamos y desplegamos experiencias web premium. Landing Pages, Sitios Web y Tiendas Online desde Veracruz, México."
               path="/"
             />
@@ -296,7 +315,7 @@ export default function App() {
           <>
             <PageMeta
               title="Términos y Condiciones | Kodeo"
-              description="Términos y condiciones de los servicios de diseño y desarrollo web de Kodeo. Léelos antes de contratar."
+              description="Términos y condiciones de los servicios de diseño y desarrollo web de Kodeo. Léelos antes de adquirir."
               path="/terminos"
             />
             <TermsPage {...sharedNavProps} onBack={handleBack} />
@@ -342,6 +361,16 @@ export default function App() {
           <>
             <PageMeta title="Usuarios | Kodeo" description="Gestión de usuarios y roles." path="/usuarios" />
             <UsersPage user={user} onNavigate={navigate} onLogout={handleLogout} copy={copy} theme={theme} onThemeToggle={toggleTheme} />
+          </>
+        } />
+
+        {/* ── Detalle de usuario (solo administrador) ── */}
+        <Route path="/usuarios/:userId" element={
+          !user ? <Navigate to="/login" replace /> :
+          user.role !== 'administrador' ? <Navigate to="/cuenta" replace /> :
+          <>
+            <PageMeta title="Detalle de usuario | Kodeo" description="Historial y detalle de un usuario." path="/usuarios" />
+            <UserDetailPage user={user} onNavigate={navigate} onLogout={handleLogout} copy={copy} theme={theme} onThemeToggle={toggleTheme} />
           </>
         } />
 

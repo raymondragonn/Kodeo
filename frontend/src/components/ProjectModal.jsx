@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import gsap from 'gsap';
 import { useBreakpoint } from '../hooks/useBreakpoint';
@@ -62,15 +62,7 @@ export default function ProjectModal({ project, copy, onClose }) {
     gsap.fromTo(panel, { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: 0.38, ease: 'power3.out', delay: 0.06 });
   }, []);
 
-  // ESC key
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') handleClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
     const backdrop = backdropRef.current;
@@ -79,7 +71,14 @@ export default function ProjectModal({ project, copy, onClose }) {
     const tl = gsap.timeline({ onComplete: onClose });
     tl.to(panel,    { opacity: 0, y: 24, duration: 0.2, ease: 'power2.in' });
     tl.to(backdrop, { opacity: 0, duration: 0.16, ease: 'power2.in' }, '-=0.08');
-  };
+  }, [onClose]);
+
+  // ESC key
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') handleClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleClose]);
 
   const modal = (
     <>

@@ -167,7 +167,7 @@ $now    = time();
 $payload = [
     'iss'      => 'kodeo-api',
     'iat'      => $now,
-    'exp'      => $now + 60 * 60 * 24 * 7,
+    'exp'      => $now + JWT_TTL_SECONDS,
     'sub'      => $user['id'],
     'name'     => $user['name'],
     'username' => $user['username'],
@@ -189,28 +189,5 @@ jsonSuccess([
 ]);
 
 // ----------------------------------------------------------------
-//  Helper
+//  Helper — generateUsername() vive ahora en config.php (compartido con register.php)
 // ----------------------------------------------------------------
-
-function generateUsername(PDO $db, string $name, ?string $email): string {
-    $base = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode(' ', $name)[0]));
-
-    if (!$base && $email) {
-        $base = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode('@', $email)[0]));
-    }
-
-    if (!$base) $base = 'usuario';
-
-    $stmt = $db->prepare('SELECT username FROM users WHERE username = ? LIMIT 1');
-    $stmt->execute([$base]);
-
-    if (!$stmt->fetch()) return $base;
-
-    for ($i = 2; $i <= 9999; $i++) {
-        $candidate = $base . $i;
-        $stmt->execute([$candidate]);
-        if (!$stmt->fetch()) return $candidate;
-    }
-
-    return $base . bin2hex(random_bytes(3));
-}

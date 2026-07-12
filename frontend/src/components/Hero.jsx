@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { trackCtaClick } from '../lib/analytics';
+import RevealButton from './RevealButton';
 
 export default function Hero({ copy, motionSpeed = 1 }) {
   const linesRef    = useRef([]);
@@ -20,7 +21,9 @@ export default function Hero({ copy, motionSpeed = 1 }) {
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
 
-      tl.from(eyebrowRef.current, { opacity: 0, y: 10, duration: dur * 0.6 });
+      if (eyebrowRef.current) {
+        tl.from(eyebrowRef.current, { opacity: 0, y: 10, duration: dur * 0.6 });
+      }
       tl.from(
         linesRef.current,
         { y: '115%', duration: dur, stagger },
@@ -34,7 +37,7 @@ export default function Hero({ copy, motionSpeed = 1 }) {
     }, sectionRef);
 
     return () => ctx.revert();
-  }, [copy.hero.lines, motionSpeed]);
+  }, [copy.hero.lines, dur, stagger]);
 
   return (
     <section
@@ -45,21 +48,23 @@ export default function Hero({ copy, motionSpeed = 1 }) {
       }}
     >
       {/* Eyebrow */}
-      <div
-        ref={eyebrowRef}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontFamily: 'var(--ui)',
-          fontSize: 11,
-          letterSpacing: '.22em',
-          textTransform: 'uppercase',
-          color: 'var(--type-soft)',
-          marginBottom: isMobile ? 32 : 50,
-        }}
-      >
-        <span>{copy.hero.eyebrow}</span>
-      </div>
+      {copy.hero.eyebrow && (
+        <div
+          ref={eyebrowRef}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontFamily: 'var(--ui)',
+            fontSize: 11,
+            letterSpacing: '.22em',
+            textTransform: 'uppercase',
+            color: 'var(--type-soft)',
+            marginBottom: isMobile ? 32 : 50,
+          }}
+        >
+          <span>{copy.hero.eyebrow}</span>
+        </div>
+      )}
 
       {/* Headline */}
       <h1
@@ -114,8 +119,9 @@ export default function Hero({ copy, motionSpeed = 1 }) {
         </p>
 
         <div ref={ctaRef} style={{ display: 'flex', gap: 12, alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
-          <button
-            onClick={() => {
+          <RevealButton
+            className="cta-breathe"
+            onActivate={() => {
               trackCtaClick({ cta_id: 'hero_comprar', cta_text: copy.hero.ctaA, section: 'hero', destination: '/comprar' });
               navigate('/comprar');
             }}
@@ -136,11 +142,9 @@ export default function Hero({ copy, motionSpeed = 1 }) {
               alignItems: 'center',
               justifyContent: 'center',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.04)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
           >
             {copy.hero.ctaA}
-          </button>
+          </RevealButton>
           <a
             href="#work"
             onClick={() => trackCtaClick({ cta_id: 'hero_ver_trabajo', cta_text: copy.hero.ctaB, section: 'hero', destination: '#work' })}

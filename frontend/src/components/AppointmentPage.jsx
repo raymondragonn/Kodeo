@@ -58,8 +58,7 @@ export default function AppointmentPage({
   };
 
   const handleChangeService = () => {
-    setSelected(null);
-    setSlot(null);
+    navigate('/comprar');
   };
 
   return (

@@ -1,8 +1,68 @@
 import { useState, useRef, useEffect } from 'react';
 import logoSvg from '../assets/logo_black_transparent.svg';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useLang, toggleLang } from '../lib/lang';
 
 const SERVICES_LABELS = new Set(['Servicios', 'Services']);
+
+function HamburgerIcon({ open }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ display: 'block' }}>
+      <line x1="3" y1="6.5" x2="17" y2="6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+        style={{ transformOrigin: '10px 6.5px', transform: open ? 'rotate(45deg) translateY(3.5px)' : 'none', transition: 'transform 0.28s cubic-bezier(.4,0,.2,1)' }} />
+      <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+        style={{ opacity: open ? 0 : 1, transition: 'opacity 0.18s ease' }} />
+      <line x1="3" y1="13.5" x2="17" y2="13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+        style={{ transformOrigin: '10px 13.5px', transform: open ? 'rotate(-45deg) translateY(-3.5px)' : 'none', transition: 'transform 0.28s cubic-bezier(.4,0,.2,1)' }} />
+    </svg>
+  );
+}
+
+function LangToggle({ style = {} }) {
+  const lang = useLang();
+  return (
+    <button
+      onClick={toggleLang}
+      aria-label={lang === 'es' ? 'Switch to English' : 'Cambiar a español'}
+      style={{
+        background: 'transparent',
+        border: '1px solid var(--line)',
+        color: 'var(--type-soft)',
+        height: 36,
+        padding: '0 10px',
+        borderRadius: 'var(--radius)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        flexShrink: 0,
+        fontFamily: 'var(--ui)',
+        fontSize: 11,
+        letterSpacing: '.1em',
+        textTransform: 'uppercase',
+        transition: 'border-color 0.2s, color 0.2s, background 0.2s',
+        ...style,
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = 'var(--line-2)';
+        e.currentTarget.style.color = 'var(--type)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = 'var(--line)';
+        e.currentTarget.style.color = 'var(--type-soft)';
+      }}
+    >
+      {/* Globe icon */}
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z" />
+      </svg>
+      {lang.toUpperCase()}
+    </button>
+  );
+}
 
 function ThemeToggle({ theme, onThemeToggle, style = {} }) {
   const isDark = theme === 'dark';
@@ -104,8 +164,22 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
     return () => { document.body.style.overflow = ''; };
   }, [menuOpen]);
 
-  // Close mobile menu on lang/copy change (route change)
-  useEffect(() => { setMenuOpen(false); }, [copy]);
+  // Keep the overlay from surviving a switch back to the desktop layout.
+  useEffect(() => {
+    if (isMobile) return undefined;
+    const id = window.requestAnimationFrame(() => setMenuOpen(false));
+    return () => window.cancelAnimationFrame(id);
+  }, [isMobile]);
+
+  // Escape closes the mobile navigation and returns focus to normal content.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [menuOpen]);
 
   const handleMobileNav = (fn) => {
     setMenuOpen(false);
@@ -114,17 +188,6 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
 
   /* ── MOBILE ────────────────────────────────────────────── */
   if (isMobile) {
-    const HamburgerIcon = () => (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ display: 'block' }}>
-        <line x1="3" y1="6.5" x2="17" y2="6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-          style={{ transformOrigin: '10px 6.5px', transform: menuOpen ? 'rotate(45deg) translateY(3.5px)' : 'none', transition: 'transform 0.28s cubic-bezier(.4,0,.2,1)' }} />
-        <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-          style={{ opacity: menuOpen ? 0 : 1, transition: 'opacity 0.18s ease' }} />
-        <line x1="3" y1="13.5" x2="17" y2="13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-          style={{ transformOrigin: '10px 13.5px', transform: menuOpen ? 'rotate(-45deg) translateY(-3.5px)' : 'none', transition: 'transform 0.28s cubic-bezier(.4,0,.2,1)' }} />
-      </svg>
-    );
-
     return (
       <>
         <header style={{
@@ -138,7 +201,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
           background: 'var(--nav-bg)',
           backdropFilter: 'blur(14px)',
           WebkitBackdropFilter: 'blur(14px)',
-          borderBottom: menuOpen ? 'none' : '1px solid var(--line)',
+          borderBottom: '1px solid var(--line)',
           minHeight: 60,
         }}>
           <a
@@ -150,12 +213,15 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
           </a>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <LangToggle />
             <ThemeToggle theme={theme} onThemeToggle={onThemeToggle} />
             <button
               onClick={() => setMenuOpen(p => !p)}
               aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-navigation"
               style={{
-                background: menuOpen ? 'var(--bg-3)' : 'transparent',
+                background: 'transparent',
                 border: '1px solid var(--line)',
                 color: 'var(--type)',
                 width: 44, height: 44,
@@ -166,118 +232,65 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <HamburgerIcon />
+              <HamburgerIcon open={false} />
             </button>
           </div>
         </header>
 
         {/* Full-screen mobile menu */}
         {menuOpen && (
-          <div style={{
+          <div id="mobile-navigation" role="dialog" aria-modal="true" aria-label="Navegación principal" style={{
             position: 'fixed', top: 60, left: 0, right: 0, bottom: 0,
             zIndex: 99, background: 'var(--bg)', overflowY: 'auto',
             display: 'flex', flexDirection: 'column',
             borderTop: '1px solid var(--line)',
           }}>
 
-            {/* ── MENÚ PORTAL (sesión activa) ── */}
-            {user ? (
+            {/* El menú público no cambia con el estado de la sesión. */}
               <>
-                {/* Banda superior: info de usuario */}
+                {/* Acceso: perfil activo o acciones para visitantes */}
                 <div style={{ padding: '20px 20px 0' }}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '0 0 20px', borderBottom: '1px solid var(--line)',
-                  }}>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: '50%',
-                      background: 'var(--bg-3)', border: '1px solid var(--line)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                    }}>
-                      <ProfileIcon />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{
-                        fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
-                        textTransform: 'uppercase', color: 'var(--type)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {user.name || user.username}
-                      </div>
-                      <div style={{
-                        fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)',
-                        marginTop: 2,
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {user.email}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Links del portal */}
-                <nav style={{ flex: 1, padding: '0 20px' }}>
-                  {[
-                    { label: 'Inicio',    href: '/',           action: () => onLogoClick?.() },
-                    { label: 'Proyectos', href: '/proyectos',  action: () => onAuthClick?.('proyectos') },
-                    { label: 'Citas',     href: '/citas',      action: () => onAuthClick?.('citas') },
-                    { label: 'Cuenta',    href: '/cuenta',     action: () => onAuthClick?.('cuenta') },
-                  ].map(({ label, href, action }) => (
-                    <a
-                      key={href}
-                      href={href}
-                      onClick={e => { e.preventDefault(); handleMobileNav(action); }}
+                  {user ? (
+                    <button
+                      onClick={() => { setMenuOpen(false); onAuthClick?.('proyectos'); }}
                       style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '22px 0', borderBottom: '1px solid var(--line)',
-                        fontFamily: 'var(--display)', fontSize: 28, letterSpacing: '-0.02em',
-                        color: 'var(--type)', textDecoration: 'none',
-                        WebkitTapHighlightColor: 'transparent',
+                        display: 'flex', width: '100%', alignItems: 'center', gap: 12,
+                        padding: '0 0 20px', border: 0, borderBottom: '1px solid var(--line)',
+                        background: 'transparent', color: 'var(--type)', textAlign: 'left',
+                        cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
                       }}
                     >
-                      {label}
-                      <span style={{ color: 'var(--type-soft)', fontSize: 18 }}>→</span>
-                    </a>
-                  ))}
-                  <button
-                    onClick={() => { setMenuOpen(false); onLogout?.(); }}
-                    style={{
-                      display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '22px 0', borderBottom: '1px solid var(--line)',
-                      background: 'none', border: 'none',
-                      fontFamily: 'var(--display)', fontSize: 28, letterSpacing: '-0.02em',
-                      color: '#e05050', cursor: 'pointer', textAlign: 'left',
-                      WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >
-                    Cerrar sesión
-                    <span style={{ fontSize: 18 }}>→</span>
-                  </button>
-                </nav>
-
-                <div style={{
-                  padding: '20px 20px 36px', marginTop: 'auto',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                  <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
-                    © Kodeo {new Date().getFullYear()}
-                  </span>
-                  <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
-                    Veracruz, MX
-                  </span>
-                </div>
-              </>
-            ) : (
-              /* ── MENÚ LANDING (sin sesión) ── */
-              <>
-                {/* Botones de auth */}
-                <div style={{ padding: '20px 20px 0' }}>
-                  <div style={{ display: 'flex', gap: 10, paddingBottom: 20, borderBottom: '1px solid var(--line)' }}>
-                    {[
-                      { label: copy.authLogin ?? 'Iniciar sesión', route: 'login',    primary: true  },
-                      { label: copy.authRegister ?? 'Registrarme',  route: 'register', primary: false },
-                    ].map(({ label, route, primary }) => (
+                      <span style={{
+                        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'var(--bg-3)', border: '1px solid var(--line)',
+                      }}>
+                        <ProfileIcon />
+                      </span>
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{
+                          display: 'block', fontFamily: 'var(--ui)', fontSize: 11,
+                          letterSpacing: '.12em', textTransform: 'uppercase',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {user.name || user.username}
+                        </span>
+                        <span style={{
+                          display: 'block', marginTop: 3, fontFamily: 'var(--body)',
+                          fontSize: 11, color: 'var(--type-muted)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {user.email}
+                        </span>
+                      </span>
+                      <span style={{ fontSize: 16, color: 'var(--type-soft)' }}>→</span>
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 10, paddingBottom: 20, borderBottom: '1px solid var(--line)' }}>
+                      {[
+                        { label: copy.authLogin ?? 'Iniciar sesión', route: 'login', primary: true },
+                        { label: copy.authRegister ?? 'Registrarme', route: 'register', primary: false },
+                      ].map(({ label, route, primary }) => (
                       <button
                         key={route}
                         onClick={() => { setMenuOpen(false); onAuthClick?.(route); }}
@@ -294,8 +307,9 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                       >
                         {label}
                       </button>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Links de navegación landing */}
@@ -331,7 +345,6 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                   </span>
                 </div>
               </>
-            )}
           </div>
         )}
       </>
@@ -508,6 +521,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
           {copy.navAvailable}
         </span>
         <ThemeToggle theme={theme} onThemeToggle={onThemeToggle} />
+        <LangToggle />
 
         {/* Profile dropdown */}
         <div ref={profileRef} style={{ position: 'relative' }}>

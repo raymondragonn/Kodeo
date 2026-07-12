@@ -151,8 +151,19 @@ export default function Services({ copy, motionSpeed = 1, onServiceClick }) {
                     textTransform: 'uppercase',
                     color: 'var(--type-soft)',
                     marginTop: 4,
+                    display: 'inline-flex',
+                    alignItems: 'flex-start',
+                    gap: 6,
                   }}>
-                    {s.price} · {s.time}
+                    <span style={{ display: 'inline-flex', flexDirection: 'column' }}>
+                      <span>{s.price}</span>
+                      <span style={{ fontSize: 8, letterSpacing: '.1em', opacity: 0.6, marginTop: 2 }}>{copy.services.priceNote}</span>
+                    </span>
+                    <span>·</span>
+                    <span style={{ display: 'inline-flex', flexDirection: 'column' }}>
+                      <span>{s.time}</span>
+                      <span style={{ fontSize: 8, letterSpacing: '.1em', opacity: 0.6, marginTop: 2 }}>{copy.services.timeNote}</span>
+                    </span>
                   </div>
                   {PDF_MAP[s.code] && (
                     <a
@@ -196,8 +207,18 @@ export default function Services({ copy, motionSpeed = 1, onServiceClick }) {
                 </span>
               )}
 
-              {!isMobile && <span style={{ color: 'var(--type-soft)' }}>{s.time}</span>}
-              {!isMobile && <span style={{ textAlign: 'right' }}>{s.price}</span>}
+              {!isMobile && (
+                <span style={{ color: 'var(--type-soft)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {s.time}
+                  <span style={{ fontSize: 8, letterSpacing: '.12em', opacity: 0.6 }}>{copy.services.timeNote}</span>
+                </span>
+              )}
+              {!isMobile && (
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                  {s.price}
+                  <span style={{ fontSize: 8, letterSpacing: '.12em', opacity: 0.6, color: 'var(--type-soft)' }}>{copy.services.priceNote}</span>
+                </span>
+              )}
 
               <span style={{
                 textAlign: 'right',

@@ -5,14 +5,16 @@ import { formatDMY } from '../utils/deliveryDate';
 import { API_BASE_URL as API } from '../lib/api';
 
 const STATUS_MAP = {
-  pendiente:  { bg: 'rgba(148,163,184,0.1)', color: '#64748b', border: 'rgba(148,163,184,0.3)' },
-  en_proceso: { bg: 'rgba(234,179,8,0.1)',   color: '#ca8a04', border: 'rgba(234,179,8,0.3)'   },
-  completado: { bg: 'rgba(34,197,94,0.1)',   color: '#16a34a', border: 'rgba(34,197,94,0.3)'   },
-  cancelado:  { bg: 'rgba(239,68,68,0.1)',   color: '#dc2626', border: 'rgba(239,68,68,0.3)'   },
+  pendiente:  { label: 'Pendiente',  bg: 'rgba(148,163,184,0.1)', color: '#64748b', border: 'rgba(148,163,184,0.3)' },
+  en_proceso: { label: 'En proceso', bg: 'rgba(234,179,8,0.1)',   color: '#ca8a04', border: 'rgba(234,179,8,0.3)'   },
+  completado: { label: 'Completado', bg: 'rgba(34,197,94,0.1)',   color: '#16a34a', border: 'rgba(34,197,94,0.3)'   },
+  cancelado:  { label: 'Cancelado',  bg: 'rgba(239,68,68,0.1)',   color: '#dc2626', border: 'rgba(239,68,68,0.3)'   },
 };
 
 const KANBAN_COLS = ['pendiente', 'en_proceso', 'completado', 'cancelado'];
 const SERVICES    = ['Landing Page', 'Sitio Web', 'Tienda Online'];
+const DAYS_ES     = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+const MONTHS_ES   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 // ── HOOK RESPONSIVE ───────────────────────────────────────────────────────────
 function useIsMobile() {
@@ -25,6 +27,7 @@ function useIsMobile() {
     // Safari < 14 uses addListener
     if (mq.addEventListener) mq.addEventListener('change', handler);
     else mq.addListener(handler);
+    setIsMobile(mq.matches);
     return () => {
       if (mq.removeEventListener) mq.removeEventListener('change', handler);
       else mq.removeListener(handler);
@@ -129,16 +132,15 @@ const GLOBAL_CSS = `
 `;
 
 // ── BADGES & HELPERS ──────────────────────────────────────────────────────────
-function StatusBadge({ status, copy }) {
+function StatusBadge({ status }) {
   const s = STATUS_MAP[status] ?? STATUS_MAP.pendiente;
-  const label = copy.portal.status[status] ?? copy.portal.status.pendiente;
   return (
     <span style={{
       fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase',
       padding: '4px 10px', borderRadius: 'var(--radius-pill)',
       background: s.bg, color: s.color, border: `1px solid ${s.border}`, flexShrink: 0,
       WebkitUserSelect: 'none', userSelect: 'none',
-    }}>{label}</span>
+    }}>{s.label}</span>
   );
 }
 
@@ -165,9 +167,9 @@ function ViewIcon({ type, active }) {
 // ── PROGRESS BAR ──────────────────────────────────────────────────────────────
 const STEPS = ['pendiente', 'en_proceso', 'completado'];
 
-function ProgressBar({ status, copy }) {
+function ProgressBar({ status }) {
   if (status === 'cancelado') return (
-    <div style={{ fontFamily: 'var(--body)', fontSize: 12, color: '#dc2626', marginTop: 10 }}>{copy.portal.orders.orderCancelled}</div>
+    <div style={{ fontFamily: 'var(--body)', fontSize: 12, color: '#dc2626', marginTop: 10 }}>Pedido cancelado</div>
   );
   const cur = STEPS.indexOf(status);
   return (
@@ -197,7 +199,7 @@ function ProgressBar({ status, copy }) {
             fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
             color: i <= cur ? 'var(--type)' : 'var(--type-muted)',
             textAlign: i === 0 ? 'left' : i === STEPS.length - 1 ? 'right' : 'center', flex: 1,
-          }}>{copy.portal.status[s]}</span>
+          }}>{STATUS_MAP[s].label}</span>
         ))}
       </div>
     </div>
@@ -205,8 +207,7 @@ function ProgressBar({ status, copy }) {
 }
 
 // ── ADMIN: fila editable ──────────────────────────────────────────────────────
-function AdminRow({ order, onSave, copy }) {
-  const O = copy.portal.orders;
+function AdminRow({ order, onSave }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm]       = useState({
     status: order.status, start_date: order.start_date ?? '',
@@ -232,7 +233,7 @@ function AdminRow({ order, onSave, copy }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--type)' }}>{order.service}</span>
-            <StatusBadge status={editing ? form.status : order.status} copy={copy}/>
+            <StatusBadge status={editing ? form.status : order.status}/>
           </div>
           <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             #{order.id} · <strong style={{ color: 'var(--type-soft)' }}>{order.username}</strong> · {order.user_email}
@@ -247,34 +248,34 @@ function AdminRow({ order, onSave, copy }) {
             background: editing ? 'var(--type)' : 'transparent', color: editing ? 'var(--bg)' : 'var(--type-soft)',
             border: '1px solid var(--line)', borderRadius: 'var(--radius)',
             padding: '8px 14px', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
-          }}>{saving ? '…' : editing ? O.save : O.edit}</button>
+          }}>{saving ? '…' : editing ? 'Guardar' : 'Editar'}</button>
           {editing && (
             <button className="kd-btn" onClick={() => { setForm({ status: order.status, start_date: order.start_date ?? '', delivery_date: order.delivery_date ?? '', notes: order.notes ?? '' }); setEditing(false); }} style={{
               fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
               background: 'transparent', color: '#e05050', border: '1px solid rgba(239,68,68,0.3)',
               borderRadius: 'var(--radius)', padding: '8px 12px', cursor: 'pointer',
-            }}>{O.cancel}</button>
+            }}>Cancelar</button>
           )}
         </div>
       </div>
       {editing && (
         <div className="kd-edit-grid" style={{ padding: '16px 20px', borderTop: '1px solid var(--line)' }}>
           <div>
-            <label style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 5 }}>{O.statusLabel}</label>
+            <label style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 5 }}>Estatus</label>
             <select className="kd-select" value={form.status} onChange={e => f('status', e.target.value)} style={inputStyle}>
-              {Object.keys(STATUS_MAP).map(k => <option key={k} value={k}>{copy.portal.status[k]}</option>)}
+              {Object.entries(STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 5 }}>{O.startDateLabel}</label>
+            <label style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 5 }}>Fecha inicio</label>
             <input type="date" value={form.start_date} onChange={e => f('start_date', e.target.value)} style={inputStyle}/>
           </div>
           <div>
-            <label style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 5 }}>{O.deliveryDateLabel}</label>
+            <label style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 5 }}>Fecha entrega</label>
             <input type="date" value={form.delivery_date} onChange={e => f('delivery_date', e.target.value)} style={inputStyle}/>
           </div>
           <div style={{ gridColumn: '1/-1' }}>
-            <label style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 5 }}>{O.internalNotes}</label>
+            <label style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 5 }}>Notas internas</label>
             <textarea value={form.notes} onChange={e => f('notes', e.target.value)} rows={2}
               style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--body)' }}/>
           </div>
@@ -282,8 +283,8 @@ function AdminRow({ order, onSave, copy }) {
       )}
       {!editing && (order.start_date || order.delivery_date) && (
         <div style={{ padding: '10px 20px', borderTop: '1px solid var(--line)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          {order.start_date && <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>{O.start}: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.start_date)}</strong></span>}
-          {order.delivery_date && <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>{O.delivery}: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.delivery_date)}</strong></span>}
+          {order.start_date && <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Inicio: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.start_date)}</strong></span>}
+          {order.delivery_date && <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Entrega: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.delivery_date)}</strong></span>}
         </div>
       )}
     </div>
@@ -291,25 +292,24 @@ function AdminRow({ order, onSave, copy }) {
 }
 
 // ── CLIENTE: tarjeta lista ────────────────────────────────────────────────────
-function ClientCard({ order, copy }) {
-  const O = copy.portal.orders;
+function ClientCard({ order }) {
   return (
     <div className="kd-card" style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-2)', padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--type)' }}>{order.service}</span>
-            <StatusBadge status={order.status} copy={copy}/>
+            <StatusBadge status={order.status}/>
           </div>
-          <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>{O.orderNum.replace('{n}', order.id)} · {formatDMY(order.created_at)}</span>
+          <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Pedido #{order.id} · {formatDMY(order.created_at)}</span>
         </div>
         <span style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', flexShrink: 0 }}>MX${parseFloat(order.amount).toLocaleString('es-MX')}</span>
       </div>
-      <ProgressBar status={order.status} copy={copy}/>
+      <ProgressBar status={order.status}/>
       {(order.start_date || order.delivery_date) && (
         <div style={{ marginTop: 14, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          {order.start_date && <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>{O.start}: <strong style={{ color: 'var(--type)' }}>{formatDMY(order.start_date)}</strong></span>}
-          {order.delivery_date && <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>{O.delivery}: <strong style={{ color: 'var(--type)' }}>{formatDMY(order.delivery_date)}</strong></span>}
+          {order.start_date && <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Inicio: <strong style={{ color: 'var(--type)' }}>{formatDMY(order.start_date)}</strong></span>}
+          {order.delivery_date && <span style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)' }}>Entrega: <strong style={{ color: 'var(--type)' }}>{formatDMY(order.delivery_date)}</strong></span>}
         </div>
       )}
       {order.notes && (
@@ -322,8 +322,7 @@ function ClientCard({ order, copy }) {
 }
 
 // ── KANBAN: tarjeta ───────────────────────────────────────────────────────────
-function KanbanCard({ order, isAdmin, onSave, onPointerDown, dragging, justDropped, copy }) {
-  const O = copy.portal.orders;
+function KanbanCard({ order, isAdmin, onSave, onPointerDown, dragging, justDropped }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm]       = useState({
     status: order.status, start_date: order.start_date ?? '',
@@ -375,11 +374,11 @@ function KanbanCard({ order, isAdmin, onSave, onPointerDown, dragging, justDropp
       </div>
       {isAdmin
         ? <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: 'var(--type-muted)' }}>#{order.id} · {order.username}</span>
-        : <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: 'var(--type-muted)' }}>{O.orderNum.replace('{n}', order.id)}</span>
+        : <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: 'var(--type-muted)' }}>Pedido #{order.id}</span>
       }
       {order.delivery_date && (
         <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: 'var(--type-muted)' }}>
-          {O.delivery}: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.delivery_date)}</strong>
+          Entrega: <strong style={{ color: 'var(--type-soft)' }}>{formatDMY(order.delivery_date)}</strong>
         </span>
       )}
       {order.notes && !editing && (
@@ -397,28 +396,28 @@ function KanbanCard({ order, isAdmin, onSave, onPointerDown, dragging, justDropp
             background: 'transparent', border: '1px solid var(--line)', color: 'var(--type-soft)',
             borderRadius: 'var(--radius)', padding: '6px 10px', cursor: 'pointer', alignSelf: 'flex-end',
           }}
-        >{O.edit}</button>
+        >Editar</button>
       )}
       {editing && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
           <div>
-            <label style={{ fontFamily: 'var(--ui)', fontSize: 8, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 4 }}>{O.statusLabel}</label>
+            <label style={{ fontFamily: 'var(--ui)', fontSize: 8, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 4 }}>Estatus</label>
             <select className="kd-select" value={form.status} onChange={e => f('status', e.target.value)} style={inputStyle}>
-              {Object.keys(STATUS_MAP).map(k => <option key={k} value={k}>{copy.portal.status[k]}</option>)}
+              {Object.entries(STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             <div>
-              <label style={{ fontFamily: 'var(--ui)', fontSize: 8, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 4 }}>{O.start}</label>
+              <label style={{ fontFamily: 'var(--ui)', fontSize: 8, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 4 }}>Inicio</label>
               <input type="date" value={form.start_date} onChange={e => f('start_date', e.target.value)} style={inputStyle}/>
             </div>
             <div>
-              <label style={{ fontFamily: 'var(--ui)', fontSize: 8, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 4 }}>{O.delivery}</label>
+              <label style={{ fontFamily: 'var(--ui)', fontSize: 8, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 4 }}>Entrega</label>
               <input type="date" value={form.delivery_date} onChange={e => f('delivery_date', e.target.value)} style={inputStyle}/>
             </div>
           </div>
           <div>
-            <label style={{ fontFamily: 'var(--ui)', fontSize: 8, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 4 }}>{O.notes}</label>
+            <label style={{ fontFamily: 'var(--ui)', fontSize: 8, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-soft)', display: 'block', marginBottom: 4 }}>Notas</label>
             <textarea value={form.notes} onChange={e => f('notes', e.target.value)} rows={2}
               style={{ ...inputStyle, resize: 'vertical' }}/>
           </div>
@@ -427,12 +426,12 @@ function KanbanCard({ order, isAdmin, onSave, onPointerDown, dragging, justDropp
               fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase',
               background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', color: '#e05050',
               borderRadius: 'var(--radius)', padding: '6px 10px', cursor: 'pointer',
-            }}>{O.cancel}</button>
+            }}>Cancelar</button>
             <button className="kd-btn" onClick={handleSave} disabled={saving} style={{
               fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.12em', textTransform: 'uppercase',
               background: 'var(--type)', border: 'none', color: 'var(--bg)',
               borderRadius: 'var(--radius)', padding: '6px 10px', cursor: 'pointer',
-            }}>{saving ? '…' : O.save}</button>
+            }}>{saving ? '…' : 'Guardar'}</button>
           </div>
         </div>
       )}
@@ -441,8 +440,7 @@ function KanbanCard({ order, isAdmin, onSave, onPointerDown, dragging, justDropp
 }
 
 // ── VISTA KANBAN ───────────────────────────────────────────────────────────────
-function KanbanView({ orders, isAdmin, onSave, copy }) {
-  const O = copy.portal.orders;
+function KanbanView({ orders, isAdmin, onSave }) {
   const [draggingId, setDraggingId]   = useState(null);
   const [ghostPos, setGhostPos]       = useState({ x: 0, y: 0 });
   const [ghostData, setGhostData]     = useState(null);
@@ -525,7 +523,7 @@ function KanbanView({ orders, isAdmin, onSave, copy }) {
           <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: 'var(--type-muted)' }}>
             #{ghostData.id}{ghostData.username ? ` · ${ghostData.username}` : ''}
           </span>
-          <StatusBadge status={ghostData.status} copy={copy}/>
+          <StatusBadge status={ghostData.status}/>
         </div>
       )}
 
@@ -545,7 +543,7 @@ function KanbanView({ orders, isAdmin, onSave, copy }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 transition: 'background 0.2s, border-color 0.2s',
               }}>
-                <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: s.color }}>{copy.portal.status[col]}</span>
+                <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.18em', textTransform: 'uppercase', color: s.color }}>{s.label}</span>
                 <span style={{ fontFamily: 'var(--ui)', fontSize: 9, color: s.color, opacity: 0.7 }}>{colOrders.length}</span>
               </div>
               <div style={{
@@ -566,12 +564,12 @@ function KanbanView({ orders, isAdmin, onSave, copy }) {
                     textTransform: 'uppercase', color: s.color,
                     animation: 'kanbanPlaceholder 0.18s ease forwards',
                     transformOrigin: 'top',
-                  }}>{O.dropHere}</div>
+                  }}>Soltar aquí</div>
                 )}
                 {colOrders.length === 0 && !highlight
-                  ? <div style={{ padding: '20px 0', textAlign: 'center', fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>{O.emptyColumn}</div>
+                  ? <div style={{ padding: '20px 0', textAlign: 'center', fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>Sin pedidos</div>
                   : colOrders.map(o => (
-                    <KanbanCard key={o.id} order={o} isAdmin={isAdmin} onSave={onSave} copy={copy}
+                    <KanbanCard key={o.id} order={o} isAdmin={isAdmin} onSave={onSave}
                       dragging={draggingId === o.id} justDropped={justDropped === o.id}
                       onPointerDown={e => handlePointerDown(o.id, e)}/>
                   ))
@@ -586,8 +584,7 @@ function KanbanView({ orders, isAdmin, onSave, copy }) {
 }
 
 // ── VISTA CALENDARIO ──────────────────────────────────────────────────────────
-function CalendarView({ orders, copy }) {
-  const O = copy.portal.orders;
+function CalendarView({ orders }) {
   const isMobile = useIsMobile();
   const today    = new Date();
   const [year, setYear]     = useState(today.getFullYear());
@@ -622,7 +619,7 @@ function CalendarView({ orders, copy }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <button className="kd-btn" onClick={prev} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius)', color: 'var(--type-soft)', padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui)', fontSize: 14, minWidth: 40 }}>←</button>
         <span style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 16 : 18, letterSpacing: '-0.02em', color: 'var(--type)', textAlign: 'center' }}>
-          {O.months[month]} {year}
+          {MONTHS_ES[month]} {year}
         </span>
         <button className="kd-btn" onClick={next} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius)', color: 'var(--type-soft)', padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui)', fontSize: 14, minWidth: 40 }}>→</button>
       </div>
@@ -630,7 +627,7 @@ function CalendarView({ orders, copy }) {
       {/* Grid */}
       <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--bg-3)', borderBottom: '1px solid var(--line)' }}>
-          {O.days.map(d => (
+          {DAYS_ES.map(d => (
             <div key={d} style={{ padding: isMobile ? '6px 2px' : '8px 4px', textAlign: 'center', fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>
               {isMobile ? d[0] : d}
             </div>
@@ -711,8 +708,8 @@ function CalendarView({ orders, copy }) {
 
       {/* Leyenda */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}><strong style={{ color: 'var(--type-soft)' }}>↓</strong> {O.delivery}</span>
-        <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}><strong style={{ color: 'var(--type-soft)' }}>→</strong> {O.start}</span>
+        <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}><strong style={{ color: 'var(--type-soft)' }}>↓</strong> Entrega</span>
+        <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}><strong style={{ color: 'var(--type-soft)' }}>→</strong> Inicio</span>
       </div>
 
       {/* Panel del día seleccionado */}
@@ -720,7 +717,7 @@ function CalendarView({ orders, copy }) {
         <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           <div style={{ padding: '12px 18px', background: 'var(--bg-3)', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
-              {O.dayOfMonth.replace('{d}', selected).replace('{month}', O.months[month])}
+              {selected} de {MONTHS_ES[month]}
             </span>
             <button className="kd-btn" onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: 'var(--type-muted)', cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1 }}>✕</button>
           </div>
@@ -737,8 +734,8 @@ function CalendarView({ orders, copy }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--type)' }}>{o.service}</span>
-                      <StatusBadge status={o.status} copy={copy}/>
-                      <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: s.color }}>{o._type === 'delivery' ? O.delivery : O.start}</span>
+                      <StatusBadge status={o.status}/>
+                      <span style={{ fontFamily: 'var(--body)', fontSize: 10, color: s.color }}>{o._type === 'delivery' ? 'Entrega' : 'Inicio'}</span>
                     </div>
                     <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}>#{o.id}{o.username ? ` · ${o.username}` : ''}</span>
                   </div>
@@ -756,8 +753,7 @@ function CalendarView({ orders, copy }) {
 }
 
 // ── FILTER BAR ────────────────────────────────────────────────────────────────
-function FilterBar({ search, onSearch, statusFilter, onStatus, serviceFilter, onService, sort, onSort, total, filtered, isAdmin, onClear, copy }) {
-  const O = copy.portal.orders;
+function FilterBar({ search, onSearch, statusFilter, onStatus, serviceFilter, onService, sort, onSort, total, filtered, isAdmin, onClear }) {
   const isMobile = useIsMobile();
   const chipStyle = (active) => ({
     fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase',
@@ -788,7 +784,7 @@ function FilterBar({ search, onSearch, statusFilter, onStatus, serviceFilter, on
         <input
           type="search"
           value={search}
-          placeholder={isAdmin ? O.searchAdminPlaceholder : O.searchPlaceholder}
+          placeholder={isAdmin ? 'Buscar por servicio, #, usuario, correo…' : 'Buscar por servicio o #…'}
           onChange={e => onSearch(e.target.value)}
           style={{
             width: '100%', boxSizing: 'border-box', padding: '9px 36px 9px 30px',
@@ -808,14 +804,14 @@ function FilterBar({ search, onSearch, statusFilter, onStatus, serviceFilter, on
       {/* Selects (sort + service) */}
       <div style={{ display: 'flex', gap: 8, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
         <select className="kd-select" value={sort} onChange={e => onSort(e.target.value)} style={{ ...selectStyle, flex: isMobile ? '1 1 calc(50% - 4px)' : 'none' }}>
-          <option value="newest">{O.sortNewest}</option>
-          <option value="oldest">{O.sortOldest}</option>
-          <option value="amount_desc">{O.sortAmountDesc}</option>
-          <option value="amount_asc">{O.sortAmountAsc}</option>
+          <option value="newest">Más reciente</option>
+          <option value="oldest">Más antiguo</option>
+          <option value="amount_desc">Mayor importe</option>
+          <option value="amount_asc">Menor importe</option>
         </select>
         {isAdmin && (
           <select className="kd-select" value={serviceFilter} onChange={e => onService(e.target.value)} style={{ ...selectStyle, flex: isMobile ? '1 1 calc(50% - 4px)' : 'none' }}>
-            <option value="todos">{O.allServices}</option>
+            <option value="todos">Todos los servicios</option>
             {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         )}
@@ -825,14 +821,14 @@ function FilterBar({ search, onSearch, statusFilter, onStatus, serviceFilter, on
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         {['todos', 'pendiente', 'en_proceso', 'completado', 'cancelado'].map(s => (
           <button key={s} className="kd-btn" onClick={() => onStatus(s)} style={chipStyle(statusFilter === s)}>
-            {s === 'todos' ? O.all : copy.portal.status[s]}
+            {s === 'todos' ? 'Todos' : STATUS_MAP[s].label}
           </button>
         ))}
         <span style={{ marginLeft: 'auto', fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--type-muted)', flexShrink: 0 }}>
           {filtered}/{total}
         </span>
         {hasFilters && (
-          <button className="kd-btn" onClick={onClear} style={{ ...chipStyle(false), color: '#ca8a04', borderColor: 'rgba(234,179,8,0.4)' }}>{O.clear}</button>
+          <button className="kd-btn" onClick={onClear} style={{ ...chipStyle(false), color: '#ca8a04', borderColor: 'rgba(234,179,8,0.4)' }}>Limpiar</button>
         )}
       </div>
     </div>
@@ -841,7 +837,6 @@ function FilterBar({ search, onSearch, statusFilter, onStatus, serviceFilter, on
 
 // ── PÁGINA PRINCIPAL ──────────────────────────────────────────────────────────
 export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, onThemeToggle }) {
-  const O = copy.portal.orders;
   const isMobile = useIsMobile();
   const [orders, setOrders]               = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -865,12 +860,12 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
       setOrders(d.orders ?? []);
       setError('');
     } catch {
-      setError(O.loadError);
+      setError('No se pudieron cargar los pedidos');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [O.loadError]);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -914,10 +909,10 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
         setOrders(prev => prev.map(o => o.id === id ? data.order : o));
         return true;
       }
-      setSaveError(data.error ?? O.saveError);
+      setSaveError(data.error ?? 'Error al guardar el pedido');
       return false;
     } catch {
-      setSaveError(O.connError);
+      setSaveError('No se pudo conectar con el servidor');
       return false;
     }
   };
@@ -944,15 +939,15 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
           <div>
             {isAdmin && (
               <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
-                {O.adminPanel}
+                Panel de gestión
               </p>
             )}
             <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-              {isAdmin ? O.titleAdmin : O.title}
+              {isAdmin ? 'Todos los pedidos' : 'Pedidos'}
             </h1>
             {isAdmin && (
               <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '6px 0 0' }}>
-                {(orders.length === 1 ? O.totalOne : O.totalMany).replace('{n}', orders.length)}
+                {orders.length} pedido{orders.length !== 1 ? 's' : ''} en total
               </p>
             )}
           </div>
@@ -961,9 +956,9 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
             {!loading && !error && orders.length > 0 && (
               <div style={{ display: 'flex', gap: 4, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: 4, flexShrink: 0 }}>
                 {[
-                  { id: 'list',     label: O.viewList     },
-                  { id: 'kanban',   label: O.viewKanban   },
-                  { id: 'calendar', label: O.viewCalendar },
+                  { id: 'list',     label: 'Lista'      },
+                  { id: 'kanban',   label: 'Kanban'     },
+                  { id: 'calendar', label: 'Calendario' },
                 ].map(v => (
                   <button key={v.id} className="kd-btn" onClick={() => setView(v.id)} style={viewBtnStyle(v.id)} title={v.label} aria-label={v.label} aria-pressed={view === v.id}>
                     <ViewIcon type={v.id} active={view === v.id}/>
@@ -978,7 +973,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
 
         {loading && (
           <div style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-muted)', textAlign: 'center', padding: '60px 0' }}>
-            {O.loading}
+            Cargando pedidos…
           </div>
         )}
         {error && (
@@ -995,16 +990,16 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
 
         {!loading && !error && orders.length === 0 && (
           <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '60px 24px', textAlign: 'center' }}>
-            <p style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--type)', margin: '0 0 8px' }}>{O.emptyTitle}</p>
+            <p style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--type)', margin: '0 0 8px' }}>Sin pedidos aún</p>
             <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: '0 0 24px' }}>
-              {isAdmin ? O.emptyAdmin : O.emptyClient}
+              {isAdmin ? 'No hay pedidos registrados.' : 'Cuando adquieras un servicio aparecerá aquí.'}
             </p>
             {!isAdmin && (
               <button className="kd-btn" onClick={() => onNavigate?.('/comprar')} style={{
                 background: 'var(--type)', color: 'var(--bg)', border: 0,
                 padding: '11px 22px', borderRadius: 'var(--radius-pill)',
                 fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer',
-              }}>{O.viewServices}</button>
+              }}>Ver servicios →</button>
             )}
           </div>
         )}
@@ -1019,7 +1014,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
                 serviceFilter={serviceFilter} onService={setServiceFilter}
                 sort={sort} onSort={setSort}
                 total={orders.length} filtered={view === 'list' ? filteredOrders.length : kanbanCalOrders.length}
-                isAdmin={isAdmin} onClear={clearFilters} copy={copy}
+                isAdmin={isAdmin} onClear={clearFilters}
               />
             )}
 
@@ -1031,7 +1026,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
                     width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--type-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                   </svg>
-                  <input type="search" value={search} placeholder={O.searchShort} onChange={e => setSearch(e.target.value)}
+                  <input type="search" value={search} placeholder="Buscar…" onChange={e => setSearch(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', padding: '8px 32px 8px 30px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius)', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', outline: 'none', WebkitAppearance: 'none' }}/>
                   {search && <button className="kd-btn" onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--type-muted)', padding: 4 }}>✕</button>}
                 </div>
@@ -1043,7 +1038,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
                     color: statusFilter === k ? s.color : 'var(--type-muted)',
                     border: `1px solid ${statusFilter === k ? s.border : 'var(--line)'}`,
                     transition: 'all 0.18s', flexShrink: 0,
-                  }}>{copy.portal.status[k]}</button>
+                  }}>{s.label}</button>
                 ))}
               </div>
             )}
@@ -1052,19 +1047,19 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
             {view === 'list' && (
               filteredOrders.length === 0 ? (
                 <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '48px 24px', textAlign: 'center' }}>
-                  <p style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--type)', margin: '0 0 8px' }}>{O.noResults}</p>
-                  <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '0 0 20px' }}>{O.noResultsDesc}</p>
+                  <p style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--type)', margin: '0 0 8px' }}>Sin resultados</p>
+                  <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '0 0 20px' }}>Ningún pedido coincide con los filtros.</p>
                   <button className="kd-btn" onClick={clearFilters} style={{
                     background: 'transparent', border: '1px solid var(--line)', color: 'var(--type-soft)',
                     padding: '9px 18px', borderRadius: 'var(--radius-pill)',
                     fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer',
-                  }}>{O.clearFilters}</button>
+                  }}>Limpiar filtros</button>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {isAdmin
-                    ? filteredOrders.map(o => <AdminRow key={o.id} order={o} onSave={handleSave} copy={copy}/>)
-                    : filteredOrders.map(o => <ClientCard key={o.id} order={o} copy={copy}/>)
+                    ? filteredOrders.map(o => <AdminRow key={o.id} order={o} onSave={handleSave}/>)
+                    : filteredOrders.map(o => <ClientCard key={o.id} order={o}/>)
                   }
                 </div>
               )
@@ -1075,15 +1070,15 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
               <>
                 {isMobile && (
                   <p style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)', marginBottom: 10, marginTop: -8 }}>
-                    {O.swipeHint}
+                    ← Desliza para ver todas las columnas
                   </p>
                 )}
-                <KanbanView orders={kanbanCalOrders} isAdmin={isAdmin} onSave={handleSave} copy={copy}/>
+                <KanbanView orders={kanbanCalOrders} isAdmin={isAdmin} onSave={handleSave}/>
               </>
             )}
 
             {/* ── VISTA CALENDARIO ── */}
-            {view === 'calendar' && <CalendarView orders={kanbanCalOrders} copy={copy}/>}
+            {view === 'calendar' && <CalendarView orders={kanbanCalOrders}/>}
           </>
         )}
       </div>

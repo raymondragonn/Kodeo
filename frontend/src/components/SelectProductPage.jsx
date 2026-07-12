@@ -5,7 +5,6 @@ import Nav from './Nav';
 import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { estimatedDeliveryDate, formatDateEs } from '../utils/deliveryDate';
-import { trackCtaClick } from '../lib/analytics';
 
 const ACCENT = {
   '01': 'var(--accent-green)',
@@ -106,6 +105,8 @@ export default function SelectProductPage({
               svc={svc}
               accent={ACCENT[svc.code]}
               ctaLabel={sp.cta}
+              priceNote={copy.services.priceNote}
+              timeNote={copy.services.timeNote}
               isMobile={isMobile}
               onSelect={() => handleSelect(svc)}
             />
@@ -118,7 +119,7 @@ export default function SelectProductPage({
   );
 }
 
-function ProductCard({ svc, accent, ctaLabel, isMobile, onSelect }) {
+function ProductCard({ svc, accent, ctaLabel, priceNote, timeNote, isMobile, onSelect }) {
   return (
     <button
       onClick={onSelect}
@@ -183,10 +184,21 @@ function ProductCard({ svc, accent, ctaLabel, isMobile, onSelect }) {
           lineHeight: 1,
           letterSpacing: '-0.03em',
           paddingBottom: '0.06em',
-          marginBottom: 6,
+          marginBottom: 2,
           color: 'var(--type)',
         }}>
           {svc.price}
+        </div>
+        <div style={{
+          fontFamily: 'var(--ui)',
+          fontSize: 8,
+          letterSpacing: '.12em',
+          textTransform: 'uppercase',
+          opacity: 0.6,
+          color: 'var(--type-soft)',
+          marginBottom: 10,
+        }}>
+          {priceNote}
         </div>
         <div style={{
           fontFamily: 'var(--ui)',
@@ -194,9 +206,20 @@ function ProductCard({ svc, accent, ctaLabel, isMobile, onSelect }) {
           letterSpacing: '.2em',
           textTransform: 'uppercase',
           color: 'var(--type-soft)',
-          marginBottom: 6,
+          marginBottom: 2,
         }}>
           {svc.time}
+        </div>
+        <div style={{
+          fontFamily: 'var(--ui)',
+          fontSize: 8,
+          letterSpacing: '.12em',
+          textTransform: 'uppercase',
+          opacity: 0.6,
+          color: 'var(--type-soft)',
+          marginBottom: 6,
+        }}>
+          {timeNote}
         </div>
         <div style={{
           fontFamily: 'var(--body)',

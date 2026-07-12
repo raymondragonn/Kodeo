@@ -4,17 +4,17 @@ import RefreshButton from './RefreshButton';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { API_BASE_URL as API } from '../lib/api';
 
-const PROJECT_STATUS = {
-  en_diseno:     { label: 'En diseño',     color: 'var(--accent-blue)' },
-  en_desarrollo: { label: 'En desarrollo', color: 'var(--accent-yellow)' },
-  completado:    { label: 'Completado',    color: 'var(--accent-green)' },
-  cancelado:     { label: 'Cancelado',     color: 'var(--type-muted)' },
+const PROJECT_STATUS_COLORS = {
+  en_diseno:     'var(--accent-blue)',
+  en_desarrollo: 'var(--accent-yellow)',
+  completado:    'var(--accent-green)',
+  cancelado:     'var(--type-muted)',
 };
 
-const ORDER_STATUS = {
-  pendiente: { label: 'Pendiente', color: 'var(--accent-yellow)' },
-  pagado:    { label: 'Pagado',    color: '#63C44D' },
-  cancelado: { label: 'Cancelado', color: 'var(--type-muted)' },
+const ORDER_STATUS_COLORS = {
+  pendiente: 'var(--accent-yellow)',
+  pagado:    '#63C44D',
+  cancelado: 'var(--type-muted)',
 };
 
 const money = (amount, currency = 'MXN') =>
@@ -23,6 +23,7 @@ const money = (amount, currency = 'MXN') =>
 export default function ProjectsPage({
   user, copy, onNavigate, onLogout, theme, onThemeToggle,
 }) {
+  const P = copy.portal.projects;
   const token        = localStorage.getItem('token');
   const isAdmin      = user?.role === 'administrador';
   const { isMobile } = useBreakpoint();
@@ -30,6 +31,7 @@ export default function ProjectsPage({
   const [projects, setProjects]     = useState(null);
   const [error, setError]           = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showProjectForm, setShowProjectForm] = useState(false);
 
   const authFetch = useCallback(async (path, options = {}) => {
     const res  = await fetch(`${API}/${path}`, {
@@ -77,19 +79,29 @@ export default function ProjectsPage({
             <div>
               {isAdmin && (
                 <p style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-muted)', margin: '0 0 6px' }}>
-                  Panel de gestión
+                  {P.adminEyebrow}
                 </p>
               )}
               <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 28 : 36, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-                Proyectos
+                {P.title}
               </h1>
             </div>
-            <RefreshButton onClick={handleRefresh} loading={refreshing} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowProjectForm(open => !open)}
+                  style={pillBtn}
+                  aria-expanded={showProjectForm}
+                >
+                  {showProjectForm ? P.cancel : `+ ${P.newProjectTitle}`}
+                </button>
+              )}
+              <RefreshButton onClick={handleRefresh} loading={refreshing} />
+            </div>
           </div>
           <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', margin: '8px 0 0', lineHeight: 1.5 }}>
-            {isAdmin
-              ? 'Crea proyectos, genera órdenes de pago con link único y da seguimiento a los cobros.'
-              : 'Sigue el avance de tus proyectos y aprueba los cambios pendientes.'}
+            {isAdmin ? P.subtitleAdmin : P.subtitleClient}
           </p>
         </div>
 
@@ -101,11 +113,14 @@ export default function ProjectsPage({
         {!isAdmin && pendingExtras.length > 0 && (
           <div style={{
             border: '1px solid rgba(255,222,89,.45)', background: 'rgba(255,222,89,.07)',
+            borderRadius: 'var(--radius-lg)',
             padding: '20px 24px', marginBottom: 32,
             display: 'flex', flexDirection: 'column', gap: 12,
           }}>
             <p style={{ fontFamily: 'var(--ui)', fontSize: 12, letterSpacing: '.1em', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent-yellow)', margin: 0 }}>
-              Tienes {pendingExtras.length === 1 ? 'una solicitud' : `${pendingExtras.length} solicitudes`} de cambio/ajuste pendiente{pendingExtras.length > 1 ? 's' : ''} de aprobación
+              {pendingExtras.length === 1
+                ? P.pendingExtrasOne
+                : P.pendingExtrasMany.replace('{n}', pendingExtras.length)}
             </p>
             {pendingExtras.map(o => (
               <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
@@ -113,7 +128,7 @@ export default function ProjectsPage({
                   <strong style={{ color: 'var(--type)' }}>{o.project_name}</strong> — {o.descripcion} · {money(o.amount, o.currency)}
                 </span>
                 <button onClick={() => onNavigate?.(`/pago/orden/${o.public_token}`)} style={pillBtn}>
-                  Aprobar y pagar →
+                  {P.approveAndPay}
                 </button>
               </div>
             ))}
@@ -121,15 +136,30 @@ export default function ProjectsPage({
         )}
 
         {/* ── Admin: crear proyecto ── */}
-        {isAdmin && <NewProjectForm authFetch={authFetch} onCreated={loadProjects} />}
+        {isAdmin && showProjectForm && (
+          <NewProjectForm
+            authFetch={authFetch}
+            onCreated={async () => {
+              await loadProjects();
+              setShowProjectForm(false);
+            }}
+            onCancel={() => setShowProjectForm(false)}
+            copy={copy}
+          />
+        )}
 
         {/* ── Listado ── */}
-        {!projects && !error && <p style={bodyText}>Cargando proyectos…</p>}
+        {!projects && !error && <p style={bodyText}>{P.loading}</p>}
 
         {projects?.length === 0 && (
-          <p style={bodyText}>
-            {isAdmin ? 'Aún no hay proyectos. Crea el primero arriba.' : 'Aún no tienes proyectos activos. Cuando contrates uno, aparecerá aquí.'}
-          </p>
+          <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '60px 24px', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--type)', margin: '0 0 8px' }}>
+              {isAdmin ? P.emptyTitleAdmin : P.emptyTitleClient}
+            </p>
+            <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: 0, lineHeight: 1.6 }}>
+              {isAdmin ? P.emptyBodyAdmin : P.emptyBodyClient}
+            </p>
+          </div>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -141,6 +171,8 @@ export default function ProjectsPage({
               authFetch={authFetch}
               onChanged={loadProjects}
               onNavigate={onNavigate}
+              copy={copy}
+              isMobile={isMobile}
             />
           ))}
         </div>
@@ -151,11 +183,14 @@ export default function ProjectsPage({
 
 // ── Tarjeta de proyecto ─────────────────────────────────────────────────────
 
-function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate }) {
+function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy, isMobile }) {
+  const P = copy.portal.projects;
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [busy, setBusy]   = useState(false);
   const [error, setError] = useState(null);
-  const status = PROJECT_STATUS[project.status] ?? PROJECT_STATUS.en_diseno;
+  const statusKey   = PROJECT_STATUS_COLORS[project.status] ? project.status : 'en_diseno';
+  const statusColor = PROJECT_STATUS_COLORS[statusKey];
+  const statusLabel = copy.portal.status[statusKey];
 
   const updateStatus = async (newStatus) => {
     setBusy(true); setError(null);
@@ -167,36 +202,51 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate }) {
   };
 
   return (
-    <div style={{ border: '1px solid var(--line)' }}>
-      <div style={{ height: 3, background: status.color }} />
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      <div style={{ height: 3, background: statusColor }} />
 
-      <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid var(--line)' }}>
-        <div style={{ flex: 1, minWidth: 220 }}>
+      <div style={{
+        padding: isMobile ? '20px' : '24px',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : (isAdmin ? 'minmax(220px, 1.4fr) minmax(190px, 1fr) minmax(170px, .65fr)' : 'minmax(0, 1fr) auto'),
+        alignItems: 'start', gap: isMobile ? 18 : 28,
+        borderBottom: '1px solid var(--line)',
+      }}>
+        <div>
+          <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.projectColumn}</p>
           <h2 style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: 24, letterSpacing: '-0.02em', margin: 0 }}>
             {project.name}
           </h2>
-          {isAdmin && (
-            <p style={{ ...hintText, marginTop: 4 }}>
-              {project.user_name ? `${project.user_name} · ${project.user_email}` : 'Sin cliente asignado — se liga al abrir su link de pago'}
-            </p>
-          )}
-          {project.notes && <p style={{ ...hintText, marginTop: 4 }}>{project.notes}</p>}
         </div>
 
-        {isAdmin ? (
-          <select
-            value={project.status}
-            disabled={busy}
-            onChange={e => updateStatus(e.target.value)}
-            style={{ ...inputStyle, width: 'auto', color: status.color }}
-          >
-            {Object.entries(PROJECT_STATUS).map(([value, { label }]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        ) : (
-          <Chip color={status.color}>{status.label}</Chip>
+        {isAdmin && (
+          <div>
+            <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.clientColumn}</p>
+            <p style={{ ...bodyText, margin: 0, color: 'var(--type)' }}>
+              {project.user_name || P.noClientAssigned}
+            </p>
+            {project.user_email && <p style={{ ...hintText, margin: '3px 0 0', wordBreak: 'break-word' }}>{project.user_email}</p>}
+            {project.notes && <p style={{ ...hintText, margin: '10px 0 0' }}>{project.notes}</p>}
+          </div>
         )}
+
+        <div style={{ justifySelf: isMobile ? 'stretch' : 'end', width: isMobile ? '100%' : 'auto' }}>
+          <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.statusColumn}</p>
+          {isAdmin ? (
+            <select
+              value={project.status}
+              disabled={busy}
+              onChange={e => updateStatus(e.target.value)}
+              style={{ ...inputStyle, width: isMobile ? '100%' : 170, color: statusColor }}
+            >
+              {Object.keys(PROJECT_STATUS_COLORS).map(value => (
+                <option key={value} value={value}>{copy.portal.status[value]}</option>
+              ))}
+            </select>
+          ) : (
+            <Chip color={statusColor}>{statusLabel}</Chip>
+          )}
+        </div>
       </div>
 
       {/* Órdenes de pago */}
@@ -209,10 +259,12 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate }) {
             authFetch={authFetch}
             onChanged={onChanged}
             onNavigate={onNavigate}
+            copy={copy}
+            isMobile={isMobile}
           />
         ))}
         {(project.payment_orders ?? []).length === 0 && (
-          <p style={{ ...hintText, padding: '14px 24px', margin: 0 }}>Sin órdenes de pago.</p>
+          <p style={{ ...hintText, padding: '14px 24px', margin: 0 }}>{P.noOrders}</p>
         )}
       </div>
 
@@ -226,10 +278,11 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate }) {
               authFetch={authFetch}
               onDone={() => { setShowOrderForm(false); onChanged(); }}
               onCancel={() => setShowOrderForm(false)}
+              copy={copy}
             />
           ) : (
             <button onClick={() => setShowOrderForm(true)} style={ghostBtn}>
-              + Nueva orden de pago / cargo extra
+              {P.newOrderBtn}
             </button>
           )}
         </div>
@@ -240,10 +293,13 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate }) {
 
 // ── Fila de orden de pago ───────────────────────────────────────────────────
 
-function OrderRow({ order, isAdmin, authFetch, onChanged, onNavigate }) {
+function OrderRow({ order, isAdmin, authFetch, onChanged, onNavigate, copy, isMobile }) {
+  const P = copy.portal.projects;
   const [busy, setBusy]     = useState(false);
   const [copied, setCopied] = useState(false);
-  const status  = ORDER_STATUS[order.status] ?? ORDER_STATUS.pendiente;
+  const statusKey   = ORDER_STATUS_COLORS[order.status] ? order.status : 'pendiente';
+  const statusColor = ORDER_STATUS_COLORS[statusKey];
+  const statusLabel = copy.portal.status[statusKey];
   const isExtra = Number(order.es_cargo_extra) === 1;
   const payUrl  = `${window.location.origin}/pago/orden/${order.public_token}`;
 
@@ -263,36 +319,40 @@ function OrderRow({ order, isAdmin, authFetch, onChanged, onNavigate }) {
   };
 
   return (
-    <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-      <div style={{ flex: 1, minWidth: 220 }}>
+    <div style={{
+      padding: isMobile ? '16px 20px' : '16px 24px', borderTop: '1px solid var(--line)',
+      display: 'grid', alignItems: 'center', gap: isMobile ? 12 : 20,
+      gridTemplateColumns: isMobile ? '1fr' : 'minmax(240px, 1fr) auto minmax(220px, auto)',
+    }}>
+      <div>
         <p style={{ ...bodyText, margin: 0 }}>
-          {order.descripcion || 'Pago del proyecto'}
+          {order.descripcion || P.defaultOrderDesc}
           {isExtra && (
-            <span style={{ marginLeft: 10, fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--accent-yellow)' }}>
-              Cargo extra
+            <span style={{ marginLeft: 10, fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--accent-yellow)' }}>
+              {P.extraChargeTag}
             </span>
           )}
         </p>
         <p style={{ ...hintText, margin: '3px 0 0' }}>
           {money(order.amount, order.currency)}
-          {Number(order.permite_msi) === 1 && ' · MSI disponible'}
-          {order.status === 'pagado' && order.paid_at && ` · Pagado el ${order.paid_at.slice(0, 10)} (${order.tipo_pago})`}
+          {Number(order.permite_msi) === 1 && ` · ${P.msiAvailable}`}
+          {order.status === 'pagado' && order.paid_at && ` · ${P.paidOn.replace('{date}', order.paid_at.slice(0, 10)).replace('{type}', order.tipo_pago)}`}
         </p>
       </div>
 
-      <Chip color={status.color}>{status.label}</Chip>
+      <div style={{ justifySelf: isMobile ? 'start' : 'center' }}><Chip color={statusColor}>{statusLabel}</Chip></div>
 
       {order.status === 'pendiente' && !isAdmin && (
-        <button onClick={() => onNavigate?.(`/pago/orden/${order.public_token}`)} style={pillBtn}>
-          {isExtra ? 'Aprobar y pagar →' : 'Pagar →'}
+        <button onClick={() => onNavigate?.(`/pago/orden/${order.public_token}`)} style={{ ...pillBtn, justifySelf: isMobile ? 'start' : 'end' }}>
+          {isExtra ? P.approveAndPay : P.pay}
         </button>
       )}
 
       {isAdmin && order.status === 'pendiente' && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={copyLink} style={ghostBtn}>{copied ? '✓ Copiado' : 'Copiar link'}</button>
-          <button onClick={() => patchStatus('pagado')} disabled={busy} style={ghostBtn}>Marcar pagada (transferencia)</button>
-          <button onClick={() => patchStatus('cancelado')} disabled={busy} style={{ ...ghostBtn, color: '#e05050', borderColor: 'rgba(224,80,80,.4)' }}>Cancelar</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
+          <button onClick={copyLink} style={ghostBtn}>{copied ? P.copied : P.copyLink}</button>
+          <button onClick={() => patchStatus('pagado')} disabled={busy} style={ghostBtn}>{P.markPaid}</button>
+          <button onClick={() => patchStatus('cancelado')} disabled={busy} style={{ ...ghostBtn, color: '#e05050', borderColor: 'rgba(224,80,80,.4)' }}>{P.cancel}</button>
         </div>
       )}
     </div>
@@ -301,7 +361,8 @@ function OrderRow({ order, isAdmin, authFetch, onChanged, onNavigate }) {
 
 // ── Formularios de admin ────────────────────────────────────────────────────
 
-function NewProjectForm({ authFetch, onCreated }) {
+function NewProjectForm({ authFetch, onCreated, onCancel, copy }) {
+  const P = copy.portal.projects;
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
@@ -323,22 +384,28 @@ function NewProjectForm({ authFetch, onCreated }) {
   };
 
   return (
-    <form onSubmit={submit} style={{ border: '1px solid var(--line)', padding: 24, marginBottom: 32, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <p style={{ ...eyebrowStyle, margin: 0 }}>Nuevo proyecto</p>
+    <form onSubmit={submit} style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: 24, marginBottom: 32, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <p style={{ ...eyebrowStyle, margin: 0 }}>{P.newProjectTitle}</p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del proyecto" required style={{ ...inputStyle, flex: 2, minWidth: 200 }} />
-        <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="Correo del cliente (opcional)" style={{ ...inputStyle, flex: 2, minWidth: 200 }} />
+        <input value={name} onChange={e => setName(e.target.value)} placeholder={P.projectNamePlaceholder} required style={{ ...inputStyle, flex: 2, minWidth: 200 }} />
+        <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder={P.clientEmailPlaceholder} style={{ ...inputStyle, flex: 2, minWidth: 200 }} />
       </div>
-      <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas internas (opcional)" style={inputStyle} />
+      <input value={notes} onChange={e => setNotes(e.target.value)} placeholder={P.internalNotesPlaceholder} style={inputStyle} />
       {error && <p style={{ ...hintText, color: '#e05050', margin: 0 }}>{error}</p>}
-      <button type="submit" disabled={busy || !name.trim()} style={{ ...pillBtn, alignSelf: 'flex-start', opacity: busy || !name.trim() ? 0.6 : 1 }}>
-        {busy ? 'Creando…' : 'Crear proyecto'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button type="submit" disabled={busy || !name.trim()} style={{ ...pillBtn, opacity: busy || !name.trim() ? 0.6 : 1 }}>
+          {busy ? P.creating : P.createProject}
+        </button>
+        <button type="button" disabled={busy} onClick={onCancel} style={{ ...pillBtn, background: 'transparent', color: 'var(--type-soft)' }}>
+          {P.cancel}
+        </button>
+      </div>
     </form>
   );
 }
 
-function NewOrderForm({ projectId, authFetch, onDone, onCancel }) {
+function NewOrderForm({ projectId, authFetch, onDone, onCancel, copy }) {
+  const P = copy.portal.projects;
   const [amount, setAmount]       = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [permiteMsi, setPermiteMsi]   = useState(true);
@@ -370,9 +437,9 @@ function NewOrderForm({ projectId, authFetch, onDone, onCancel }) {
   if (payUrl) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <p style={{ ...bodyText, margin: 0, color: '#63C44D' }}>Orden creada. Comparte este link con el cliente:</p>
+        <p style={{ ...bodyText, margin: 0, color: '#63C44D' }}>{P.orderCreated}</p>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <code style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--type)', background: 'var(--bg-2)', padding: '8px 12px', border: '1px solid var(--line)', wordBreak: 'break-all', flex: 1, minWidth: 220 }}>
+          <code style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--type)', background: 'var(--bg-2)', padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 'var(--radius)', wordBreak: 'break-all', flex: 1, minWidth: 220 }}>
             {payUrl}
           </code>
           <button
@@ -382,9 +449,9 @@ function NewOrderForm({ projectId, authFetch, onDone, onCancel }) {
             }}
             style={ghostBtn}
           >
-            {copied ? '✓ Copiado' : 'Copiar'}
+            {copied ? P.copied : P.copy}
           </button>
-          <button onClick={onDone} style={pillBtn}>Listo</button>
+          <button onClick={onDone} style={pillBtn}>{P.done}</button>
         </div>
       </div>
     );
@@ -396,13 +463,13 @@ function NewOrderForm({ projectId, authFetch, onDone, onCancel }) {
         <input
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          type="number" min="10" step="0.01" placeholder="Monto (MXN)" required
+          type="number" min="10" step="0.01" placeholder={P.amountPlaceholder} required
           style={{ ...inputStyle, flex: 1, minWidth: 140 }}
         />
         <input
           value={descripcion}
           onChange={e => setDescripcion(e.target.value)}
-          placeholder={esExtra ? 'Descripción del cambio (ej. Módulo extra de chat)' : 'Concepto (ej. Anticipo 50%)'}
+          placeholder={esExtra ? P.extraDescPlaceholder : P.conceptPlaceholder}
           required={esExtra}
           style={{ ...inputStyle, flex: 3, minWidth: 220 }}
         />
@@ -410,19 +477,19 @@ function NewOrderForm({ projectId, authFetch, onDone, onCancel }) {
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
         <label style={checkLabel}>
           <input type="checkbox" checked={permiteMsi} onChange={e => setPermiteMsi(e.target.checked)} />
-          Permitir MSI
+          {P.allowMsi}
         </label>
         <label style={checkLabel}>
           <input type="checkbox" checked={esExtra} onChange={e => setEsExtra(e.target.checked)} />
-          Es cargo extra por cambios
+          {P.isExtraCharge}
         </label>
       </div>
       {error && <p style={{ ...hintText, color: '#e05050', margin: 0 }}>{error}</p>}
       <div style={{ display: 'flex', gap: 10 }}>
         <button type="submit" disabled={busy} style={{ ...pillBtn, opacity: busy ? 0.6 : 1 }}>
-          {busy ? 'Generando…' : 'Generar link de pago'}
+          {busy ? P.generating : P.generatePayLink}
         </button>
-        <button type="button" onClick={onCancel} style={ghostBtn}>Cancelar</button>
+        <button type="button" onClick={onCancel} style={ghostBtn}>{P.cancel}</button>
       </div>
     </form>
   );
@@ -433,7 +500,7 @@ function NewOrderForm({ projectId, authFetch, onDone, onCancel }) {
 function Chip({ color, children }) {
   return (
     <span style={{
-      fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em',
+      fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em',
       textTransform: 'uppercase', color,
       border: `1px solid ${color}`, borderRadius: 'var(--radius-pill)',
       padding: '5px 12px', whiteSpace: 'nowrap',
@@ -458,7 +525,8 @@ const hintText = {
 
 const inputStyle = {
   padding: '11px 14px',
-  background: 'var(--bg)', border: '1px solid var(--line)',
+  background: 'var(--bg-2)', border: '1px solid var(--line)',
+  borderRadius: 'var(--radius)',
   fontFamily: 'var(--body)', fontSize: 14,
   color: 'var(--type)', outline: 'none', boxSizing: 'border-box',
 };

@@ -6,14 +6,14 @@ import { useBreakpoint } from '../hooks/useBreakpoint';
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 
-function formatDate(iso) {
+function formatDate(iso, locale) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 // ── Badge de rol ──────────────────────────────────────────────────────────────
 
-function RoleBadge({ role }) {
+function RoleBadge({ role, U }) {
   const isAdmin = role === 'administrador';
   return (
     <span style={{
@@ -23,7 +23,7 @@ function RoleBadge({ role }) {
       background: isAdmin ? '#5170ff12' : 'transparent',
       borderRadius: 'var(--radius-pill)', padding: '3px 9px', whiteSpace: 'nowrap',
     }}>
-      {isAdmin ? 'Admin' : 'Cliente'}
+      {isAdmin ? U.roleAdmin : U.roleClient}
     </span>
   );
 }
@@ -49,19 +49,22 @@ function Avatar({ name, role }) {
 
 // ── Fila de usuario ───────────────────────────────────────────────────────────
 
-function UserRow({ u, isMe, isSaving, isMobile, isLast, onToggleRole }) {
+function UserRow({ u, isMe, isSaving, isMobile, isLast, onToggleRole, onOpen, U, locale }) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <div
+      onClick={onOpen}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 14,
+        display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: 14,
+        flexWrap: isMobile ? 'wrap' : 'nowrap',
         padding: isMobile ? '14px 16px' : '13px 20px',
         background: hovered ? 'var(--bg-3)' : 'var(--bg-2)',
         borderBottom: isLast ? 'none' : '1px solid var(--line)',
         transition: 'background .15s',
+        cursor: 'pointer',
       }}
     >
       <Avatar name={u.name || u.username} role={u.role} />
@@ -71,26 +74,26 @@ function UserRow({ u, isMe, isSaving, isMobile, isLast, onToggleRole }) {
           <span style={{ fontFamily: 'var(--ui)', fontSize: 12, letterSpacing: '.05em', color: 'var(--type)', textTransform: 'uppercase' }}>
             {u.name || u.username}
           </span>
-          <RoleBadge role={u.role} />
+          <RoleBadge role={u.role} U={U} />
           {isMe && (
             <span style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--type-muted)', border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)', padding: '2px 7px' }}>
-              Tú
+              {U.you}
             </span>
           )}
         </div>
-        <div style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', marginTop: 3 }}>
+        <div style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--type-muted)', marginTop: 3, wordBreak: 'break-word', lineHeight: 1.5 }}>
           {u.email}
           <span style={{ margin: '0 5px', opacity: .35 }}>·</span>
           @{u.username}
           <span style={{ margin: '0 5px', opacity: .35 }}>·</span>
-          {formatDate(u.created_at)}
+          {formatDate(u.created_at, locale)}
         </div>
       </div>
 
       {!isMe && (
         <button
           disabled={isSaving}
-          onClick={() => onToggleRole(u)}
+          onClick={(e) => { e.stopPropagation(); onToggleRole(u); }}
           style={{
             flexShrink: 0,
             background: 'none', border: '1px solid var(--line)',
@@ -99,11 +102,12 @@ function UserRow({ u, isMe, isSaving, isMobile, isLast, onToggleRole }) {
             fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
             borderRadius: 'var(--radius-pill)', padding: '6px 14px',
             opacity: isSaving ? .5 : 1, transition: 'border-color .2s, color .2s',
+            width: isMobile ? '100%' : 'auto',
           }}
           onMouseEnter={e => { if (!isSaving) e.currentTarget.style.borderColor = u.role === 'administrador' ? '#e0505055' : '#5170ff55'; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; }}
         >
-          {isSaving ? 'Guardando...' : u.role === 'administrador' ? 'Revocar admin' : 'Hacer admin'}
+          {isSaving ? U.saving : u.role === 'administrador' ? U.revokeAdmin : U.makeAdmin}
         </button>
       )}
     </div>
@@ -136,7 +140,7 @@ function Modal({ children, onClose }) {
 
 // ── Modal: crear administrador ────────────────────────────────────────────────
 
-function CreateAdminModal({ onClose, onCreated }) {
+function CreateAdminModal({ onClose, onCreated, U }) {
   const [form,    setForm]    = useState({ name: '', username: '', email: '', password: '' });
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState(null);
@@ -158,7 +162,7 @@ function CreateAdminModal({ onClose, onCreated }) {
         body:    JSON.stringify({ ...form, role: 'administrador' }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al crear el usuario');
+      if (!res.ok) throw new Error(data.error || U.createError);
       onCreated(data.user);
     } catch (err) {
       setError(err.message);
@@ -183,38 +187,38 @@ function CreateAdminModal({ onClose, onCreated }) {
     <Modal onClose={onClose}>
       <div style={{ marginBottom: 20 }}>
         <p style={{ fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.22em', textTransform: 'uppercase', color: '#5170ff', margin: '0 0 6px' }}>
-          Nuevo usuario
+          {U.newUserTag}
         </p>
         <h2 style={{ fontFamily: 'var(--display)', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--type)', margin: 0 }}>
-          Crear administrador
+          {U.createAdminTitle}
         </h2>
         <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '8px 0 0', lineHeight: 1.5 }}>
-          El usuario tendrá acceso completo como administrador desde el inicio.
+          {U.createAdminDesc}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
-          <label style={labelStyle}>Nombre completo</label>
-          <input ref={firstRef} value={form.name} onChange={set('name')} placeholder="Nombre Apellido" required style={inputStyle}
+          <label style={labelStyle}>{U.nameLabel}</label>
+          <input ref={firstRef} value={form.name} onChange={set('name')} placeholder={U.namePlaceholder} required style={inputStyle}
             onFocus={e => e.currentTarget.style.borderColor = '#5170ff55'}
             onBlur={e => e.currentTarget.style.borderColor = 'var(--line)'} />
         </div>
         <div>
-          <label style={labelStyle}>Nombre de usuario</label>
-          <input value={form.username} onChange={set('username')} placeholder="usuario_kodeo" required pattern="[a-z0-9_]{3,30}" style={inputStyle}
+          <label style={labelStyle}>{U.usernameLabel}</label>
+          <input value={form.username} onChange={set('username')} placeholder={U.usernamePlaceholder} required pattern="[a-z0-9_]{3,30}" style={inputStyle}
             onFocus={e => e.currentTarget.style.borderColor = '#5170ff55'}
             onBlur={e => e.currentTarget.style.borderColor = 'var(--line)'} />
         </div>
         <div>
-          <label style={labelStyle}>Correo electrónico</label>
-          <input type="email" value={form.email} onChange={set('email')} placeholder="admin@kodeo.mx" required style={inputStyle}
+          <label style={labelStyle}>{U.emailLabel}</label>
+          <input type="email" value={form.email} onChange={set('email')} placeholder={U.emailPlaceholder} required style={inputStyle}
             onFocus={e => e.currentTarget.style.borderColor = '#5170ff55'}
             onBlur={e => e.currentTarget.style.borderColor = 'var(--line)'} />
         </div>
         <div>
-          <label style={labelStyle}>Contraseña</label>
-          <input type="password" value={form.password} onChange={set('password')} placeholder="Mínimo 8 caracteres" required minLength={8} style={inputStyle}
+          <label style={labelStyle}>{U.passwordLabel}</label>
+          <input type="password" value={form.password} onChange={set('password')} placeholder={U.passwordPlaceholder} required minLength={8} style={inputStyle}
             onFocus={e => e.currentTarget.style.borderColor = '#5170ff55'}
             onBlur={e => e.currentTarget.style.borderColor = 'var(--line)'} />
         </div>
@@ -227,10 +231,10 @@ function CreateAdminModal({ onClose, onCreated }) {
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
           <button type="button" onClick={onClose} style={{ background: 'none', border: '1px solid var(--line)', cursor: 'pointer', color: 'var(--type-muted)', fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', borderRadius: 'var(--radius-pill)', padding: '9px 18px' }}>
-            Cancelar
+            {U.cancel}
           </button>
           <button type="submit" disabled={saving} style={{ background: saving ? 'var(--bg-3)' : '#5170ff', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', color: saving ? 'var(--type-muted)' : '#fff', fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', borderRadius: 'var(--radius-pill)', padding: '9px 20px', transition: 'background .2s' }}>
-            {saving ? 'Creando...' : 'Crear administrador'}
+            {saving ? U.creating : U.createAdminBtn}
           </button>
         </div>
       </form>
@@ -240,25 +244,23 @@ function CreateAdminModal({ onClose, onCreated }) {
 
 // ── Modal: confirmar cambio de rol ────────────────────────────────────────────
 
-function ConfirmModal({ confirm, saving, onConfirm, onClose }) {
+function ConfirmModal({ confirm, saving, onConfirm, onClose, U }) {
   const isUpgrade = confirm.newRole === 'administrador';
+  const [descBefore, descAfter] = (isUpgrade ? U.confirmMakeDesc : U.confirmRevokeDesc).split('{name}');
   return (
     <Modal onClose={onClose}>
       <h2 style={{ fontFamily: 'var(--display)', fontSize: 20, letterSpacing: '-0.02em', color: 'var(--type)', margin: '0 0 10px' }}>
-        {isUpgrade ? 'Hacer administrador' : 'Revocar acceso admin'}
+        {isUpgrade ? U.confirmMakeTitle : U.confirmRevokeTitle}
       </h2>
       <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-muted)', margin: '0 0 24px', lineHeight: 1.55 }}>
-        {isUpgrade
-          ? <><strong style={{ color: 'var(--type)' }}>{confirm.name}</strong> tendrá acceso completo como administrador a todos los paneles y pedidos.</>
-          : <>Se revocarán los permisos de administrador de <strong style={{ color: 'var(--type)' }}>{confirm.name}</strong>. Pasará a ser cliente.</>
-        }
+        {descBefore}<strong style={{ color: 'var(--type)' }}>{confirm.name}</strong>{descAfter}
       </p>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--line)', cursor: 'pointer', color: 'var(--type-muted)', fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', borderRadius: 'var(--radius-pill)', padding: '9px 18px' }}>
-          Cancelar
+          {U.cancel}
         </button>
         <button onClick={onConfirm} disabled={saving} style={{ background: isUpgrade ? '#5170ff' : '#dc2626', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', color: '#fff', fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', borderRadius: 'var(--radius-pill)', padding: '9px 18px', opacity: saving ? .6 : 1, transition: 'opacity .2s' }}>
-          {saving ? 'Guardando...' : 'Confirmar'}
+          {saving ? U.saving : U.confirmBtn}
         </button>
       </div>
     </Modal>
@@ -268,6 +270,7 @@ function ConfirmModal({ confirm, saving, onConfirm, onClose }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onThemeToggle }) {
+  const U = copy.portal.users;
   const { isMobile } = useBreakpoint();
   const [users,      setUsers]      = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -285,14 +288,14 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
     try {
       const res  = await fetch(`${API_BASE_URL}/users.php`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al cargar usuarios');
+      if (!res.ok) throw new Error(data.error || U.loadError);
       setUsers(data.users || []);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, U.loadError]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
@@ -306,7 +309,7 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
         body:    JSON.stringify({ role: newRole }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al actualizar rol');
+      if (!res.ok) throw new Error(data.error || U.updateRoleError);
       setUsers(prev => prev.map(u => String(u.id) === String(userId) ? { ...u, role: newRole } : u));
     } catch (e) {
       alert(e.message);
@@ -334,9 +337,9 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
                       : [...admins, ...clients];
 
   const FILTERS = [
-    { key: 'todos',          label: 'Todos',           count: users.length  },
-    { key: 'administrador',  label: 'Administradores', count: admins.length },
-    { key: 'cliente',        label: 'Clientes',        count: clients.length },
+    { key: 'todos',          label: U.filterAll,     count: users.length  },
+    { key: 'administrador',  label: U.filterAdmins,  count: admins.length },
+    { key: 'cliente',        label: U.filterClients, count: clients.length },
   ];
 
   return (
@@ -347,14 +350,14 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
         <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 16, marginBottom: 28, flexWrap: 'wrap' }}>
           <div>
             <h1 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 26 : 34, letterSpacing: '-0.03em', color: 'var(--type)', margin: 0, lineHeight: 1.1 }}>
-              Gestión de usuarios
+              {U.title}
             </h1>
             <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)', margin: '7px 0 0' }}>
-              Solo administradores. Asigna roles o crea nuevos accesos desde aquí.
+              {U.subtitle}
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, width: isMobile ? '100%' : 'auto', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
             <RefreshButton onClick={fetchUsers} loading={loading} />
 
             {/* Botón crear administrador */}
@@ -366,6 +369,7 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
                 color: '#fff', fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
                 borderRadius: 'var(--radius-pill)', padding: '10px 20px',
                 transition: 'opacity .2s', flexShrink: 0,
+                width: isMobile ? '100%' : 'auto',
               }}
               onMouseEnter={e => e.currentTarget.style.opacity = '.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
@@ -373,7 +377,7 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              Crear administrador
+              {U.createAdminBtn}
             </button>
           </div>
         </div>
@@ -381,9 +385,9 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
         {/* ── KPIs ── */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
           {[
-            { label: 'Total de usuarios', value: users.length  },
-            { label: 'Administradores',   value: admins.length },
-            { label: 'Clientes',          value: clients.length },
+            { label: U.kpiTotal,   value: users.length  },
+            { label: U.kpiAdmins,  value: admins.length },
+            { label: U.kpiClients, value: clients.length },
           ].map(({ label, value }) => (
             <div key={label} style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '18px 20px' }}>
               <div style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)', marginBottom: 6 }}>{label}</div>
@@ -396,9 +400,9 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
         <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
 
           {/* Toolbar: filtros */}
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', background: 'var(--bg-2)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', background: 'var(--bg-2)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row', alignContent: 'stretch' }}>
             {/* Filtros */}
-            <div style={{ display: 'flex', gap: 3, background: 'var(--bg-3)', border: '1px solid var(--line)', borderRadius: 'var(--radius-pill)', padding: 3 }}>
+            <div style={{ display: 'flex', gap: 3, background: 'var(--bg-3)', border: '1px solid var(--line)', borderRadius: isMobile ? 'var(--radius-lg)' : 'var(--radius-pill)', padding: 3, width: isMobile ? '100%' : 'auto', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
               {FILTERS.map(f => (
                 <button
                   key={f.key}
@@ -410,6 +414,9 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
                     color:      filter === f.key ? 'var(--bg)'   : 'var(--type-muted)',
                     transition: 'background .2s, color .2s',
                     display: 'flex', alignItems: 'center', gap: 6,
+                    justifyContent: 'center',
+                    flex: isMobile ? '1 1 calc(50% - 3px)' : '0 0 auto',
+                    minWidth: isMobile ? 'calc(50% - 3px)' : 'auto',
                   }}
                 >
                   {f.label}
@@ -426,7 +433,7 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
           {/* Lista */}
           {loading && (
             <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--bg-2)', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)' }}>
-              Cargando...
+              {U.loading}
             </div>
           )}
 
@@ -438,7 +445,7 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
 
           {!loading && !error && filteredUsers.length === 0 && (
             <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--bg-2)', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-muted)' }}>
-              No hay usuarios en esta categoría.
+              {U.emptyCategory}
             </div>
           )}
 
@@ -451,6 +458,9 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
               isMobile={isMobile}
               isLast={i === filteredUsers.length - 1}
               onToggleRole={handleToggleRole}
+              onOpen={() => onNavigate(`/usuarios/${u.id}`)}
+              U={U}
+              locale={copy.portal.locale}
             />
           ))}
         </div>
@@ -458,7 +468,7 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
 
       {/* Modales */}
       {showCreate && (
-        <CreateAdminModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />
+        <CreateAdminModal onClose={() => setShowCreate(false)} onCreated={handleCreated} U={U} />
       )}
 
       {confirm && (
@@ -467,6 +477,7 @@ export default function UsersPage({ user, onNavigate, onLogout, copy, theme, onT
           saving={saving !== null}
           onConfirm={() => changeRole(confirm.userId, confirm.newRole)}
           onClose={() => setConfirm(null)}
+          U={U}
         />
       )}
     </PortalLayout>
