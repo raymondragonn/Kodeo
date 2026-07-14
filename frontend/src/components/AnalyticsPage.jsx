@@ -738,6 +738,7 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
       // proyectos; los administradores todos (para configurar/consultar la
       // analítica de cualquier proyecto de cliente).
       const statusAccent = {
+        diagnostico:   '#8f8f8f',
         en_diseno:     '#5170ff',
         en_desarrollo: '#FFDE59',
         completado:    '#63C44D',

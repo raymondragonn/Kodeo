@@ -17,6 +17,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/project-helpers.php';
 require_once __DIR__ . '/vendor/autoload.php';
 
 setCorsHeaders();
@@ -76,5 +77,23 @@ $db->prepare('
         service_code = COALESCE(service_code, VALUES(service_code)),
         scheduled_at = COALESCE(scheduled_at, VALUES(scheduled_at))
 ')->execute([(int) $auth['sub'], $auth['email'], $uid, $service, $serviceCode, $scheduledAt]);
+
+$stmt = $db->prepare("
+    SELECT id, user_id, service, service_code
+    FROM appointments
+    WHERE cal_booking_uid = ? AND call_type = 'intro'
+    LIMIT 1
+");
+$stmt->execute([$uid]);
+$appointment = $stmt->fetch();
+if ($appointment) {
+    ensureDiagnosticProjectForIntroAppointment(
+        $db,
+        (int) $appointment['id'],
+        isset($appointment['user_id']) ? (int) $appointment['user_id'] : null,
+        $appointment['service'] ?? null,
+        $appointment['service_code'] ?? null
+    );
+}
 
 jsonSuccess(['created' => true]);

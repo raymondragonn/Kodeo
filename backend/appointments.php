@@ -3,6 +3,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/project-helpers.php';
 require_once __DIR__ . '/vendor/autoload.php';
 
 setCorsHeaders();
@@ -21,24 +22,27 @@ if ($method === 'GET') {
     $db->prepare('
         UPDATE appointments SET user_id = ? WHERE user_id IS NULL AND attendee_email = ?
     ')->execute([(int)$auth['sub'], $auth['email']]);
+    syncClaimedProjectsForUser($db, (int) $auth['sub']);
+    backfillMissingDiagnosticProjects($db);
 
     if ($auth['role'] === 'administrador') {
-        $stmt = $db->query('
+        $stmt = $db->query("
             SELECT a.*, COALESCE(u.name, a.attendee_email) AS user_name,
                    COALESCE(u.email, a.attendee_email) AS user_email
             FROM appointments a
             LEFT JOIN users u ON u.id = a.user_id
+            WHERE a.status <> 'cancelled'
             ORDER BY a.created_at DESC
-        ');
+        ");
     } else {
-        $stmt = $db->prepare('
+        $stmt = $db->prepare("
             SELECT a.*, COALESCE(u.name, a.attendee_email) AS user_name,
                    COALESCE(u.email, a.attendee_email) AS user_email
             FROM appointments a
             LEFT JOIN users u ON u.id = a.user_id
-            WHERE a.user_id = ?
+            WHERE a.user_id = ? AND a.status <> 'cancelled'
             ORDER BY a.created_at DESC
-        ');
+        ");
         $stmt->execute([(int)$auth['sub']]);
     }
 
@@ -183,6 +187,30 @@ if ($method === 'PATCH') {
         jsonSuccess(['updated' => true]);
     }
 
+    // ── Admin cancela una cita ──────────────────────────────────────────────
+    if ($action === 'cancel') {
+        if ($auth['role'] !== 'administrador') jsonError('Acceso denegado', 403);
+
+        $stmt = $db->prepare('
+            SELECT a.*, COALESCE(u.name, a.attendee_email) AS user_name,
+                   COALESCE(u.email, a.attendee_email) AS user_email
+            FROM appointments a
+            LEFT JOIN users u ON u.id = a.user_id
+            WHERE a.id = ?
+        ');
+        $stmt->execute([$id]);
+        $appointment = $stmt->fetch();
+        if (!$appointment) jsonError('Cita no encontrada', 404);
+        if (in_array($appointment['status'], ['cancelled', 'completado'], true)) {
+            jsonError('La cita ya está cancelada o completada');
+        }
+
+        $db->prepare("UPDATE appointments SET status = 'cancelled' WHERE id = ?")->execute([$id]);
+
+        notifyClientCancelled($appointment);
+        jsonSuccess(['updated' => true]);
+    }
+
     // ── Admin marca proyecto como completado ───────────────────────────────
     if ($action === 'complete') {
         if ($auth['role'] !== 'administrador') jsonError('Acceso denegado', 403);
@@ -254,6 +282,26 @@ function notifyClientRescheduled(array $appointment, DateTime $utc): void {
     );
 
     sendMail($appointment['user_email'], 'Tu cita fue reprogramada — Kodeo', $html);
+}
+
+function notifyClientCancelled(array $appointment): void {
+    if (empty($appointment['user_email'])) return;
+
+    $body = '
+        <p style="margin: 0 0 14px;">Hola ' . htmlspecialchars($appointment['user_name']) . ',</p>
+        <p style="margin: 0 0 14px;">Tu cita sobre <strong style="color:#ffffff;">'
+            . htmlspecialchars($appointment['service'] ?? 'tu proyecto') . '</strong> ha sido cancelada.</p>
+        <p style="margin: 0; color: #aaa; font-size: 13px;">Si tienes dudas o quieres agendar de nuevo, contáctanos.</p>
+    ';
+
+    $html = renderEmailLayout(
+        'Tu cita fue cancelada',
+        $body,
+        ['label' => 'Ver mis citas', 'url' => ALLOWED_ORIGIN . '/citas'],
+        DEFAULT_EMAIL_ACCENT
+    );
+
+    sendMail($appointment['user_email'], 'Tu cita fue cancelada — Kodeo', $html);
 }
 
 function notifyTeamProjectDetails(int $appointmentId, string $details, array $auth): void {

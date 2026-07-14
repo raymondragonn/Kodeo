@@ -26,6 +26,12 @@
   --accent-green: #63C44D;
   --accent-red: #FF3131;
   --accent-blue: #5170ff;
+  /* Versiones legibles como texto/borde: los acentos de arriba pierden
+     contraste sobre fondos claros — se sobreescriben en tema claro */
+  --accent-yellow-text: #FFDE59;
+  --accent-green-text:  #63C44D;
+  --accent-red-text:    #FF3131;
+  --accent-blue-text:   #5170ff;
 
   /* Typography */
   --display: Arial, "Helvetica Neue", sans-serif;
@@ -59,6 +65,10 @@
     --badge-color: #0d0d0d;
     --glow: rgba(0,0,0,0.04);
     --logo-filter: invert(1);
+    --accent-yellow-text: #92400e;
+    --accent-green-text:  #166534;
+    --accent-red-text:    #991b1b;
+    --accent-blue-text:   #1e40af;
   }
 }
 
@@ -81,6 +91,10 @@
   --badge-color: #0d0d0d;
   --glow: rgba(0,0,0,0.04);
   --logo-filter: invert(1);
+  --accent-yellow-text: #92400e;
+  --accent-green-text:  #166534;
+  --accent-red-text:    #991b1b;
+  --accent-blue-text:   #1e40af;
 }
 
 [data-theme="dark"] {
@@ -102,6 +116,10 @@
   --badge-color: #ffffff;
   --glow: rgba(255,255,255,0.04);
   --logo-filter: none;
+  --accent-yellow-text: #FFDE59;
+  --accent-green-text:  #63C44D;
+  --accent-red-text:    #FF3131;
+  --accent-blue-text:   #5170ff;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

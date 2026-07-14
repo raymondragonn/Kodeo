@@ -4,6 +4,7 @@ import PortalLayout from './PortalLayout';
 import PageMeta from './PageMeta';
 import RefreshButton from './RefreshButton';
 import BookingCalendar from './BookingCalendar';
+import ConfirmModal from './ConfirmModal';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { API_BASE_URL as API } from '../lib/api';
 import { inputStyle } from '../data/projectFormFields';
@@ -429,10 +430,13 @@ function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile, T, locale }
 // ── Fila de cita (solo información; el admin puede reprogramar las de panel) ─
 
 function CitaRow({ cita, first, isAdmin, token, onRefresh, T, locale }) {
-  const [editing, setEditing] = useState(false);
-  const [when, setWhen]       = useState('');
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState(null);
+  const [editing, setEditing]     = useState(false);
+  const [when, setWhen]           = useState('');
+  const [saving, setSaving]       = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [error, setError]         = useState(null);
+  const canCancel = isAdmin && cita.status !== 'cancelled' && cita.status !== 'completado';
 
   const info  = {
     label: T.statusLabels[cita.status] || cita.status,
@@ -470,6 +474,24 @@ function CitaRow({ cita, first, isAdmin, token, onRefresh, T, locale }) {
       setError(e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const cancelCita = async () => {
+    setCancelling(true); setError(null);
+    try {
+      const res  = await fetch(`${API}/appointments.php?id=${cita.id}&action=cancel`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      onRefresh?.();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCancelling(false);
+      setConfirmingCancel(false);
     }
   };
 
@@ -525,7 +547,35 @@ function CitaRow({ cita, first, isAdmin, token, onRefresh, T, locale }) {
             {T.reschedule}
           </button>
         )}
+
+        {canCancel && !editing && (
+          <button
+            onClick={() => setConfirmingCancel(true)}
+            disabled={cancelling}
+            style={{
+              padding: '7px 14px', background: 'transparent', color: '#e05050',
+              border: '1px solid #e0505044', borderRadius: 'var(--radius-pill)',
+              cursor: cancelling ? 'not-allowed' : 'pointer', opacity: cancelling ? 0.6 : 1,
+              fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >
+            {cancelling ? T.cancelling : T.cancelAppointment}
+          </button>
+        )}
       </div>
+
+      {confirmingCancel && (
+        <ConfirmModal
+          title={T.cancelAppointment}
+          message={T.confirmCancelAppointment}
+          confirmLabel={cancelling ? T.cancelling : T.cancelAppointment}
+          cancelLabel={T.cancel}
+          busy={cancelling}
+          onConfirm={cancelCita}
+          onCancel={() => setConfirmingCancel(false)}
+        />
+      )}
 
       {isAdmin && editing && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

@@ -14,15 +14,18 @@ USE `kodeo-website`;
 -- el primer usuario autenticado que abra el link de pago lo reclama.
 CREATE TABLE IF NOT EXISTS projects (
   id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  appointment_id BIGINT UNSIGNED NULL,
   user_id     BIGINT UNSIGNED NULL,
   name        VARCHAR(160)    NOT NULL,
-  status      ENUM('en_diseno','en_desarrollo','completado','cancelado') NOT NULL DEFAULT 'en_diseno',
+  status      ENUM('diagnostico','en_diseno','en_desarrollo','completado','cancelado') NOT NULL DEFAULT 'en_diseno',
   notes       TEXT            NULL,
   created_at  TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
   PRIMARY KEY (id),
+  UNIQUE KEY uq_projects_appointment (appointment_id),
   KEY idx_projects_user (user_id),
+  CONSTRAINT fk_projects_appointment FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL,
   CONSTRAINT fk_projects_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

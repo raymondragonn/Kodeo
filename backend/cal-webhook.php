@@ -11,6 +11,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/project-helpers.php';
 require_once __DIR__ . '/vendor/autoload.php';
 
 $rawBody = file_get_contents('php://input');
@@ -150,6 +151,24 @@ function handleBookingCreated(array $payload): void {
                 scheduled_at   = COALESCE(VALUES(scheduled_at), scheduled_at),
                 video_url      = COALESCE(VALUES(video_url), video_url)
         ')->execute([$userId ?: null, $attendeeEmail, $whatsapp ?: null, $uid, $service, $serviceCode, $scheduledAt, $videoUrl]);
+
+        $stmt = getDb()->prepare("
+            SELECT id, user_id, service, service_code
+            FROM appointments
+            WHERE cal_booking_uid = ? AND call_type = 'intro'
+            LIMIT 1
+        ");
+        $stmt->execute([$uid]);
+        $appointment = $stmt->fetch();
+        if ($appointment) {
+            ensureDiagnosticProjectForIntroAppointment(
+                getDb(),
+                (int) $appointment['id'],
+                isset($appointment['user_id']) ? (int) $appointment['user_id'] : null,
+                $appointment['service'] ?? null,
+                $appointment['service_code'] ?? null
+            );
+        }
 
         notifyTeamNewBooking($service, $scheduledAt, $attendee);
         if ($attendeeEmail) notifyGuestBookingConfirmed($payload);

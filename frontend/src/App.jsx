@@ -168,7 +168,7 @@ export default function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
-    navigate('/');
+    window.location.replace('/');
   };
   const handleLoginSuccess  = (userData) => setUser(userData);
   const handleUserUpdate    = (userData) => {

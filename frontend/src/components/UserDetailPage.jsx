@@ -32,6 +32,7 @@ const STATUS_COLOR = {
   completado: '#16a34a', pagado: '#16a34a', confirmed: '#16a34a', Completada: '#16a34a',
   cancelado: '#e05050', cancelled: '#e05050',
   en_proceso: '#d08700', en_desarrollo: '#d08700', pending: '#d08700', pendiente: '#d08700', rescheduled: '#d08700',
+  diagnostico: '#8f8f8f',
   en_diseno: '#5170ff', form_submitted: '#5170ff',
 };
 

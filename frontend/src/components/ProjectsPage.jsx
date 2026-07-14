@@ -1,19 +1,39 @@
 import { useState, useEffect, useCallback } from 'react';
 import PortalLayout from './PortalLayout';
 import RefreshButton from './RefreshButton';
+import ConfirmModal from './ConfirmModal';
+import ViewModeSwitch from './ViewModeSwitch';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { API_BASE_URL as API } from '../lib/api';
 
+// Diagnóstico = amarillo, diseño = verde, desarrollo = rojo, despliegue (completado) = azul.
+// Colores vivos: para usos decorativos (barra superior, punto de la tabla) —
+// no llevan texto encima, así que no necesitan la variante de alto contraste.
 const PROJECT_STATUS_COLORS = {
-  en_diseno:     'var(--accent-blue)',
-  en_desarrollo: 'var(--accent-yellow)',
-  completado:    'var(--accent-green)',
+  diagnostico:   'var(--accent-yellow)',
+  en_diseno:     'var(--accent-green)',
+  en_desarrollo: 'var(--accent-red)',
+  completado:    'var(--accent-blue)',
   cancelado:     'var(--type-muted)',
 };
 
+// Mismos colores en su variante legible como texto (los acentos vivos pierden
+// contraste sobre fondo claro) — usados en el <select> y el Chip de estatus.
+const PROJECT_STATUS_TEXT_COLORS = {
+  diagnostico:   'var(--accent-yellow-text)',
+  en_diseno:     'var(--accent-green-text)',
+  en_desarrollo: 'var(--accent-red-text)',
+  completado:    'var(--accent-blue-text)',
+  cancelado:     'var(--type-muted)',
+};
+
+// Orden obligatorio de avance — 'cancelado' es la única excepción, se puede
+// colocar desde cualquier estatus (debe reflejar backend/projects.php).
+const PROJECT_STATUS_ORDER = ['diagnostico', 'en_diseno', 'en_desarrollo', 'completado'];
+
 const ORDER_STATUS_COLORS = {
-  pendiente: 'var(--accent-yellow)',
-  pagado:    '#63C44D',
+  pendiente: 'var(--accent-yellow-text)',
+  pagado:    'var(--accent-green-text)',
   cancelado: 'var(--type-muted)',
 };
 
@@ -32,6 +52,8 @@ export default function ProjectsPage({
   const [error, setError]           = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
+  const [view, setView] = useState('cards');
+  const [statusFilter, setStatusFilter] = useState('todos');
 
   const authFetch = useCallback(async (path, options = {}) => {
     const res  = await fetch(`${API}/${path}`, {
@@ -65,6 +87,20 @@ export default function ProjectsPage({
       .map(o => ({ ...o, project_name: p.name }))
   );
 
+  // Filtro por subestado (solo admin) — cancelado no aplica: esos proyectos
+  // ya no se cargan desde el backend.
+  const STATUS_FILTERS = [
+    { key: 'todos', label: P.filterAll, count: (projects ?? []).length },
+    ...PROJECT_STATUS_ORDER.map(key => ({
+      key,
+      label: copy.portal.status[key],
+      count: (projects ?? []).filter(p => p.status === key).length,
+    })),
+  ];
+  const filteredProjects = statusFilter === 'todos'
+    ? (projects ?? [])
+    : (projects ?? []).filter(p => p.status === statusFilter);
+
   async function handleRefresh() {
     setRefreshing(true);
     await loadProjects();
@@ -97,6 +133,16 @@ export default function ProjectsPage({
                   {showProjectForm ? P.cancel : `+ ${P.newProjectTitle}`}
                 </button>
               )}
+              {projects?.length > 0 && (
+                <ViewModeSwitch
+                  value={view}
+                  onChange={setView}
+                  options={[
+                    { id: 'cards', label: P.viewCards, icon: 'grid' },
+                    { id: 'table', label: P.viewTable, icon: 'list' },
+                  ]}
+                />
+              )}
               <RefreshButton onClick={handleRefresh} loading={refreshing} />
             </div>
           </div>
@@ -117,7 +163,7 @@ export default function ProjectsPage({
             padding: '20px 24px', marginBottom: 32,
             display: 'flex', flexDirection: 'column', gap: 12,
           }}>
-            <p style={{ fontFamily: 'var(--ui)', fontSize: 12, letterSpacing: '.1em', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent-yellow)', margin: 0 }}>
+            <p style={{ fontFamily: 'var(--ui)', fontSize: 12, letterSpacing: '.1em', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent-yellow-text)', margin: 0 }}>
               {pendingExtras.length === 1
                 ? P.pendingExtrasOne
                 : P.pendingExtrasMany.replace('{n}', pendingExtras.length)}
@@ -148,6 +194,33 @@ export default function ProjectsPage({
           />
         )}
 
+        {/* ── Filtro por subestado (solo admin) ── */}
+        {isAdmin && projects?.length > 0 && (
+          <div style={{
+            display: 'flex', gap: 3, background: 'var(--bg-2)', border: '1px solid var(--line)',
+            borderRadius: isMobile ? 'var(--radius-lg)' : 'var(--radius-pill)', padding: 3,
+            marginBottom: 24, flexWrap: 'wrap', width: isMobile ? '100%' : 'fit-content',
+          }}>
+            {STATUS_FILTERS.map(f => (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                style={{
+                  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+                  padding: '7px 14px', borderRadius: 'var(--radius-pill)', border: 0, cursor: 'pointer',
+                  background: statusFilter === f.key ? 'var(--type)' : 'transparent',
+                  color:      statusFilter === f.key ? 'var(--bg)'   : 'var(--type-muted)',
+                  transition: 'background .2s, color .2s',
+                  display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+                }}
+              >
+                {f.label}
+                <span style={{ fontSize: 9, opacity: statusFilter === f.key ? .7 : .5 }}>{f.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ── Listado ── */}
         {!projects && !error && <p style={bodyText}>{P.loading}</p>}
 
@@ -162,22 +235,97 @@ export default function ProjectsPage({
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {projects?.map(project => (
-            <ProjectCard
-              key={project.id}
-              project={project}
+        {projects?.length > 0 && filteredProjects.length === 0 && (
+          <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', padding: '40px 24px', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: 0 }}>
+              {P.emptyFilter}
+            </p>
+          </div>
+        )}
+
+        {filteredProjects.length > 0 && (
+          view === 'table' ? (
+            <ProjectsTable
+              projects={filteredProjects}
               isAdmin={isAdmin}
               authFetch={authFetch}
               onChanged={loadProjects}
-              onNavigate={onNavigate}
               copy={copy}
               isMobile={isMobile}
             />
-          ))}
-        </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {filteredProjects.map(project => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  isAdmin={isAdmin}
+                  authFetch={authFetch}
+                  onChanged={loadProjects}
+                  onNavigate={onNavigate}
+                  copy={copy}
+                  isMobile={isMobile}
+                />
+              ))}
+            </div>
+          )
+        )}
       </div>
     </PortalLayout>
+  );
+}
+
+// ── Estado del proyecto: compartido entre tarjeta y fila de tabla ──────────
+
+function useProjectStatus(authFetch, project, onChanged) {
+  const [busy, setBusy]   = useState(false);
+  const [error, setError] = useState(null);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+
+  const updateStatus = async (newStatus) => {
+    setBusy(true); setError(null);
+    try {
+      await authFetch(`projects.php?id=${project.id}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+      onChanged();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); setConfirmingCancel(false); }
+  };
+
+  const handleStatusChange = (newStatus) => {
+    if (newStatus === 'cancelado') { setConfirmingCancel(true); return; }
+    updateStatus(newStatus);
+  };
+
+  return { busy, error, confirmingCancel, setConfirmingCancel, updateStatus, handleStatusChange };
+}
+
+function StatusSelect({ project, busy, onChange, copy, style }) {
+  const canMoveToDesign = !!project.has_confirmed_payment;
+  const statusColor = PROJECT_STATUS_TEXT_COLORS[project.status] ?? PROJECT_STATUS_TEXT_COLORS.en_diseno;
+  const currentIdx  = PROJECT_STATUS_ORDER.indexOf(project.status);
+  const nextStatus  = currentIdx >= 0 ? PROJECT_STATUS_ORDER[currentIdx + 1] : undefined;
+
+  // Solo se puede avanzar al siguiente estatus de la línea, quedarse en el
+  // actual, o cancelar — nunca saltar pasos ni retroceder.
+  const isOptionDisabled = (value) => {
+    if (value === project.status || value === 'cancelado') return false;
+    if (value !== nextStatus) return true;
+    return value === 'en_diseno' && !canMoveToDesign;
+  };
+
+  return (
+    <select
+      value={project.status}
+      disabled={busy}
+      onChange={e => onChange(e.target.value)}
+      style={{ ...inputStyle, color: statusColor, ...style }}
+    >
+      {Object.keys(PROJECT_STATUS_COLORS).map(value => (
+        <option key={value} value={value} disabled={isOptionDisabled(value)}>
+          {copy.portal.status[value]}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -186,24 +334,17 @@ export default function ProjectsPage({
 function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy, isMobile }) {
   const P = copy.portal.projects;
   const [showOrderForm, setShowOrderForm] = useState(false);
-  const [busy, setBusy]   = useState(false);
-  const [error, setError] = useState(null);
+  const { busy, error, confirmingCancel, setConfirmingCancel, updateStatus, handleStatusChange } =
+    useProjectStatus(authFetch, project, onChanged);
+  const canMoveToDesign = !!project.has_confirmed_payment;
   const statusKey   = PROJECT_STATUS_COLORS[project.status] ? project.status : 'en_diseno';
-  const statusColor = PROJECT_STATUS_COLORS[statusKey];
+  const barColor    = PROJECT_STATUS_COLORS[statusKey];
+  const textColor   = PROJECT_STATUS_TEXT_COLORS[statusKey];
   const statusLabel = copy.portal.status[statusKey];
-
-  const updateStatus = async (newStatus) => {
-    setBusy(true); setError(null);
-    try {
-      await authFetch(`projects.php?id=${project.id}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
-      onChanged();
-    } catch (err) { setError(err.message); }
-    finally { setBusy(false); }
-  };
 
   return (
     <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-      <div style={{ height: 3, background: statusColor }} />
+      <div style={{ height: 3, background: barColor }} />
 
       <div style={{
         padding: isMobile ? '20px' : '24px',
@@ -233,21 +374,30 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy,
         <div style={{ justifySelf: isMobile ? 'stretch' : 'end', width: isMobile ? '100%' : 'auto' }}>
           <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.statusColumn}</p>
           {isAdmin ? (
-            <select
-              value={project.status}
-              disabled={busy}
-              onChange={e => updateStatus(e.target.value)}
-              style={{ ...inputStyle, width: isMobile ? '100%' : 170, color: statusColor }}
-            >
-              {Object.keys(PROJECT_STATUS_COLORS).map(value => (
-                <option key={value} value={value}>{copy.portal.status[value]}</option>
-              ))}
-            </select>
+            <StatusSelect
+              project={project}
+              busy={busy}
+              onChange={handleStatusChange}
+              copy={copy}
+              style={{ width: isMobile ? '100%' : 170 }}
+            />
           ) : (
-            <Chip color={statusColor}>{statusLabel}</Chip>
+            <Chip color={textColor}>{statusLabel}</Chip>
           )}
         </div>
       </div>
+
+      {isAdmin && project.status === 'diagnostico' && !canMoveToDesign && (
+        <div style={{
+          padding: isMobile ? '14px 20px' : '14px 24px',
+          borderBottom: '1px solid var(--line)',
+          background: 'rgba(255,222,89,.06)',
+        }}>
+          <p style={{ ...hintText, margin: 0, color: 'var(--accent-yellow-text)' }}>
+            {P.designLockedUntilPaid}
+          </p>
+        </div>
+      )}
 
       {/* Órdenes de pago */}
       <div>
@@ -286,6 +436,18 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy,
             </button>
           )}
         </div>
+      )}
+
+      {confirmingCancel && (
+        <ConfirmModal
+          title={P.cancelProjectTitle}
+          message={P.confirmCancelProject}
+          confirmLabel={busy ? P.cancelling : P.cancel}
+          cancelLabel={P.keepProject}
+          busy={busy}
+          onConfirm={() => updateStatus('cancelado')}
+          onCancel={() => setConfirmingCancel(false)}
+        />
       )}
     </div>
   );
@@ -328,7 +490,7 @@ function OrderRow({ order, isAdmin, authFetch, onChanged, onNavigate, copy, isMo
         <p style={{ ...bodyText, margin: 0 }}>
           {order.descripcion || P.defaultOrderDesc}
           {isExtra && (
-            <span style={{ marginLeft: 10, fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--accent-yellow)' }}>
+            <span style={{ marginLeft: 10, fontFamily: 'var(--ui)', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--accent-yellow-text)' }}>
               {P.extraChargeTag}
             </span>
           )}
@@ -356,6 +518,119 @@ function OrderRow({ order, isAdmin, authFetch, onChanged, onNavigate, copy, isMo
         </div>
       )}
     </div>
+  );
+}
+
+// ── Vista de tabla ───────────────────────────────────────────────────────────
+
+function orderSummary(orders, P) {
+  if (!orders || orders.length === 0) {
+    return <span style={hintText}>{P.noOrders}</span>;
+  }
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {orders.map(order => (
+        <Chip key={order.id} color={ORDER_STATUS_COLORS[order.status] ?? ORDER_STATUS_COLORS.pendiente}>
+          {money(order.amount, order.currency)}
+        </Chip>
+      ))}
+    </div>
+  );
+}
+
+function ProjectsTable({ projects, isAdmin, authFetch, onChanged, copy, isMobile }) {
+  const P = copy.portal.projects;
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? (isAdmin ? 680 : 460) : 'auto' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-2)', borderBottom: '1px solid var(--line)' }}>
+              <th style={thStyle}>{P.projectColumn}</th>
+              {isAdmin && <th style={thStyle}>{P.clientColumn}</th>}
+              <th style={thStyle}>{P.statusColumn}</th>
+              <th style={thStyle}>{P.ordersColumn}</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>{P.createdColumn}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map(project => (
+              <ProjectsTableRow
+                key={project.id}
+                project={project}
+                isAdmin={isAdmin}
+                authFetch={authFetch}
+                onChanged={onChanged}
+                copy={copy}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, copy }) {
+  const P = copy.portal.projects;
+  const [hovered, setHovered] = useState(false);
+  const { busy, error, confirmingCancel, setConfirmingCancel, updateStatus, handleStatusChange } =
+    useProjectStatus(authFetch, project, onChanged);
+  const statusKey   = PROJECT_STATUS_COLORS[project.status] ? project.status : 'en_diseno';
+  const barColor    = PROJECT_STATUS_COLORS[statusKey];
+  const textColor   = PROJECT_STATUS_TEXT_COLORS[statusKey];
+  const statusLabel = copy.portal.status[statusKey];
+
+  return (
+    <>
+      <tr
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{ borderBottom: '1px solid var(--line)', background: hovered ? 'var(--bg-2)' : 'transparent', transition: 'background .15s' }}
+      >
+        <td style={tdStyle}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: barColor, flexShrink: 0 }} />
+            {project.name}
+          </span>
+        </td>
+        {isAdmin && (
+          <td style={tdStyle}>
+            {project.user_name || <span style={{ color: 'var(--type-muted)' }}>{P.noClientAssigned}</span>}
+            {project.user_email && <div style={{ fontSize: 11, color: 'var(--type-muted)', marginTop: 2 }}>{project.user_email}</div>}
+          </td>
+        )}
+        <td style={tdStyle}>
+          {isAdmin ? (
+            <StatusSelect project={project} busy={busy} onChange={handleStatusChange} copy={copy} style={{ width: 150 }} />
+          ) : (
+            <Chip color={textColor}>{statusLabel}</Chip>
+          )}
+        </td>
+        <td style={tdStyle}>{orderSummary(project.payment_orders, P)}</td>
+        <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--type-muted)', fontSize: 12 }}>
+          {(project.created_at || '').slice(0, 10)}
+        </td>
+      </tr>
+
+      {error && (
+        <tr>
+          <td colSpan={isAdmin ? 5 : 4} style={{ ...tdStyle, color: '#e05050', paddingTop: 0 }}>{error}</td>
+        </tr>
+      )}
+
+      {confirmingCancel && (
+        <ConfirmModal
+          title={P.cancelProjectTitle}
+          message={P.confirmCancelProject}
+          confirmLabel={busy ? P.cancelling : P.cancel}
+          cancelLabel={P.keepProject}
+          busy={busy}
+          onConfirm={() => updateStatus('cancelado')}
+          onCancel={() => setConfirmingCancel(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -550,4 +825,14 @@ const ghostBtn = {
 const checkLabel = {
   display: 'flex', alignItems: 'center', gap: 8,
   fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type-soft)', cursor: 'pointer',
+};
+
+const thStyle = {
+  textAlign: 'left', padding: '12px 16px', whiteSpace: 'nowrap',
+  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
+  color: 'var(--type-muted)',
+};
+
+const tdStyle = {
+  padding: '14px 16px', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)',
 };

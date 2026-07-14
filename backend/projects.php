@@ -9,10 +9,14 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/project-helpers.php';
 
 setCorsHeaders();
 
-const PROJECT_STATUSES = ['en_diseno', 'en_desarrollo', 'completado', 'cancelado'];
+const PROJECT_STATUSES = ['diagnostico', 'en_diseno', 'en_desarrollo', 'completado', 'cancelado'];
+// Orden obligatorio de avance — 'cancelado' es la única excepción, se puede
+// colocar desde cualquier estatus.
+const PROJECT_STATUS_ORDER = ['diagnostico', 'en_diseno', 'en_desarrollo', 'completado'];
 
 $auth   = getAuthUser();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -43,26 +47,91 @@ function attachPaymentOrders(PDO $db, array $projects): array {
     return $projects;
 }
 
+function attachProjectPaymentState(PDO $db, array $projects): array {
+    if (!$projects) return [];
+
+    $ids          = array_column($projects, 'id');
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $db->prepare("
+        SELECT
+            p.id,
+            a.stripe_payment_intent_id AS appointment_payment_intent_id,
+            EXISTS (
+                SELECT 1
+                FROM payment_orders po
+                WHERE po.project_id = p.id
+                  AND po.status = 'pagado'
+            ) AS has_paid_order
+        FROM projects p
+        LEFT JOIN appointments a ON a.id = p.appointment_id
+        WHERE p.id IN ($placeholders)
+    ");
+    $stmt->execute($ids);
+
+    $stateByProject = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $stateByProject[(int) $row['id']] = [
+            'has_confirmed_payment' => !empty($row['appointment_payment_intent_id']) || (int) ($row['has_paid_order'] ?? 0) === 1,
+        ];
+    }
+
+    foreach ($projects as &$project) {
+        $project['has_confirmed_payment'] = $stateByProject[(int) $project['id']]['has_confirmed_payment'] ?? false;
+    }
+
+    return $projects;
+}
+
+function projectHasConfirmedPayment(PDO $db, int $projectId): bool {
+    $stmt = $db->prepare('
+        SELECT
+            p.id,
+            p.appointment_id,
+            a.stripe_payment_intent_id AS appointment_payment_intent_id,
+            EXISTS (
+                SELECT 1
+                FROM payment_orders po
+                WHERE po.project_id = p.id
+                  AND po.status = \'pagado\'
+            ) AS has_paid_order
+        FROM projects p
+        LEFT JOIN appointments a ON a.id = p.appointment_id
+        WHERE p.id = ?
+        LIMIT 1
+    ');
+    $stmt->execute([$projectId]);
+    $row = $stmt->fetch();
+    if (!$row) return false;
+
+    return !empty($row['appointment_payment_intent_id']) || (int) ($row['has_paid_order'] ?? 0) === 1;
+}
+
 // ── GET: listar proyectos ──────────────────────────────────────
 if ($method === 'GET') {
+    backfillMissingDiagnosticProjects($db);
+
     if ($isAdmin) {
         $stmt = $db->query('
             SELECT p.*, u.name AS user_name, u.email AS user_email
             FROM projects p
             LEFT JOIN users u ON u.id = p.user_id
+            WHERE p.status <> \'cancelado\'
             ORDER BY p.created_at DESC
         ');
     } else {
+        syncClaimedProjectsForUser($db, (int) $auth['sub']);
         $stmt = $db->prepare('
             SELECT p.*, u.name AS user_name, u.email AS user_email
             FROM projects p
             LEFT JOIN users u ON u.id = p.user_id
-            WHERE p.user_id = ?
+            WHERE p.user_id = ? AND p.status NOT IN (\'diagnostico\', \'cancelado\')
             ORDER BY p.created_at DESC
         ');
         $stmt->execute([$auth['sub']]);
     }
-    jsonSuccess(['projects' => attachPaymentOrders($db, $stmt->fetchAll())]);
+    $projects = attachPaymentOrders($db, $stmt->fetchAll());
+    $projects = attachProjectPaymentState($db, $projects);
+    jsonSuccess(['projects' => $projects]);
 }
 
 if (!$isAdmin) jsonError('Acceso denegado', 403);
@@ -119,10 +188,29 @@ if ($method === 'PATCH') {
         $sets[] = 'name = ?';  $values[] = $name;
     }
     if (array_key_exists('status', $body)) {
-        if (!in_array($body['status'], PROJECT_STATUSES, true)) {
+        $newStatus = $body['status'];
+        if (!in_array($newStatus, PROJECT_STATUSES, true)) {
             jsonError('Estatus inválido. Valores: ' . implode(', ', PROJECT_STATUSES));
         }
-        $sets[] = 'status = ?'; $values[] = $body['status'];
+
+        if ($newStatus !== 'cancelado') {
+            $currentStmt = $db->prepare('SELECT status FROM projects WHERE id = ?');
+            $currentStmt->execute([$id]);
+            $currentStatus = $currentStmt->fetchColumn();
+            if ($currentStatus === false) jsonError('Proyecto no encontrado', 404);
+
+            $currentIdx = array_search($currentStatus, PROJECT_STATUS_ORDER, true);
+            $newIdx     = array_search($newStatus, PROJECT_STATUS_ORDER, true);
+            if ($newStatus !== $currentStatus && ($currentIdx === false || $newIdx !== $currentIdx + 1)) {
+                jsonError('Los proyectos deben avanzar en orden: diagnóstico → en diseño → en desarrollo → completado.', 409);
+            }
+        }
+
+        if ($newStatus === 'en_diseno' && !projectHasConfirmedPayment($db, $id)) {
+            jsonError('El proyecto solo puede pasar a "En diseño" cuando el pago ya fue confirmado por Stripe o validado manualmente.', 409);
+        }
+
+        $sets[] = 'status = ?'; $values[] = $newStatus;
     }
     if (array_key_exists('notes', $body)) {
         $sets[] = 'notes = ?';  $values[] = trim($body['notes']) ?: null;
@@ -145,7 +233,9 @@ if ($method === 'PATCH') {
     $project = $stmt->fetch();
     if (!$project) jsonError('Proyecto no encontrado', 404);
 
-    jsonSuccess(['project' => attachPaymentOrders($db, [$project])[0]]);
+    $project = attachPaymentOrders($db, [$project]);
+    $project = attachProjectPaymentState($db, $project);
+    jsonSuccess(['project' => $project[0]]);
 }
 
 jsonError('Método no permitido', 405);
