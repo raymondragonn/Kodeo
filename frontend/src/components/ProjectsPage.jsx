@@ -418,6 +418,10 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy,
         )}
       </div>
 
+      {isAdmin && project.status === 'completado' && (
+        <ReviewSection project={project} authFetch={authFetch} onChanged={onChanged} copy={copy} />
+      )}
+
       {error && <p style={{ ...hintText, color: '#e05050', padding: '0 24px 12px', margin: 0 }}>{error}</p>}
 
       {isAdmin && (
@@ -538,6 +542,58 @@ function orderSummary(orders, P) {
   );
 }
 
+function ReviewCell({ project, authFetch, onChanged, P }) {
+  const [busy, setBusy]     = useState(false);
+  const [copied, setCopied] = useState(false);
+  const review = project.review;
+
+  const generate = async () => {
+    setBusy(true);
+    try {
+      await authFetch(`projects.php?id=${project.id}`, { method: 'POST' });
+      onChanged();
+    } catch { /* el recargado mostrará el estado real */ }
+    finally { setBusy(false); }
+  };
+
+  const copyLink = async url => {
+    try { await navigator.clipboard.writeText(url); } catch { /* clipboard no disponible */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (!review) {
+    return (
+      <button onClick={generate} disabled={busy} style={{ ...ghostBtn, padding: '6px 12px', fontSize: 10 }}>
+        {busy ? P.generatingReview : P.generateReview}
+      </button>
+    );
+  }
+
+  if (!review.submitted_at) {
+    const url = `${window.location.origin}/resena/${review.public_token}`;
+    return (
+      <button onClick={() => copyLink(url)} style={{ ...ghostBtn, padding: '6px 12px', fontSize: 10 }}>
+        {copied ? P.copied : P.copyLink}
+      </button>
+    );
+  }
+
+  const rating = Number(review.rating ?? 0);
+  return (
+    <span title={review.feedback || P.reviewNoComment} style={{ display: 'inline-flex', gap: 1 }}>
+      {[1, 2, 3, 4, 5].map(value => (
+        <svg key={value} width={12} height={12} viewBox="0 0 24 24"
+          fill={value <= rating ? 'var(--accent-yellow, #FFDE59)' : 'none'}
+          stroke={value <= rating ? 'var(--accent-yellow, #FFDE59)' : 'var(--type-soft)'}
+          strokeWidth="1.5" strokeLinejoin="round">
+          <path d="M12 2.5l2.9 6.24 6.6.72-4.9 4.6 1.3 6.6L12 17.6l-5.9 3.06 1.3-6.6-4.9-4.6 6.6-.72L12 2.5z" />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
 function ProjectsTable({ projects, isAdmin, authFetch, onChanged, copy, isMobile }) {
   const P = copy.portal.projects;
   return (
@@ -550,6 +606,7 @@ function ProjectsTable({ projects, isAdmin, authFetch, onChanged, copy, isMobile
               {isAdmin && <th style={thStyle}>{P.clientColumn}</th>}
               <th style={thStyle}>{P.statusColumn}</th>
               <th style={thStyle}>{P.ordersColumn}</th>
+              {isAdmin && <th style={thStyle}>{P.reviewTitle}</th>}
               <th style={{ ...thStyle, textAlign: 'right' }}>{P.createdColumn}</th>
             </tr>
           </thead>
@@ -608,6 +665,13 @@ function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, copy }) {
           )}
         </td>
         <td style={tdStyle}>{orderSummary(project.payment_orders, P)}</td>
+        {isAdmin && (
+          <td style={tdStyle}>
+            {project.status === 'completado'
+              ? <ReviewCell project={project} authFetch={authFetch} onChanged={onChanged} P={P} />
+              : <span style={hintText}>—</span>}
+          </td>
+        )}
         <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--type-muted)', fontSize: 12 }}>
           {(project.created_at || '').slice(0, 10)}
         </td>
@@ -615,7 +679,7 @@ function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, copy }) {
 
       {error && (
         <tr>
-          <td colSpan={isAdmin ? 5 : 4} style={{ ...tdStyle, color: '#e05050', paddingTop: 0 }}>{error}</td>
+          <td colSpan={isAdmin ? 6 : 4} style={{ ...tdStyle, color: '#e05050', paddingTop: 0 }}>{error}</td>
         </tr>
       )}
 
@@ -771,6 +835,76 @@ function NewOrderForm({ projectId, authFetch, onDone, onCancel, copy }) {
 }
 
 // ── Sub-componentes y estilos ───────────────────────────────────────────────
+
+// Solo se puede generar/ver una vez que el proyecto está 'completado' — es
+// la única puerta de entrada a la encuesta, y el admin decide cuándo
+// generar el link y cómo compartirlo (copiar, WhatsApp, etc.), sin correo automático.
+function ReviewSection({ project, authFetch, onChanged, copy }) {
+  const P = copy.portal.projects;
+  const [busy, setBusy]     = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError]   = useState('');
+  const review = project.review;
+
+  const generate = async () => {
+    setBusy(true); setError('');
+    try {
+      await authFetch(`projects.php?id=${project.id}`, { method: 'POST' });
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyLink = async url => {
+    try { await navigator.clipboard.writeText(url); } catch { /* clipboard no disponible */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (!review) {
+    return (
+      <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)' }}>
+        <button onClick={generate} disabled={busy} style={ghostBtn}>
+          {busy ? P.generatingReview : P.generateReview}
+        </button>
+        {error && <p style={{ ...hintText, color: '#e05050', margin: '8px 0 0' }}>{error}</p>}
+      </div>
+    );
+  }
+
+  if (!review.submitted_at) {
+    const url = `${window.location.origin}/resena/${review.public_token}`;
+    return (
+      <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)' }}>
+        <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.reviewTitle}</p>
+        <p style={{ ...hintText, margin: '0 0 10px' }}>{P.reviewGenerated}</p>
+        <button onClick={() => copyLink(url)} style={ghostBtn}>{copied ? P.copied : P.copyLink}</button>
+      </div>
+    );
+  }
+
+  const rating = Number(review.rating ?? 0);
+
+  return (
+    <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)' }}>
+      <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.reviewTitle}</p>
+      <div style={{ display: 'flex', gap: 2, marginBottom: review.feedback ? 8 : 0 }}>
+        {[1, 2, 3, 4, 5].map(value => (
+          <svg key={value} width={16} height={16} viewBox="0 0 24 24"
+            fill={value <= rating ? 'var(--accent-yellow, #FFDE59)' : 'none'}
+            stroke={value <= rating ? 'var(--accent-yellow, #FFDE59)' : 'var(--type-soft)'}
+            strokeWidth="1.5" strokeLinejoin="round">
+            <path d="M12 2.5l2.9 6.24 6.6.72-4.9 4.6 1.3 6.6L12 17.6l-5.9 3.06 1.3-6.6-4.9-4.6 6.6-.72L12 2.5z" />
+          </svg>
+        ))}
+      </div>
+      <p style={{ ...bodyText, margin: 0 }}>{review.feedback || P.reviewNoComment}</p>
+    </div>
+  );
+}
 
 function Chip({ color, children }) {
   return (

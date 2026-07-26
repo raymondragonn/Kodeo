@@ -10,6 +10,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/project-helpers.php';
+require_once __DIR__ . '/review-helpers.php';
 
 setCorsHeaders();
 
@@ -43,6 +44,28 @@ function attachPaymentOrders(PDO $db, array $projects): array {
     }
     foreach ($projects as &$project) {
         $project['payment_orders'] = $byProject[$project['id']] ?? [];
+    }
+    return $projects;
+}
+
+/** Adjunta a cada proyecto su reseña, si ya se generó (null mientras no esté 'completado'). */
+function attachProjectReviews(PDO $db, array $projects): array {
+    if (!$projects) return [];
+    $ids          = array_column($projects, 'id');
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $db->prepare("
+        SELECT id, project_id, public_token, rating, feedback, submitted_at, created_at
+        FROM project_reviews
+        WHERE project_id IN ($placeholders)
+    ");
+    $stmt->execute($ids);
+
+    $byProject = [];
+    foreach ($stmt->fetchAll() as $review) {
+        $byProject[$review['project_id']] = $review;
+    }
+    foreach ($projects as &$project) {
+        $project['review'] = $byProject[$project['id']] ?? null;
     }
     return $projects;
 }
@@ -131,6 +154,7 @@ if ($method === 'GET') {
     }
     $projects = attachPaymentOrders($db, $stmt->fetchAll());
     $projects = attachProjectPaymentState($db, $projects);
+    $projects = attachProjectReviews($db, $projects);
     jsonSuccess(['projects' => $projects]);
 }
 
@@ -145,6 +169,29 @@ function resolveUserId(PDO $db, string $email): ?int {
     $id = $stmt->fetchColumn();
     if (!$id) jsonError('No existe un usuario con ese correo. Déjalo vacío: el cliente quedará ligado al abrir su link de pago.', 404);
     return (int) $id;
+}
+
+// ── POST ?id= : generar (o recuperar) el link de encuesta de satisfacción ──
+// Solo disponible cuando el proyecto ya está 'completado' — es la única
+// forma de habilitar la encuesta, y queda a discreción del admin generarla
+// y compartirla (no se envía correo automático).
+if ($method === 'POST' && isset($_GET['id'])) {
+    $id = (int) $_GET['id'];
+    if (!$id) jsonError('ID requerido');
+
+    $stmt = $db->prepare('SELECT status FROM projects WHERE id = ?');
+    $stmt->execute([$id]);
+    $status = $stmt->fetchColumn();
+    if ($status === false) jsonError('Proyecto no encontrado', 404);
+    if ($status !== 'completado') {
+        jsonError('Solo puedes generar la encuesta de satisfacción cuando el proyecto está completado.', 409);
+    }
+
+    $review = createProjectReview($db, $id);
+    jsonSuccess([
+        'review'     => $review,
+        'review_url' => ALLOWED_ORIGIN . '/resena/' . $review['public_token'],
+    ]);
 }
 
 // ── POST: crear proyecto (solo admin) ──────────────────────────
@@ -235,6 +282,7 @@ if ($method === 'PATCH') {
 
     $project = attachPaymentOrders($db, [$project]);
     $project = attachProjectPaymentState($db, $project);
+    $project = attachProjectReviews($db, $project);
     jsonSuccess(['project' => $project[0]]);
 }
 

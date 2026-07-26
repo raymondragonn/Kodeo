@@ -41,6 +41,7 @@ const AppointmentPage  = lazy(() => import('./components/AppointmentPage'));
 const ClientDashboard  = lazy(() => import('./components/ClientDashboard'));
 const ProjectsPage     = lazy(() => import('./components/ProjectsPage'));
 const OrderPaymentPage = lazy(() => import('./components/OrderPaymentPage'));
+const ReviewPage       = lazy(() => import('./components/ReviewPage'));
 const AnalyticsPage    = lazy(() => import('./components/AnalyticsPage'));
 const UsersPage        = lazy(() => import('./components/UsersPage'));
 const UserDetailPage   = lazy(() => import('./components/UserDetailPage'));
@@ -433,6 +434,14 @@ export default function App() {
           <>
             <PageMeta title="Orden de pago | Kodeo" description="Completa el pago de tu proyecto de forma segura." path="/pago/orden" />
             <OrderPaymentPage {...sharedNavProps} onBack={handleBack} onNavigate={navigate} />
+          </>
+        } />
+
+        {/* ── Reseña de proyecto completado (link único, sin sesión) ── */}
+        <Route path="/resena/:token" element={
+          <>
+            <PageMeta title={copy.review.metaTitle} description={copy.review.metaDescription} path="/resena" />
+            <ReviewPage copy={copy} onNavigate={navigate} />
           </>
         } />
 
