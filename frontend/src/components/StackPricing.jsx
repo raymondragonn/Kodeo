@@ -2,6 +2,8 @@ import { useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { trackCtaClick } from '../lib/analytics';
+import { SERVICE_SLUGS } from '../lib/routes';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -11,7 +13,7 @@ const ACCENT = {
   '03': 'var(--accent-yellow)',
 };
 
-export default function StackPricing({ copy, motionSpeed = 1, onServiceClick }) {
+export default function StackPricing({ copy, motionSpeed = 1 }) {
   const sectionRef   = useRef(null);
   const headRef      = useRef(null);
   const pricingRef   = useRef(null);
@@ -58,7 +60,9 @@ export default function StackPricing({ copy, motionSpeed = 1, onServiceClick }) 
           {sp.eyebrow}
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: isMobile ? 14 : 32, flexWrap: 'wrap' }}>
-          <h2 style={{
+          {/* H1 de /costos: es la única página que monta este componente y no
+              tenía ningún encabezado de primer nivel. */}
+          <h1 style={{
             fontFamily: 'var(--display)',
             fontWeight: 400,
             fontSize: isMobile ? 'clamp(40px, 11vw, 72px)' : 'clamp(48px, 6vw, 80px)',
@@ -68,7 +72,7 @@ export default function StackPricing({ copy, motionSpeed = 1, onServiceClick }) 
             paddingBottom: '0.06em',
           }}>
             {sp.pricingTitle}
-          </h2>
+          </h1>
           <span style={{
             fontFamily: 'var(--ui)',
             fontSize: 11,
@@ -103,7 +107,6 @@ export default function StackPricing({ copy, motionSpeed = 1, onServiceClick }) 
             maxIncludes={sp.maxIncludes}
             motionSpeed={motionSpeed}
             isMobile={isMobile}
-            onServiceClick={onServiceClick}
           />
         ))}
       </div>
@@ -188,7 +191,7 @@ export default function StackPricing({ copy, motionSpeed = 1, onServiceClick }) 
   );
 }
 
-function PricingCard({ svc, accent, ctaLabel, maxIncludes, motionSpeed, isMobile, onServiceClick }) {
+function PricingCard({ svc, accent, ctaLabel, maxIncludes, motionSpeed, isMobile }) {
   const slow = `${0.22 / motionSpeed}s ease`;
 
   return (
@@ -215,17 +218,19 @@ function PricingCard({ svc, accent, ctaLabel, maxIncludes, motionSpeed, isMobile
         }}>
           {svc.code}
         </div>
-        <div style={{
+        {/* Nombre del servicio: es un encabezado real dentro de la tarjeta */}
+        <h2 style={{
           fontFamily: 'var(--display)',
           fontWeight: 400,
           fontSize: isMobile ? 'clamp(24px, 6.5vw, 38px)' : 'clamp(26px, 2.6vw, 38px)',
           lineHeight: 1.05,
           letterSpacing: '-0.025em',
+          margin: 0,
           marginBottom: 20,
           paddingBottom: '0.06em',
         }}>
           {svc.name}
-        </div>
+        </h2>
 
         {/* Price */}
         <div style={{
@@ -282,9 +287,10 @@ function PricingCard({ svc, accent, ctaLabel, maxIncludes, motionSpeed, isMobile
           })}
         </ul>
 
-        {/* CTA */}
-        <button
-          onClick={() => onServiceClick?.(svc.code)}
+        {/* CTA — enlace real: es como /costos alcanza las páginas de servicio */}
+        <a
+          href={`/${SERVICE_SLUGS[svc.code]}`}
+          onClick={() => trackCtaClick({ cta_id: 'pricing_card', cta_text: svc.name, section: 'pricing', destination: `/${SERVICE_SLUGS[svc.code]}` })}
           style={{
             marginTop: 28,
             display: 'flex',
@@ -314,7 +320,7 @@ function PricingCard({ svc, accent, ctaLabel, maxIncludes, motionSpeed, isMobile
         >
           {ctaLabel}
           <span style={{ color: accent }}>↗</span>
-        </button>
+        </a>
       </div>
     </div>
   );

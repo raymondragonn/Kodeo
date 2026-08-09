@@ -1,0 +1,107 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import NavIsland from '../../islands/NavIsland.jsx';
+import FooterIsland from '../../islands/FooterIsland.jsx';
+import { SERVICE_META } from '../../lib/routes';
+
+const SITE = 'https://kodeo.mx';
+
+export async function getStaticPaths() {
+  const guias = await getCollection('guias', ({ data }) => !data.draft);
+  return guias.map((guia) => ({ params: { guia: guia.id }, props: { guia } }));
+}
+
+const { guia } = Astro.props;
+const { Content } = await render(guia);
+const d = guia.data;
+
+const url = `${SITE}/guias/${guia.id}`;
+const service = d.service
+  ? Object.values(SERVICE_META).find((s) => s.slug === d.service)
+  : null;
+
+const fmt = (date) =>
+  new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: d.title,
+    description: d.description,
+    // La respuesta directa, para que quede explícita en los datos estructurados.
+    abstract: d.answer,
+    url,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    datePublished: d.publishedAt.toISOString(),
+    dateModified: (d.updatedAt ?? d.publishedAt).toISOString(),
+    author: { '@type': 'Organization', name: d.author, '@id': `${SITE}/#organization` },
+    publisher: { '@id': `${SITE}/#organization` },
+    inLanguage: 'es-MX',
+    image: `${SITE}/og-image.png`,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE },
+      { '@type': 'ListItem', position: 2, name: 'Guías', item: `${SITE}/guias` },
+      { '@type': 'ListItem', position: 3, name: d.title, item: url },
+    ],
+  },
+];
+---
+
+<Base title={`${d.title} | Kodeo`} description={d.description} path={`/guias/${guia.id}`} schema={schema}>
+  <div style="background: var(--bg); min-height: 100vh;">
+    <NavIsland client:load />
+
+    <article style="max-width: 720px; margin: 0 auto; padding: 40px 20px 90px;">
+
+      <nav aria-label="Ruta" style="font-family: var(--ui); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--type-soft); margin-bottom: 36px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="/" style="color: var(--type-soft);">Inicio</a>
+        <span>/</span>
+        <a href="/guias" style="color: var(--type-soft);">Guías</a>
+      </nav>
+
+      <h1 style="font-family: var(--display); font-weight: 400; font-size: clamp(32px, 6vw, 56px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 20px; padding-bottom: 0.06em;">
+        {d.title}
+      </h1>
+
+      <p style="font-family: var(--ui); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--type-soft); margin: 0 0 32px;">
+        <span>{d.author}</span>
+        <span> · </span>
+        <time datetime={d.publishedAt.toISOString()}>{fmt(d.publishedAt)}</time>
+        {d.updatedAt && <span> · Actualizado {fmt(d.updatedAt)}</span>}
+      </p>
+
+      <!-- Respuesta directa: lo primero que lee una persona con prisa y lo que
+           un motor generativo cita como respuesta. -->
+      <p style="font-family: var(--body); font-size: clamp(17px, 2.6vw, 21px); line-height: 1.65; color: var(--type); margin: 0 0 40px; padding: 24px 26px; border-left: 3px solid var(--accent-yellow); background: var(--card-frost); border-radius: 0 var(--radius) var(--radius) 0;">
+        {d.answer}
+      </p>
+
+      <div class="kd-prose">
+        <Content />
+      </div>
+
+      {service && (
+        <aside style="margin-top: 56px; border-top: 1px solid var(--line); padding-top: 32px;">
+          <p style="font-family: var(--body); font-size: 15px; color: var(--type-soft); margin: 0 0 16px;">
+            ¿Listo para dar el paso?
+          </p>
+          <a
+            href={`/${service.slug}`}
+            style="font-family: var(--ui); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--bg); background: var(--type); border-radius: var(--radius-pill); padding: 16px 26px; display: inline-flex; align-items: center; gap: 10px;"
+          >
+            {service.title.split(/[|:]/)[0].trim()} <span>→</span>
+          </a>
+        </aside>
+      )}
+
+    </article>
+
+    <FooterIsland client:visible />
+  </div>
+</Base>

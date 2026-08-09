@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import logoSvg from '../assets/logo_black_transparent.svg';
+import logoSvg from '../assets/logo_black_transparent.svg?url';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { useLang, toggleLang } from '../lib/lang';
+import { hrefForNavItem, SERVICE_SLUGS } from '../lib/routes';
 
 const SERVICES_LABELS = new Set(['Servicios', 'Services']);
 
@@ -205,8 +206,13 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
           minHeight: 60,
         }}>
           <a
-            href="#"
-            onClick={e => { e.preventDefault(); onLogoClick?.(); setMenuOpen(false); }}
+            href="/"
+            aria-label="Kodeo — inicio"
+            onClick={e => {
+              // En la portada el logo hace scroll arriba; desde otra página navega.
+              if (window.location.pathname === '/') { e.preventDefault(); onLogoClick?.(); }
+              setMenuOpen(false);
+            }}
             style={{ display: 'flex', alignItems: 'center' }}
           >
             <img src={logoSvg} alt="Kodeo" style={{ height: 50, filter: 'var(--logo-filter)' }} />
@@ -317,7 +323,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                   {copy.nav.map((n) => (
                     <a
                       key={n}
-                      href="#"
+                      href={hrefForNavItem(n)}
                       onClick={e => { e.preventDefault(); handleMobileNav(() => onNavItemClick?.(n)); }}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -372,8 +378,11 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
       WebkitBackdropFilter: 'blur(14px)',
     }}>
       <a
-        href="#"
-        onClick={e => { e.preventDefault(); onLogoClick?.(); }}
+        href="/"
+        aria-label="Kodeo — inicio"
+        onClick={e => {
+          if (window.location.pathname === '/') { e.preventDefault(); onLogoClick?.(); }
+        }}
         style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
       >
         <img src={logoSvg} alt="Kodeo" style={{ height: 68, filter: 'var(--logo-filter)' }} />
@@ -391,13 +400,13 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
               style={{ position: 'relative' }}
             >
               <a
-                href="#"
+                href={hrefForNavItem(n)}
                 onClick={e => {
-                  e.preventDefault();
+                  // "Servicios" abre el desplegable en vez de navegar, pero
+                  // conserva su href para que el enlace sea rastreable.
                   if (isServices) {
+                    e.preventDefault();
                     setPinnedItem(prev => prev === n ? null : n);
-                  } else {
-                    onNavItemClick?.(n);
                   }
                 }}
                 style={{
@@ -455,12 +464,10 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                   }} />
 
                   {copy.services.list.map((svc) => (
-                    <button
+                    <a
                       key={svc.code}
-                      onClick={() => {
-                        setPinnedItem(null);
-                        onServiceClick(svc.code);
-                      }}
+                      href={`/${SERVICE_SLUGS[svc.code]}`}
+                      onClick={() => setPinnedItem(null)}
                       style={{
                         display: 'flex',
                         width: '100%',
@@ -501,7 +508,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                         </div>
                       </div>
                       <span style={{ color: 'var(--type-soft)', fontSize: 13, flexShrink: 0 }}>↗</span>
-                    </button>
+                    </a>
                   ))}
                 </div>
               )}

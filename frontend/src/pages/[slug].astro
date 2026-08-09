@@ -1,0 +1,78 @@
+---
+import Base from '../layouts/Base.astro';
+import ServiceIsland from '../islands/ServiceIsland.jsx';
+import { COPY } from '../data/copy';
+import { SERVICE_META } from '../lib/routes';
+
+const SITE = 'https://kodeo.mx';
+
+// Antes esto era la ruta catch-all `/:slug` de react-router, que redirigía a
+// "/" si el slug no era un servicio. Ahora son tres páginas reales generadas en
+// build y cualquier otra ruta cae en el 404.
+export function getStaticPaths() {
+  return Object.entries(SERVICE_META).map(([code, meta]) => ({
+    params: { slug: meta.slug },
+    props: { code, meta },
+  }));
+}
+
+const { code, meta } = Astro.props;
+const service = COPY.es.services.list.find((s) => s.code === code);
+
+// Preguntas propias del servicio, ya escritas en copy.js pero hasta ahora sin
+// marcar: son las que un motor generativo puede citar como respuesta directa.
+const faqItems = COPY.es.servicePage.serviceFaq?.items?.[code] ?? [];
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: service.name,
+    description: service.lead,
+    url: `${SITE}/${meta.slug}`,
+    provider: { '@id': `${SITE}/#organization` },
+    areaServed: { '@type': 'Country', name: 'México' },
+    serviceType: service.name,
+    // Lo que incluye el servicio, con su descripción real.
+    hasOfferCatalog: {
+      '@type': 'OfferCatalog',
+      name: `Qué incluye ${service.name}`,
+      itemListElement: (service.includes ?? []).map((inc) => ({
+        '@type': 'Offer',
+        itemOffered: { '@type': 'Service', name: inc.name, description: inc.desc },
+      })),
+    },
+    offers: {
+      '@type': 'Offer',
+      price: meta.price,
+      priceCurrency: 'MXN',
+      availability: 'https://schema.org/InStock',
+      url: `${SITE}/${meta.slug}`,
+    },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE },
+      { '@type': 'ListItem', position: 2, name: service.name, item: `${SITE}/${meta.slug}` },
+    ],
+  },
+];
+
+if (faqItems.length) {
+  schema.push({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqItems.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a },
+    })),
+  });
+}
+---
+
+<Base title={meta.title} description={meta.description} path={`/${meta.slug}`} schema={schema}>
+  <ServiceIsland code={code} client:load />
+</Base>

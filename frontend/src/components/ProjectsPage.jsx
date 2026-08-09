@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import PortalLayout from './PortalLayout';
 import RefreshButton from './RefreshButton';
 import ConfirmModal from './ConfirmModal';
@@ -54,6 +55,8 @@ export default function ProjectsPage({
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [view, setView] = useState('cards');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const [openProjectId, setOpenProjectId] = useState(null);
+  const [clients, setClients]       = useState([]);
 
   const authFetch = useCallback(async (path, options = {}) => {
     const res  = await fetch(`${API}/${path}`, {
@@ -79,6 +82,19 @@ export default function ProjectsPage({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProjects();
   }, [loadProjects]);
+
+  // Lista de clientes registrados — alimenta el datalist de asignación (nuevo
+  // proyecto y reasignación en el detalle), sin bloquear si falla (queda el
+  // campo de correo libre como respaldo).
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      try {
+        const data = await authFetch('users.php');
+        setClients((data.users ?? []).filter(u => u.role === 'cliente'));
+      } catch { /* el campo de correo libre sigue funcionando */ }
+    })();
+  }, [isAdmin, authFetch]);
 
   // Cargos extras pendientes de aprobación (alerta destacada del cliente)
   const pendingExtras = (projects ?? []).flatMap(p =>
@@ -191,6 +207,7 @@ export default function ProjectsPage({
             }}
             onCancel={() => setShowProjectForm(false)}
             copy={copy}
+            clients={clients}
           />
         )}
 
@@ -250,6 +267,7 @@ export default function ProjectsPage({
               isAdmin={isAdmin}
               authFetch={authFetch}
               onChanged={loadProjects}
+              onOpenDetail={isAdmin ? setOpenProjectId : undefined}
               copy={copy}
               isMobile={isMobile}
             />
@@ -263,6 +281,7 @@ export default function ProjectsPage({
                   authFetch={authFetch}
                   onChanged={loadProjects}
                   onNavigate={onNavigate}
+                  onOpenDetail={isAdmin ? setOpenProjectId : undefined}
                   copy={copy}
                   isMobile={isMobile}
                 />
@@ -271,7 +290,272 @@ export default function ProjectsPage({
           )
         )}
       </div>
+
+      {openProjectId && (
+        <ProjectDetailModal
+          projectId={openProjectId}
+          authFetch={authFetch}
+          onClose={() => setOpenProjectId(null)}
+          onChanged={loadProjects}
+          copy={copy}
+          isMobile={isMobile}
+          clients={clients}
+        />
+      )}
     </PortalLayout>
+  );
+}
+
+// ── Detalle del proyecto (modal): fechas, reasignación, notas y bitácora ───
+
+const formatDate = (value, locale) =>
+  value ? new Date(value.replace(' ', 'T')).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+function ProjectDetailModal({ projectId, authFetch, onClose, onChanged, copy, isMobile, clients }) {
+  const P = copy.portal.projects;
+  const [project, setProject]   = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const [showOrderForm, setShowOrderForm] = useState(false);
+
+  const [reassignEmail, setReassignEmail] = useState('');
+  const [reassigning, setReassigning]     = useState(false);
+  const [reassignMsg, setReassignMsg]     = useState('');
+
+  const [notes, setNotes]           = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesMsg, setNotesMsg]     = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const data = await authFetch(`projects.php?id=${projectId}`);
+      setProject(data.project);
+      setNotes(data.project.notes ?? '');
+      setReassignEmail(data.project.user_email ?? '');
+      setLoadError('');
+    } catch (err) {
+      setLoadError(err.message);
+    }
+  }, [authFetch, projectId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
+
+  const refreshAll = useCallback(async () => {
+    await load();
+    onChanged();
+  }, [load, onChanged]);
+
+  const { busy, error, confirmingCancel, setConfirmingCancel, updateStatus, handleStatusChange } =
+    useProjectStatus(authFetch, project ?? {}, refreshAll);
+
+  const handleReassign = async () => {
+    setReassigning(true); setReassignMsg('');
+    try {
+      await authFetch(`projects.php?id=${projectId}`, { method: 'PATCH', body: JSON.stringify({ user_email: reassignEmail.trim() }) });
+      setReassignMsg(P.reassigned);
+      await refreshAll();
+    } catch (err) {
+      setReassignMsg(err.message);
+    } finally {
+      setReassigning(false);
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true); setNotesMsg('');
+    try {
+      await authFetch(`projects.php?id=${projectId}`, { method: 'PATCH', body: JSON.stringify({ notes }) });
+      setNotesMsg(P.notesSaved);
+      await refreshAll();
+    } catch (err) {
+      setNotesMsg(err.message);
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: isMobile ? 0 : 20,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--bg)', border: isMobile ? 0 : '1px solid var(--line)',
+          borderRadius: isMobile ? 0 : 'var(--radius-lg)', maxWidth: 640, width: '100%',
+          height: isMobile ? '100vh' : 'auto', maxHeight: isMobile ? '100vh' : 'calc(100vh - 40px)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          boxShadow: isMobile ? 'none' : '0 24px 48px -12px rgba(0,0,0,.4)',
+        }}
+      >
+        {!project ? (
+          <p style={{ ...bodyText, padding: 40 }}>{loadError || P.detailLoading}</p>
+        ) : (
+          <>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14,
+              padding: isMobile ? '20px' : '24px', borderBottom: '1px solid var(--line)',
+              flexShrink: 0, background: 'var(--bg)',
+            }}>
+              <div>
+                <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.detailTitle}</p>
+                <h2 style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: 26, letterSpacing: '-0.02em', margin: 0 }}>
+                  {project.name}
+                </h2>
+              </div>
+              <button
+                onClick={onClose}
+                aria-label="close"
+                style={{
+                  width: 32, height: 32, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'transparent', border: '1px solid var(--line)', borderRadius: '50%',
+                  color: 'var(--type-muted)', cursor: 'pointer', fontSize: 14, lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+
+            <div style={{
+              padding: isMobile ? '18px 20px' : '20px 24px', borderBottom: '1px solid var(--line)',
+              display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16,
+            }}>
+              <div>
+                <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.statusColumn}</p>
+                <StatusSelect project={project} busy={busy} onChange={handleStatusChange} copy={copy} style={{ width: '100%' }} />
+                {error && <p style={{ ...hintText, color: '#e05050', margin: '6px 0 0' }}>{error}</p>}
+              </div>
+              <div>
+                <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.assignedClientLabel}</p>
+                <p style={{ ...bodyText, margin: 0 }}>
+                  {project.user_name ? `${project.user_name} (${project.user_email})` : P.noClientAssigned}
+                </p>
+              </div>
+              <div>
+                <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.createdLabel}</p>
+                <p style={{ ...bodyText, margin: 0 }}>{formatDate(project.created_at, copy.portal.locale)}</p>
+              </div>
+              <div>
+                <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.updatedLabel}</p>
+                <p style={{ ...bodyText, margin: 0 }}>{formatDate(project.updated_at, copy.portal.locale)}</p>
+              </div>
+            </div>
+
+            <div style={{ padding: isMobile ? '18px 20px' : '20px 24px', borderBottom: '1px solid var(--line)' }}>
+              <p style={{ ...eyebrowStyle, margin: '0 0 10px' }}>{P.reassignLabel}</p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <input
+                  value={reassignEmail}
+                  onChange={e => setReassignEmail(e.target.value)}
+                  placeholder={P.reassignPlaceholder}
+                  list="project-detail-clients"
+                  style={{ ...inputStyle, flex: 1, minWidth: 200 }}
+                />
+                <datalist id="project-detail-clients">
+                  {clients.map(c => <option key={c.id} value={c.email}>{c.name}</option>)}
+                </datalist>
+                <button onClick={handleReassign} disabled={reassigning} style={{ ...pillBtn, opacity: reassigning ? 0.6 : 1 }}>
+                  {reassigning ? P.reassigning : P.reassignBtn}
+                </button>
+              </div>
+              {reassignMsg && <p style={{ ...hintText, margin: '8px 0 0' }}>{reassignMsg}</p>}
+            </div>
+
+            <div style={{ padding: isMobile ? '18px 20px' : '20px 24px', borderBottom: '1px solid var(--line)' }}>
+              <p style={{ ...eyebrowStyle, margin: '0 0 10px' }}>{P.notesLabel}</p>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder={P.notesPlaceholder}
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical', width: '100%' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                <button onClick={handleSaveNotes} disabled={savingNotes} style={ghostBtn}>
+                  {savingNotes ? P.savingNotes : P.saveNotes}
+                </button>
+                {notesMsg && <span style={hintText}>{notesMsg}</span>}
+              </div>
+            </div>
+
+            <div style={{ borderBottom: '1px solid var(--line)' }}>
+              <p style={{ ...eyebrowStyle, margin: 0, padding: isMobile ? '18px 20px 0' : '20px 24px 0' }}>{P.ordersColumn}</p>
+              {(project.payment_orders ?? []).map(order => (
+                <OrderRow
+                  key={order.id}
+                  order={order}
+                  isAdmin
+                  authFetch={authFetch}
+                  onChanged={refreshAll}
+                  copy={copy}
+                  isMobile={isMobile}
+                />
+              ))}
+              {(project.payment_orders ?? []).length === 0 && (
+                <p style={{ ...hintText, padding: '14px 24px', margin: 0 }}>{P.noOrders}</p>
+              )}
+              <div style={{ padding: isMobile ? '14px 20px' : '14px 24px' }}>
+                {showOrderForm ? (
+                  <NewOrderForm
+                    projectId={project.id}
+                    authFetch={authFetch}
+                    onDone={() => { setShowOrderForm(false); refreshAll(); }}
+                    onCancel={() => setShowOrderForm(false)}
+                    copy={copy}
+                  />
+                ) : (
+                  <button onClick={() => setShowOrderForm(true)} style={ghostBtn}>{P.newOrderBtn}</button>
+                )}
+              </div>
+            </div>
+
+            {project.status === 'completado' && (
+              <div style={{ borderBottom: '1px solid var(--line)' }}>
+                <ReviewSection project={project} authFetch={authFetch} onChanged={refreshAll} copy={copy} />
+              </div>
+            )}
+
+            <div style={{ padding: isMobile ? '18px 20px' : '20px 24px' }}>
+              <p style={{ ...eyebrowStyle, margin: '0 0 12px' }}>{P.activityTitle}</p>
+              {(project.activity ?? []).length === 0 && <p style={hintText}>{P.activityEmpty}</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {(project.activity ?? []).map(entry => (
+                  <div key={entry.id} style={{ display: 'flex', gap: 14, alignItems: 'baseline' }}>
+                    <span style={{ ...hintText, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {formatDate(entry.created_at, copy.portal.locale)}
+                    </span>
+                    <span style={bodyText}>{entry.detail}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {confirmingCancel && (
+        <ConfirmModal
+          title={P.cancelProjectTitle}
+          message={P.confirmCancelProject}
+          confirmLabel={busy ? P.cancelling : P.cancel}
+          cancelLabel={P.keepProject}
+          busy={busy}
+          onConfirm={() => updateStatus('cancelado')}
+          onCancel={() => setConfirmingCancel(false)}
+        />
+      )}
+    </div>,
+    document.body
   );
 }
 
@@ -331,7 +615,7 @@ function StatusSelect({ project, busy, onChange, copy, style }) {
 
 // ── Tarjeta de proyecto ─────────────────────────────────────────────────────
 
-function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy, isMobile }) {
+function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, onOpenDetail, copy, isMobile }) {
   const P = copy.portal.projects;
   const [showOrderForm, setShowOrderForm] = useState(false);
   const { busy, error, confirmingCancel, setConfirmingCancel, updateStatus, handleStatusChange } =
@@ -343,7 +627,13 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy,
   const statusLabel = copy.portal.status[statusKey];
 
   return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+    <div
+      onClick={() => onOpenDetail?.(project.id)}
+      style={{
+        border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+        cursor: onOpenDetail ? 'pointer' : 'default',
+      }}
+    >
       <div style={{ height: 3, background: barColor }} />
 
       <div style={{
@@ -371,7 +661,10 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy,
           </div>
         )}
 
-        <div style={{ justifySelf: isMobile ? 'stretch' : 'end', width: isMobile ? '100%' : 'auto' }}>
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ justifySelf: isMobile ? 'stretch' : 'end', width: isMobile ? '100%' : 'auto' }}
+        >
           <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.statusColumn}</p>
           {isAdmin ? (
             <StatusSelect
@@ -399,48 +692,50 @@ function ProjectCard({ project, isAdmin, authFetch, onChanged, onNavigate, copy,
         </div>
       )}
 
-      {/* Órdenes de pago */}
-      <div>
-        {(project.payment_orders ?? []).map(order => (
-          <OrderRow
-            key={order.id}
-            order={order}
-            isAdmin={isAdmin}
-            authFetch={authFetch}
-            onChanged={onChanged}
-            onNavigate={onNavigate}
-            copy={copy}
-            isMobile={isMobile}
-          />
-        ))}
-        {(project.payment_orders ?? []).length === 0 && (
-          <p style={{ ...hintText, padding: '14px 24px', margin: 0 }}>{P.noOrders}</p>
-        )}
-      </div>
-
-      {isAdmin && project.status === 'completado' && (
-        <ReviewSection project={project} authFetch={authFetch} onChanged={onChanged} copy={copy} />
-      )}
-
-      {error && <p style={{ ...hintText, color: '#e05050', padding: '0 24px 12px', margin: 0 }}>{error}</p>}
-
-      {isAdmin && (
-        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)' }}>
-          {showOrderForm ? (
-            <NewOrderForm
-              projectId={project.id}
+      <div onClick={e => e.stopPropagation()}>
+        {/* Órdenes de pago */}
+        <div>
+          {(project.payment_orders ?? []).map(order => (
+            <OrderRow
+              key={order.id}
+              order={order}
+              isAdmin={isAdmin}
               authFetch={authFetch}
-              onDone={() => { setShowOrderForm(false); onChanged(); }}
-              onCancel={() => setShowOrderForm(false)}
+              onChanged={onChanged}
+              onNavigate={onNavigate}
               copy={copy}
+              isMobile={isMobile}
             />
-          ) : (
-            <button onClick={() => setShowOrderForm(true)} style={ghostBtn}>
-              {P.newOrderBtn}
-            </button>
+          ))}
+          {(project.payment_orders ?? []).length === 0 && (
+            <p style={{ ...hintText, padding: '14px 24px', margin: 0 }}>{P.noOrders}</p>
           )}
         </div>
-      )}
+
+        {isAdmin && project.status === 'completado' && (
+          <ReviewSection project={project} authFetch={authFetch} onChanged={onChanged} copy={copy} compact />
+        )}
+
+        {error && <p style={{ ...hintText, color: '#e05050', padding: '0 24px 12px', margin: 0 }}>{error}</p>}
+
+        {isAdmin && (
+          <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)' }}>
+            {showOrderForm ? (
+              <NewOrderForm
+                projectId={project.id}
+                authFetch={authFetch}
+                onDone={() => { setShowOrderForm(false); onChanged(); }}
+                onCancel={() => setShowOrderForm(false)}
+                copy={copy}
+              />
+            ) : (
+              <button onClick={() => setShowOrderForm(true)} style={ghostBtn}>
+                {P.newOrderBtn}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {confirmingCancel && (
         <ConfirmModal
@@ -579,22 +874,15 @@ function ReviewCell({ project, authFetch, onChanged, P }) {
     );
   }
 
-  const rating = Number(review.rating ?? 0);
+  const tooltip = [review.feedback, review.mejoras].filter(Boolean).join(' — ') || P.reviewNoComment;
   return (
-    <span title={review.feedback || P.reviewNoComment} style={{ display: 'inline-flex', gap: 1 }}>
-      {[1, 2, 3, 4, 5].map(value => (
-        <svg key={value} width={12} height={12} viewBox="0 0 24 24"
-          fill={value <= rating ? 'var(--accent-yellow, #FFDE59)' : 'none'}
-          stroke={value <= rating ? 'var(--accent-yellow, #FFDE59)' : 'var(--type-soft)'}
-          strokeWidth="1.5" strokeLinejoin="round">
-          <path d="M12 2.5l2.9 6.24 6.6.72-4.9 4.6 1.3 6.6L12 17.6l-5.9 3.06 1.3-6.6-4.9-4.6 6.6-.72L12 2.5z" />
-        </svg>
-      ))}
-    </span>
+    <div title={tooltip}>
+      <MiniStars value={review.rating} size={12} />
+    </div>
   );
 }
 
-function ProjectsTable({ projects, isAdmin, authFetch, onChanged, copy, isMobile }) {
+function ProjectsTable({ projects, isAdmin, authFetch, onChanged, onOpenDetail, copy, isMobile }) {
   const P = copy.portal.projects;
   return (
     <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -618,6 +906,7 @@ function ProjectsTable({ projects, isAdmin, authFetch, onChanged, copy, isMobile
                 isAdmin={isAdmin}
                 authFetch={authFetch}
                 onChanged={onChanged}
+                onOpenDetail={onOpenDetail}
                 copy={copy}
               />
             ))}
@@ -628,7 +917,7 @@ function ProjectsTable({ projects, isAdmin, authFetch, onChanged, copy, isMobile
   );
 }
 
-function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, copy }) {
+function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, onOpenDetail, copy }) {
   const P = copy.portal.projects;
   const [hovered, setHovered] = useState(false);
   const { busy, error, confirmingCancel, setConfirmingCancel, updateStatus, handleStatusChange } =
@@ -641,9 +930,13 @@ function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, copy }) {
   return (
     <>
       <tr
+        onClick={() => onOpenDetail?.(project.id)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        style={{ borderBottom: '1px solid var(--line)', background: hovered ? 'var(--bg-2)' : 'transparent', transition: 'background .15s' }}
+        style={{
+          borderBottom: '1px solid var(--line)', background: hovered ? 'var(--bg-2)' : 'transparent',
+          transition: 'background .15s', cursor: onOpenDetail ? 'pointer' : 'default',
+        }}
       >
         <td style={tdStyle}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -657,7 +950,7 @@ function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, copy }) {
             {project.user_email && <div style={{ fontSize: 11, color: 'var(--type-muted)', marginTop: 2 }}>{project.user_email}</div>}
           </td>
         )}
-        <td style={tdStyle}>
+        <td style={tdStyle} onClick={e => e.stopPropagation()}>
           {isAdmin ? (
             <StatusSelect project={project} busy={busy} onChange={handleStatusChange} copy={copy} style={{ width: 150 }} />
           ) : (
@@ -666,7 +959,7 @@ function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, copy }) {
         </td>
         <td style={tdStyle}>{orderSummary(project.payment_orders, P)}</td>
         {isAdmin && (
-          <td style={tdStyle}>
+          <td style={tdStyle} onClick={e => e.stopPropagation()}>
             {project.status === 'completado'
               ? <ReviewCell project={project} authFetch={authFetch} onChanged={onChanged} P={P} />
               : <span style={hintText}>—</span>}
@@ -700,7 +993,7 @@ function ProjectsTableRow({ project, isAdmin, authFetch, onChanged, copy }) {
 
 // ── Formularios de admin ────────────────────────────────────────────────────
 
-function NewProjectForm({ authFetch, onCreated, onCancel, copy }) {
+function NewProjectForm({ authFetch, onCreated, onCancel, copy, clients }) {
   const P = copy.portal.projects;
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
@@ -727,7 +1020,17 @@ function NewProjectForm({ authFetch, onCreated, onCancel, copy }) {
       <p style={{ ...eyebrowStyle, margin: 0 }}>{P.newProjectTitle}</p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <input value={name} onChange={e => setName(e.target.value)} placeholder={P.projectNamePlaceholder} required style={{ ...inputStyle, flex: 2, minWidth: 200 }} />
-        <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder={P.clientEmailPlaceholder} style={{ ...inputStyle, flex: 2, minWidth: 200 }} />
+        <input
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          type="email"
+          placeholder={P.clientEmailPlaceholder}
+          list="new-project-clients"
+          style={{ ...inputStyle, flex: 2, minWidth: 200 }}
+        />
+        <datalist id="new-project-clients">
+          {(clients ?? []).map(c => <option key={c.id} value={c.email}>{c.name}</option>)}
+        </datalist>
       </div>
       <input value={notes} onChange={e => setNotes(e.target.value)} placeholder={P.internalNotesPlaceholder} style={inputStyle} />
       {error && <p style={{ ...hintText, color: '#e05050', margin: 0 }}>{error}</p>}
@@ -839,7 +1142,7 @@ function NewOrderForm({ projectId, authFetch, onDone, onCancel, copy }) {
 // Solo se puede generar/ver una vez que el proyecto está 'completado' — es
 // la única puerta de entrada a la encuesta, y el admin decide cuándo
 // generar el link y cómo compartirlo (copiar, WhatsApp, etc.), sin correo automático.
-function ReviewSection({ project, authFetch, onChanged, copy }) {
+function ReviewSection({ project, authFetch, onChanged, copy, compact = false }) {
   const P = copy.portal.projects;
   const [busy, setBusy]     = useState(false);
   const [copied, setCopied] = useState(false);
@@ -886,22 +1189,61 @@ function ReviewSection({ project, authFetch, onChanged, copy }) {
     );
   }
 
-  const rating = Number(review.rating ?? 0);
+  const expectativasLabel = copy.review.expectativasOptions[review.expectativas] ?? review.expectativas;
 
   return (
     <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)' }}>
       <p style={{ ...eyebrowStyle, margin: '0 0 7px' }}>{P.reviewTitle}</p>
-      <div style={{ display: 'flex', gap: 2, marginBottom: review.feedback ? 8 : 0 }}>
-        {[1, 2, 3, 4, 5].map(value => (
-          <svg key={value} width={16} height={16} viewBox="0 0 24 24"
-            fill={value <= rating ? 'var(--accent-yellow, #FFDE59)' : 'none'}
-            stroke={value <= rating ? 'var(--accent-yellow, #FFDE59)' : 'var(--type-soft)'}
-            strokeWidth="1.5" strokeLinejoin="round">
-            <path d="M12 2.5l2.9 6.24 6.6.72-4.9 4.6 1.3 6.6L12 17.6l-5.9 3.06 1.3-6.6-4.9-4.6 6.6-.72L12 2.5z" />
-          </svg>
-        ))}
-      </div>
-      <p style={{ ...bodyText, margin: 0 }}>{review.feedback || P.reviewNoComment}</p>
+      <MiniStars value={review.rating} />
+
+      {!compact && (
+        <>
+          <p style={{ ...bodyText, margin: '8px 0 12px' }}>{review.feedback || P.reviewNoComment}</p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+            <ReviewSubRating label={P.reviewComunicacion} value={review.rating_comunicacion} />
+            <ReviewSubRating label={P.reviewDiseno} value={review.rating_diseno} />
+            <ReviewSubRating label={P.reviewVelocidad} value={review.rating_velocidad} />
+            <p style={{ ...hintText, margin: 0 }}>{P.reviewExpectativas}: <span style={{ color: 'var(--type)' }}>{expectativasLabel}</span></p>
+          </div>
+
+          {review.mejoras && (
+            <div style={{ marginBottom: 10 }}>
+              <p style={{ ...hintText, margin: '0 0 4px' }}>{P.reviewMejoras}</p>
+              <p style={{ ...bodyText, margin: 0 }}>{review.mejoras}</p>
+            </div>
+          )}
+
+          <p style={{ ...hintText, margin: 0, color: review.puede_publicar ? 'var(--accent-green-text)' : 'var(--type-muted)' }}>
+            {Number(review.puede_publicar) === 1 ? P.reviewPublicarSi : P.reviewPublicarNo}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MiniStars({ value, size = 16 }) {
+  const rating = Number(value ?? 0);
+  return (
+    <div style={{ display: 'flex', gap: 2 }}>
+      {[1, 2, 3, 4, 5].map(star => (
+        <svg key={star} width={size} height={size} viewBox="0 0 24 24"
+          fill={star <= rating ? 'var(--accent-yellow, #FFDE59)' : 'none'}
+          stroke={star <= rating ? 'var(--accent-yellow, #FFDE59)' : 'var(--type-soft)'}
+          strokeWidth="1.5" strokeLinejoin="round">
+          <path d="M12 2.5l2.9 6.24 6.6.72-4.9 4.6 1.3 6.6L12 17.6l-5.9 3.06 1.3-6.6-4.9-4.6 6.6-.72L12 2.5z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+function ReviewSubRating({ label, value }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ ...hintText, minWidth: 130 }}>{label}</span>
+      <MiniStars value={value} size={13} />
     </div>
   );
 }

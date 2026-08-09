@@ -20,8 +20,13 @@ function AccordionItem({ question, answer, motionSpeed = 1 }) {
 
   return (
     <div style={{ borderBottom: '1px solid var(--line)' }}>
+      {/* La pregunta es un encabezado real (patrón de acordeón accesible).
+          `font: inherit` evita que el h2 imponga su tamaño y grosor: el estilo
+          sigue viniendo del span interior. */}
+      <h2 style={{ margin: 0, font: 'inherit' }}>
       <button
         onClick={() => setOpen(p => !p)}
+        aria-expanded={open}
         style={{
           width: '100%',
           background: 'none',
@@ -63,6 +68,7 @@ function AccordionItem({ question, answer, motionSpeed = 1 }) {
           +
         </span>
       </button>
+      </h2>
 
       <div ref={bodyRef} style={{ height: 0, overflow: 'hidden', opacity: 0 }}>
         <p style={{

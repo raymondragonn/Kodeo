@@ -1,16 +1,16 @@
 import { useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '../lib/router-shim';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Footer from './Footer';
 import Nav from './Nav';
 import RevealButton from './RevealButton';
 import { useBreakpoint } from '../hooks/useBreakpoint';
-const incupCover       = '/assets/projects/incup/incup-mockup-cover.png';
-const tudiCover        = '/assets/projects/tudi/tudi-mockup-cover.png';
-const ferbodaCover     = '/assets/projects/ferboda/ferboda-mockup-cover.png';
-const stratpharmaCover = '/assets/projects/stratpharma/stratpharma-mockup-cover.png';
-const aramondraCover   = '/assets/projects/aramondra/aramondra-mockup-cover.png';
+const incupCover       = '/assets/projects/incup/incup-mockup-cover.webp';
+const tudiCover        = '/assets/projects/tudi/tudi-mockup-cover.webp';
+const ferbodaCover     = '/assets/projects/ferboda/ferboda-mockup-cover.webp';
+const stratpharmaCover = '/assets/projects/stratpharma/stratpharma-mockup-cover.webp';
+const aramondraCover   = '/assets/projects/aramondra/aramondra-mockup-cover.webp';
 
 const landingPdf  = '/LANDING PAGE - KODEO.pdf';
 const sitioWebPdf = '/SITIO WEB - KODEO.pdf';
@@ -406,7 +406,9 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
               gap: 0,
               marginTop: 14,
             }}>
-              {serviceFaqItems.slice(0, 2).map((item, i) => (
+              {/* Se muestran todas: el slice(0, 2) descartaba la tercera
+                  pregunta de cada servicio, que sí estaba escrita. */}
+              {serviceFaqItems.map((item, i) => (
                 <div
                   key={item.q}
                   style={{

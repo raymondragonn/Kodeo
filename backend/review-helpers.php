@@ -36,14 +36,25 @@ function notifyReviewSubmitted(array $review, array $project): void {
     if (!ADMIN_NOTIFY_EMAIL) return;
 
     try {
-        $stars = str_repeat('★', (int) $review['rating']) . str_repeat('☆', 5 - (int) $review['rating']);
+        $stars = fn(int $n) => str_repeat('★', $n) . str_repeat('☆', 5 - $n);
+
+        $expectativasLabels = [
+            'supero'     => 'Superó sus expectativas',
+            'cumplio'    => 'Las cumplió',
+            'parcial'    => 'Parcialmente',
+            'no_cumplio' => 'No las cumplió',
+        ];
 
         $body = '
             <p style="margin: 0 0 14px;"><strong style="color: #ffffff;">Nueva reseña recibida</strong></p>
             <p style="margin: 0 0 8px;">Proyecto: <strong style="color: #ffffff;">' . htmlspecialchars($project['name']) . '</strong></p>
             <p style="margin: 0 0 8px;">Cliente: ' . htmlspecialchars($project['user_name'] ?? 'Sin asignar') . ' (' . htmlspecialchars($project['user_email'] ?? '—') . ')</p>
-            <p style="margin: 0 0 8px;">Calificación: <strong style="color: #ffffff;">' . $stars . ' (' . (int) $review['rating'] . '/5)</strong></p>' .
-            (!empty($review['feedback']) ? '<p style="margin: 0 0 8px;">Comentario: ' . nl2br(htmlspecialchars($review['feedback'])) . '</p>' : '');
+            <p style="margin: 0 0 8px;">Experiencia general: <strong style="color: #ffffff;">' . $stars((int) $review['rating']) . ' (' . (int) $review['rating'] . '/5)</strong></p>
+            <p style="margin: 0 0 8px;">Comunicación: ' . $stars((int) $review['rating_comunicacion']) . ' · Diseño: ' . $stars((int) $review['rating_diseno']) . ' · Velocidad de entrega: ' . $stars((int) $review['rating_velocidad']) . '</p>
+            <p style="margin: 0 0 8px;">Expectativas: <strong style="color: #ffffff;">' . ($expectativasLabels[$review['expectativas']] ?? $review['expectativas']) . '</strong></p>' .
+            (!empty($review['feedback']) ? '<p style="margin: 0 0 8px;">Experiencia: ' . nl2br(htmlspecialchars($review['feedback'])) . '</p>' : '') .
+            (!empty($review['mejoras']) ? '<p style="margin: 0 0 8px;">Qué podríamos mejorar: ' . nl2br(htmlspecialchars($review['mejoras'])) . '</p>' : '') .
+            '<p style="margin: 0 0 8px;">¿Autoriza publicar la reseña?: <strong style="color: #ffffff;">' . (!empty($review['puede_publicar']) ? 'Sí' : 'No') . '</strong></p>';
 
         sendMail(
             ADMIN_NOTIFY_EMAIL,

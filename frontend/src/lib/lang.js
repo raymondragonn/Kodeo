@@ -36,7 +36,11 @@ function subscribe(callback) {
   };
 }
 
+// El HTML se pre-renderiza en español: es el idioma del contenido real y del
+// mercado. Si el navegador está en inglés, la hidratación lo cambia en cliente.
+const getServerLang = () => 'es';
+
 // Hook reactivo: re-renderiza al cambiar el idioma (incluso desde otra pestaña).
 export function useLang() {
-  return useSyncExternalStore(subscribe, getLang, getLang);
+  return useSyncExternalStore(subscribe, getLang, getServerLang);
 }

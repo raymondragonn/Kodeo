@@ -160,17 +160,19 @@ export default function MethodologyPage({ copy, motionSpeed = 1, onBack, onNavIt
                   }} />
                 </div>
 
-                {/* Step name */}
-                <div style={{
+                {/* Step name — encabezado real: son las cuatro fases del proceso */}
+                <h2 style={{
                   fontFamily: 'var(--display)',
+                  fontWeight: 400,
                   fontSize: isMobile ? 'clamp(26px, 8vw, 44px)' : 'clamp(36px, 4vw, 52px)',
                   letterSpacing: '-0.025em',
                   lineHeight: 1,
+                  margin: 0,
                   marginBottom: 16,
                   paddingBottom: '0.06em',
                 }}>
                   {step.name}
-                </div>
+                </h2>
 
                 {/* Divider */}
                 <div style={{

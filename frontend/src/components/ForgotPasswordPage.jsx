@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import logoSvg from '../assets/logo_black_transparent.svg';
+import logoSvg from '../assets/logo_black_transparent.svg?url';
 import { API_BASE_URL as API } from '../lib/api';
 
 export default function ForgotPasswordPage({ copy, onNavigate }) {

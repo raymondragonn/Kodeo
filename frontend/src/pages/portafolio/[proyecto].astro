@@ -1,0 +1,156 @@
+---
+import Base from '../../layouts/Base.astro';
+import NavIsland from '../../islands/NavIsland.jsx';
+import FooterIsland from '../../islands/FooterIsland.jsx';
+import { getProjects } from '../../lib/projects';
+import { SERVICE_META } from '../../lib/routes';
+import { imageSize } from '../../lib/imageSize';
+
+const SITE = 'https://kodeo.mx';
+
+export function getStaticPaths() {
+  return getProjects().map((p) => ({ params: { proyecto: p.slug }, props: { project: p } }));
+}
+
+const { project } = Astro.props;
+
+// Servicios con los que se relaciona este proyecto — sirven de enlace interno
+// hacia las páginas comerciales.
+const services = (project.serviceCodes ?? [])
+  .map((c) => SERVICE_META[c])
+  .filter(Boolean);
+
+const url = `${SITE}/portafolio/${project.slug}`;
+
+// Dimensiones reales: el navegador reserva el hueco y la página no salta.
+const shots = await Promise.all(
+  project.shots.map(async (src) => ({ src, size: await imageSize(src) }))
+);
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CreativeWork',
+    name: project.name,
+    headline: `${project.name} — ${project.badge}`,
+    description: project.desc,
+    url,
+    creator: { '@id': `${SITE}/#organization` },
+    about: project.badge,
+    keywords: (project.stack ?? []).join(', '),
+    image: project.cover ? `${SITE}${project.cover}` : undefined,
+    ...(project.url ? { sameAs: project.url } : {}),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE },
+      { '@type': 'ListItem', position: 2, name: 'Proyectos', item: `${SITE}/portafolio` },
+      { '@type': 'ListItem', position: 3, name: project.name, item: url },
+    ],
+  },
+];
+
+const title = `${project.name}: ${project.badge} | Caso de Kodeo`;
+const description = project.desc.slice(0, 155);
+---
+
+<Base title={title} description={description} path={`/portafolio/${project.slug}`} schema={schema}>
+  <div style="background: var(--bg); min-height: 100vh;">
+    <NavIsland client:load />
+
+    <article style="max-width: 900px; margin: 0 auto; padding: 40px 20px 90px;">
+
+      <nav aria-label="Ruta" style="font-family: var(--ui); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--type-soft); margin-bottom: 40px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="/" style="color: var(--type-soft);">Inicio</a>
+        <span>/</span>
+        <a href="/proyectos" style="color: var(--type-soft);">Proyectos</a>
+        <span>/</span>
+        <span style="color: var(--type);">{project.name}</span>
+      </nav>
+
+      <p style="font-family: var(--ui); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--type-soft); margin-bottom: 14px;">
+        {project.kind}
+      </p>
+
+      <h1 style="font-family: var(--display); font-weight: 400; font-size: clamp(38px, 8vw, 76px); line-height: 0.96; letter-spacing: -0.035em; margin: 0 0 20px; padding-bottom: 0.06em;">
+        {project.name}
+      </h1>
+
+      <p style="font-family: var(--body); font-size: clamp(16px, 2.4vw, 20px); line-height: 1.7; color: var(--type-soft); max-width: 680px; margin: 0 0 40px;">
+        {project.desc}
+      </p>
+
+      <!-- Ficha del proyecto -->
+      <dl style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 24px; padding: 28px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 0 48px;">
+        <div>
+          <dt style="font-family: var(--ui); font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--type-soft); margin-bottom: 8px;">Tipo</dt>
+          <dd style="font-family: var(--body); font-size: 15px; color: var(--type); margin: 0;">{project.tag}</dd>
+        </div>
+        <div>
+          <dt style="font-family: var(--ui); font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--type-soft); margin-bottom: 8px;">Enfoque</dt>
+          <dd style="font-family: var(--body); font-size: 15px; color: var(--type); margin: 0;">{project.badge}</dd>
+        </div>
+        <div>
+          <dt style="font-family: var(--ui); font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--type-soft); margin-bottom: 8px;">Tecnologías</dt>
+          <dd style="font-family: var(--body); font-size: 15px; color: var(--type); margin: 0;">{(project.stack ?? []).join(' · ')}</dd>
+        </div>
+        {project.url && (
+          <div>
+            <dt style="font-family: var(--ui); font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--type-soft); margin-bottom: 8px;">Sitio</dt>
+            <dd style="margin: 0;">
+              <a href={project.url} target="_blank" rel="noopener noreferrer" style="font-family: var(--body); font-size: 15px; color: var(--type); border-bottom: 1px solid var(--line-2);">
+                Visitar ↗
+              </a>
+            </dd>
+          </div>
+        )}
+      </dl>
+
+      <!-- Capturas -->
+      {project.shots.length > 0 && (
+        <section style="margin-bottom: 56px;">
+          <h2 style="font-family: var(--display); font-weight: 400; font-size: clamp(24px, 4vw, 36px); letter-spacing: -0.025em; margin: 0 0 24px;">
+            El proyecto
+          </h2>
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            {shots.map(({ src, size }, i) => (
+              <img
+                src={src}
+                alt={`${project.name} — captura ${i + 1}`}
+                width={size?.width}
+                height={size?.height}
+                loading="lazy"
+                decoding="async"
+                style="width: 100%; height: auto; border-radius: var(--radius-lg); border: 1px solid var(--line);"
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <!-- Enlace a los servicios relacionados -->
+      {services.length > 0 && (
+        <section style="border-top: 1px solid var(--line); padding-top: 36px;">
+          <h2 style="font-family: var(--display); font-weight: 400; font-size: clamp(24px, 4vw, 36px); letter-spacing: -0.025em; margin: 0 0 20px;">
+            ¿Quieres algo así?
+          </h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+            {services.map((s) => (
+              <a
+                href={`/${s.slug}`}
+                style="font-family: var(--ui); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--type); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 14px 22px; display: inline-flex; align-items: center; gap: 8px;"
+              >
+                {s.title.split(/[|:]/)[0].trim()} <span style="color: var(--type-soft);">→</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+    </article>
+
+    <FooterIsland client:visible />
+  </div>
+</Base>

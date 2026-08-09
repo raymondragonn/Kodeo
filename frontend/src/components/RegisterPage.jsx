@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import logoSvg from '../assets/logo_black_transparent.svg';
+import logoSvg from '../assets/logo_black_transparent.svg?url';
 import { auth } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { API_BASE_URL as API } from '../lib/api';

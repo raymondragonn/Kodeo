@@ -34,99 +34,6 @@ function useIsMobile() {
 }
 
 // ── CSS GLOBAL (keyframes + media queries que no se pueden hacer inline) ──────
-const GLOBAL_CSS = `
-  @keyframes kanbanLand {
-    0%   { transform: scale(1.06); box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
-    60%  { transform: scale(0.97); }
-    100% { transform: scale(1);    box-shadow: none; }
-  }
-  @keyframes kanbanPlaceholder {
-    0%   { opacity: 0; transform: scaleY(0.6); }
-    100% { opacity: 1; transform: scaleY(1); }
-  }
-  /* Kanban: horizontal scroll en mobile */
-  .kd-kanban-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    align-items: start;
-  }
-  @media (max-width: 767px) {
-    .kd-kanban-grid {
-      display: flex;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scroll-snap-type: x mandatory;
-      gap: 10px;
-      padding-bottom: 12px;
-      scrollbar-width: thin;
-      scrollbar-color: var(--line) transparent;
-    }
-    .kd-kanban-grid::-webkit-scrollbar { height: 4px; }
-    .kd-kanban-grid::-webkit-scrollbar-track { background: transparent; }
-    .kd-kanban-grid::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
-    .kd-kanban-col {
-      min-width: 260px !important;
-      flex-shrink: 0;
-      scroll-snap-align: start;
-    }
-  }
-  /* Calendario: celdas más compactas en mobile */
-  .kd-cal-cell { min-height: 70px; padding: 8px 8px 6px; }
-  @media (max-width: 767px) {
-    .kd-cal-cell { min-height: 46px; padding: 4px 3px; }
-    .kd-cal-chip { display: none; }
-    .kd-cal-dot  { display: block !important; }
-  }
-  /* date input: quitar estilos nativos en Safari */
-  input[type="date"] {
-    -webkit-appearance: none;
-    appearance: none;
-  }
-  /* Select: quitar flecha nativa en Firefox/Safari */
-  .kd-select {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    padding-right: 26px !important;
-  }
-  /* Prevenir tap highlight en iOS/Android */
-  .kd-btn, .kd-card {
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-  }
-  /* Filtros: stack en mobile */
-  .kd-filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  @media (max-width: 767px) {
-    .kd-filter-row { flex-direction: column; align-items: stretch; }
-    .kd-filter-row > * { width: 100% !important; flex: none !important; }
-    .kd-filter-selects { display: flex; gap: 8px; }
-    .kd-filter-selects select { flex: 1; }
-  }
-  /* Admin edit grid: 3 cols en desktop, 1 en mobile */
-  .kd-edit-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-  @media (max-width: 767px) {
-    .kd-edit-grid { grid-template-columns: 1fr; }
-  }
-  /* View switcher: sin label en mobile pequeño */
-  @media (max-width: 520px) {
-    .kd-view-label { display: none; }
-  }
-  /* Padding general de la página */
-  .kd-page-body { padding: 48px 24px; }
-  @media (max-width: 767px) {
-    .kd-page-body { padding: 28px 16px; }
-  }
-  /* Calendario: filtros de estatus en mobile → scroll horizontal */
-  .kd-cal-filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
-  @media (max-width: 767px) {
-    .kd-cal-filters { gap: 6px; }
-    .kd-cal-filters button { padding: 5px 8px !important; font-size: 8px !important; }
-  }
-`;
 
 // ── BADGES & HELPERS ──────────────────────────────────────────────────────────
 function StatusBadge({ status, copy }) {
@@ -936,7 +843,6 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
 
   return (
     <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
-      <style>{GLOBAL_CSS}</style>
       <div className="kd-page-body" style={{ maxWidth: maxW, width: '100%', margin: '0 auto', transition: 'max-width 0.3s' }}>
 
         {/* Page header */}

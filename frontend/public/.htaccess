@@ -1,0 +1,36 @@
+# ============================================================
+#  Kodeo — reglas de servidor para Hostinger (LiteSpeed/Apache)
+#
+#  El sitio es estático (Astro, output: 'static'), así que cada ruta existe
+#  como archivo. Las tres rutas con parámetro libre no se pueden enumerar en
+#  build: se sirven desde su página contenedora y la SPA lee el token de la
+#  URL en cliente.
+#
+#  Equivale a los "rewrites" de vercel.json, que en Hostinger no se leen.
+#  Este archivo vive en frontend/public/ para que `astro build` lo copie a
+#  dist/ en cada compilación.
+# ============================================================
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # /extras -> /costos
+  RewriteRule ^extras/?$ /costos/ [R=302,L]
+
+  # Sin esto hay bucle: /resena/ resuelve a resena/index.html por
+  # DirectoryIndex, ese path vuelve a coincidir con la regla de abajo y se
+  # reescribe a sí mismo hasta que Apache corta con 500.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^resena/[^/]+/?$ /resena/index.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^pago/orden/[^/]+/?$ /pago/index.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^usuarios/[^/]+/?$ /usuarios/index.html [L]
+</IfModule>
+
+ErrorDocument 404 /404.html

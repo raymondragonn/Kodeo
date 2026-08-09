@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '../lib/router-shim';
 import gsap from 'gsap';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { trackCtaClick } from '../lib/analytics';

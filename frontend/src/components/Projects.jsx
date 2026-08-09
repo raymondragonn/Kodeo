@@ -3,12 +3,13 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import ProjectModal from './ProjectModal';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { PROJECT_SLUGS } from '../lib/projects';
 
-const incupCover       = '/assets/projects/incup/incup-mockup-cover.png';
-const tudiCover        = '/assets/projects/tudi/tudi-mockup-cover.png';
-const ferbodaCover     = '/assets/projects/ferboda/ferboda-mockup-cover.png';
-const stratpharmaCover = '/assets/projects/stratpharma/stratpharma-mockup-cover.png';
-const aramondaCover    = '/assets/projects/aramondra/aramondra-mockup-cover.png';
+const incupCover       = '/assets/projects/incup/incup-mockup-cover.webp';
+const tudiCover        = '/assets/projects/tudi/tudi-mockup-cover.webp';
+const ferbodaCover     = '/assets/projects/ferboda/ferboda-mockup-cover.webp';
+const stratpharmaCover = '/assets/projects/stratpharma/stratpharma-mockup-cover.webp';
+const aramondaCover    = '/assets/projects/aramondra/aramondra-mockup-cover.webp';
 
 const PROJECT_COVERS = {
   '01': incupCover,
@@ -161,8 +162,16 @@ function ProjectCard({ project: p, onOpen, isMobile }) {
   const coverSrc = PROJECT_COVERS[p.idx];
 
   return (
-    <div
-      onClick={onOpen}
+    // Enlace real al caso de estudio para que sea rastreable, pero el clic
+    // normal sigue abriendo el modal como hasta ahora. Con Cmd/Ctrl se abre la
+    // página en otra pestaña.
+    <a
+      href={`/portafolio/${PROJECT_SLUGS[p.name] ?? ''}`}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+        e.preventDefault();
+        onOpen();
+      }}
       style={{
         flex: isMobile ? 'none' : `0 0 clamp(300px, 28vw, 400px)`,
         width: isMobile ? '100%' : undefined,
@@ -274,6 +283,6 @@ function ProjectCard({ project: p, onOpen, isMobile }) {
           {p.kind}
         </div>
       </div>
-    </div>
+    </a>
   );
 }

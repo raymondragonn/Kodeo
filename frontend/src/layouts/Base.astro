@@ -1,0 +1,79 @@
+---
+import '../styles/globals.css';
+import CookiesIsland from '../islands/CookiesIsland.jsx';
+import { getPublicReviews, reviewsSchema } from '../lib/reviews';
+import { businessSchema } from '../lib/business';
+
+const SITE = 'https://kodeo.mx';
+
+interface Props {
+  title: string;
+  description: string;
+  path?: string;
+  /** Solo las páginas de pago cargan Stripe (antes se descargaba en las 28 rutas). */
+  stripe?: boolean;
+  /** JSON-LD extra específico de la página (Service, FAQPage, BreadcrumbList…). */
+  schema?: unknown;
+  /** Rutas privadas: fuera del índice. */
+  noindex?: boolean;
+}
+
+const { title, description, path = '', stripe = false, schema, noindex = false } = Astro.props;
+
+const canonical = `${SITE}${path}`;
+const ogImage = `${SITE}/og-image.png`;
+
+// Identidad del negocio: es lo que permite a un motor generativo citar a Kodeo
+// con datos correctos en vez de inferirlos del texto. Los datos viven en
+// src/lib/business.js.
+const orgSchema = {
+  ...businessSchema(SITE),
+  // Valoraciones reales de clientes que autorizaron publicarlas. Si todavía no
+  // hay ninguna, no se emite nada: inventar reseñas es penalizable.
+  ...(reviewsSchema(await getPublicReviews(), `${SITE}/#organization`) ?? {}),
+};
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Kodeo" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content="es_MX" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@kodeomx" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <script is:inline src="/boot.js"></script>
+
+    <script type="application/ld+json" set:html={JSON.stringify(orgSchema)} />
+    {schema && <script type="application/ld+json" set:html={JSON.stringify(schema)} />}
+
+    {stripe && <script is:inline src="https://js.stripe.com/v3/" async></script>}
+  </head>
+
+  <body>
+    <slot />
+    <CookiesIsland client:idle />
+  </body>
+</html>

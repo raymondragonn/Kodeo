@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 5001
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5001"]
+CMD ["npx", "astro", "dev", "--force", "--host", "0.0.0.0", "--port", "5001"]

@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useBreakpoint } from '../hooks/useBreakpoint';
-import { trackDownload } from '../lib/analytics';
-const landingCover = '/assets/projects/landingpage-cover.png';
-const websiteCover = '/assets/projects/website-cover.png';
-const tiendaCover  = '/assets/projects/tiendaenlinea-cover.png';
+import { trackDownload, trackCtaClick } from '../lib/analytics';
+import { SERVICE_SLUGS } from '../lib/routes';
+const landingCover = '/assets/projects/landingpage-cover.webp';
+const websiteCover = '/assets/projects/website-cover.webp';
+const tiendaCover  = '/assets/projects/tiendaenlinea-cover.webp';
 const SERVICE_COVERS = { '01': landingCover, '02': websiteCover, '03': tiendaCover };
 const PDF_MAP        = {
   '01': '/LANDING PAGE - KODEO.pdf',
@@ -15,7 +16,7 @@ const PDF_MAP        = {
 
 gsap.registerPlugin(ScrollTrigger);
 
-export default function Services({ copy, motionSpeed = 1, onServiceClick }) {
+export default function Services({ copy, motionSpeed = 1 }) {
   const [hoverIdx, setHoverIdx]   = useState(null);
   const [autoIdx,  setAutoIdx]    = useState(0);
   const [fade,     setFade]       = useState(true);
@@ -107,9 +108,12 @@ export default function Services({ copy, motionSpeed = 1, onServiceClick }) {
 
         <div ref={listRef}>
           {copy.services.list.map((s, i) => (
-            <div
+            // Enlace real, no un div con onClick: es la vía por la que un
+            // buscador llega a las tres páginas de servicio desde la portada.
+            <a
               key={s.code}
-              onClick={() => onServiceClick && onServiceClick(s.code)}
+              href={`/${SERVICE_SLUGS[s.code]}`}
+              onClick={() => trackCtaClick({ cta_id: 'service_row', cta_text: s.name, section: 'services', destination: `/${SERVICE_SLUGS[s.code]}` })}
               onMouseEnter={() => !isMobile && setHoverIdx(i)}
               onMouseLeave={() => !isMobile && setHoverIdx(null)}
               style={{
@@ -229,7 +233,7 @@ export default function Services({ copy, motionSpeed = 1, onServiceClick }) {
               }}>
                 →
               </span>
-            </div>
+            </a>
           ))}
         </div>
       </div>

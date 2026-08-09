@@ -1,0 +1,26 @@
+---
+import Base from '../layouts/Base.astro';
+import FaqIsland from '../islands/FaqIsland.jsx';
+import { COPY } from '../data/copy';
+
+// FAQPage es el formato que Google usa para los desplegables en resultados y
+// del que los motores generativos extraen respuestas literales.
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: COPY.es.faq.items.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: { '@type': 'Answer', text: item.a },
+  })),
+};
+---
+
+<Base
+  title="Preguntas Frecuentes sobre Diseño y Desarrollo Web | Kodeo"
+  description="¿Cuánto cuesta una página web? ¿Cuánto tarda? ¿Es compatible con celulares? Resolvemos las dudas más comunes antes de contratar tu sitio web."
+  path="/preguntas"
+  schema={schema}
+>
+  <FaqIsland client:load />
+</Base>

@@ -54,7 +54,8 @@ function attachProjectReviews(PDO $db, array $projects): array {
     $ids          = array_column($projects, 'id');
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
     $stmt = $db->prepare("
-        SELECT id, project_id, public_token, rating, feedback, submitted_at, created_at
+        SELECT id, project_id, public_token, rating, rating_comunicacion, rating_diseno, rating_velocidad,
+               expectativas, feedback, mejoras, puede_publicar, submitted_at, created_at
         FROM project_reviews
         WHERE project_id IN ($placeholders)
     ");
@@ -66,6 +67,29 @@ function attachProjectReviews(PDO $db, array $projects): array {
     }
     foreach ($projects as &$project) {
         $project['review'] = $byProject[$project['id']] ?? null;
+    }
+    return $projects;
+}
+
+/** Adjunta a cada proyecto su bitácora de actividad (más reciente primero). */
+function attachProjectActivity(PDO $db, array $projects): array {
+    if (!$projects) return [];
+    $ids          = array_column($projects, 'id');
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $db->prepare("
+        SELECT id, project_id, event, detail, created_at
+        FROM project_activity
+        WHERE project_id IN ($placeholders)
+        ORDER BY created_at DESC, id DESC
+    ");
+    $stmt->execute($ids);
+
+    $byProject = [];
+    foreach ($stmt->fetchAll() as $entry) {
+        $byProject[$entry['project_id']][] = $entry;
+    }
+    foreach ($projects as &$project) {
+        $project['activity'] = $byProject[$project['id']] ?? [];
     }
     return $projects;
 }
@@ -129,6 +153,31 @@ function projectHasConfirmedPayment(PDO $db, int $projectId): bool {
     return !empty($row['appointment_payment_intent_id']) || (int) ($row['has_paid_order'] ?? 0) === 1;
 }
 
+// ── GET ?id= : detalle de un proyecto, con bitácora de actividad ──
+if ($method === 'GET' && isset($_GET['id'])) {
+    $id = (int) $_GET['id'];
+    if (!$id) jsonError('ID requerido');
+
+    $stmt = $db->prepare('
+        SELECT p.*, u.name AS user_name, u.email AS user_email
+        FROM projects p LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.id = ?
+    ');
+    $stmt->execute([$id]);
+    $project = $stmt->fetch();
+    if (!$project) jsonError('Proyecto no encontrado', 404);
+
+    if (!$isAdmin && (int) $project['user_id'] !== (int) $auth['sub']) {
+        jsonError('Acceso denegado', 403);
+    }
+
+    $project = attachPaymentOrders($db, [$project]);
+    $project = attachProjectPaymentState($db, $project);
+    $project = attachProjectReviews($db, $project);
+    $project = attachProjectActivity($db, $project);
+    jsonSuccess(['project' => $project[0]]);
+}
+
 // ── GET: listar proyectos ──────────────────────────────────────
 if ($method === 'GET') {
     backfillMissingDiagnosticProjects($db);
@@ -188,6 +237,7 @@ if ($method === 'POST' && isset($_GET['id'])) {
     }
 
     $review = createProjectReview($db, $id);
+    logProjectActivity($db, $id, 'review_generated', 'Encuesta de satisfacción generada');
     jsonSuccess([
         'review'     => $review,
         'review_url' => ALLOWED_ORIGIN . '/resena/' . $review['public_token'],
@@ -207,15 +257,19 @@ if ($method === 'POST') {
 
     $db->prepare('INSERT INTO projects (user_id, name, notes) VALUES (?, ?, ?)')
        ->execute([$userId, $name, $notes ?: null]);
+    $newId = (int) $db->lastInsertId();
+
+    logProjectActivity($db, $newId, 'created', 'Proyecto creado' . ($email !== '' ? " y asignado a {$email}" : ' (prospecto sin cuenta)'));
 
     $stmt = $db->prepare('
         SELECT p.*, u.name AS user_name, u.email AS user_email
         FROM projects p LEFT JOIN users u ON u.id = p.user_id
         WHERE p.id = ?
     ');
-    $stmt->execute([(int) $db->lastInsertId()]);
+    $stmt->execute([$newId]);
     $project = $stmt->fetch();
     $project['payment_orders'] = [];
+    $project['activity'] = [];
 
     jsonSuccess(['project' => $project]);
 }
@@ -225,9 +279,10 @@ if ($method === 'PATCH') {
     $id = (int) ($_GET['id'] ?? 0);
     if (!$id) jsonError('ID requerido');
 
-    $body   = json_decode(file_get_contents('php://input'), true) ?? [];
-    $sets   = [];
-    $values = [];
+    $body       = json_decode(file_get_contents('php://input'), true) ?? [];
+    $sets       = [];
+    $values     = [];
+    $activityLog = [];
 
     if (array_key_exists('name', $body)) {
         $name = trim($body['name']);
@@ -240,12 +295,12 @@ if ($method === 'PATCH') {
             jsonError('Estatus inválido. Valores: ' . implode(', ', PROJECT_STATUSES));
         }
 
-        if ($newStatus !== 'cancelado') {
-            $currentStmt = $db->prepare('SELECT status FROM projects WHERE id = ?');
-            $currentStmt->execute([$id]);
-            $currentStatus = $currentStmt->fetchColumn();
-            if ($currentStatus === false) jsonError('Proyecto no encontrado', 404);
+        $currentStmt = $db->prepare('SELECT status FROM projects WHERE id = ?');
+        $currentStmt->execute([$id]);
+        $currentStatus = $currentStmt->fetchColumn();
+        if ($currentStatus === false) jsonError('Proyecto no encontrado', 404);
 
+        if ($newStatus !== 'cancelado') {
             $currentIdx = array_search($currentStatus, PROJECT_STATUS_ORDER, true);
             $newIdx     = array_search($newStatus, PROJECT_STATUS_ORDER, true);
             if ($newStatus !== $currentStatus && ($currentIdx === false || $newIdx !== $currentIdx + 1)) {
@@ -258,18 +313,32 @@ if ($method === 'PATCH') {
         }
 
         $sets[] = 'status = ?'; $values[] = $newStatus;
+        if ($newStatus !== $currentStatus) {
+            $fromLabel = PROJECT_STATUS_LABELS[$currentStatus] ?? $currentStatus;
+            $toLabel   = PROJECT_STATUS_LABELS[$newStatus] ?? $newStatus;
+            $activityLog[] = ['event' => 'status_changed', 'detail' => "Estatus actualizado: {$fromLabel} → {$toLabel}"];
+        }
     }
     if (array_key_exists('notes', $body)) {
         $sets[] = 'notes = ?';  $values[] = trim($body['notes']) ?: null;
     }
     if (array_key_exists('user_email', $body)) {
-        $sets[] = 'user_id = ?'; $values[] = resolveUserId($db, trim($body['user_email']));
+        $emailInput = trim($body['user_email']);
+        $sets[] = 'user_id = ?'; $values[] = resolveUserId($db, $emailInput);
+        $activityLog[] = [
+            'event'  => 'assigned',
+            'detail' => $emailInput === '' ? 'Proyecto desasignado de cliente' : "Proyecto asignado a {$emailInput}",
+        ];
     }
 
     if (empty($sets)) jsonError('Nada que actualizar');
 
     $values[] = $id;
     $db->prepare('UPDATE projects SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($values);
+
+    foreach ($activityLog as $entry) {
+        logProjectActivity($db, $id, $entry['event'], $entry['detail']);
+    }
 
     $stmt = $db->prepare('
         SELECT p.*, u.name AS user_name, u.email AS user_email
@@ -283,6 +352,7 @@ if ($method === 'PATCH') {
     $project = attachPaymentOrders($db, [$project]);
     $project = attachProjectPaymentState($db, $project);
     $project = attachProjectReviews($db, $project);
+    $project = attachProjectActivity($db, $project);
     jsonSuccess(['project' => $project[0]]);
 }
 

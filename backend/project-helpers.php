@@ -58,6 +58,20 @@ function backfillMissingDiagnosticProjects(PDO $db): void {
     }
 }
 
+const PROJECT_STATUS_LABELS = [
+    'diagnostico'   => 'En diagnóstico',
+    'en_diseno'     => 'En diseño',
+    'en_desarrollo' => 'En desarrollo',
+    'completado'    => 'Completado',
+    'cancelado'     => 'Cancelado',
+];
+
+/** Registra un evento en la bitácora del proyecto (tabla project_activity). */
+function logProjectActivity(PDO $db, int $projectId, string $event, ?string $detail = null): void {
+    $db->prepare('INSERT INTO project_activity (project_id, event, detail) VALUES (?, ?, ?)')
+       ->execute([$projectId, $event, $detail]);
+}
+
 function syncClaimedProjectsForUser(PDO $db, int $userId): void {
     if ($userId <= 0) return;
 

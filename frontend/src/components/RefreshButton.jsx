@@ -1,7 +1,6 @@
 export default function RefreshButton({ onClick, loading, label = 'Actualizar', loadingLabel = 'Actualizando...' }) {
   return (
     <>
-      <style>{`@keyframes kd-refresh-spin { to { transform: rotate(360deg); } }`}</style>
       <button
         onClick={() => { if (!loading) onClick(); }}
         disabled={loading}

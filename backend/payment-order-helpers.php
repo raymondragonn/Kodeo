@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/project-helpers.php';
 
 const PAYMENT_ORDER_ACCENT = '#5170ff';
 
@@ -32,6 +33,13 @@ function settlePaymentOrder(\Stripe\PaymentIntent $pi): bool {
 
     if ($updated->rowCount() > 0) {
         notifyPaymentOrderPaid($orderId);
+
+        $projectStmt = $db->prepare('SELECT project_id FROM payment_orders WHERE id = ?');
+        $projectStmt->execute([$orderId]);
+        $projectId = $projectStmt->fetchColumn();
+        if ($projectId) {
+            logProjectActivity($db, (int) $projectId, 'order_paid', "Orden de pago #{$orderId} pagada con tarjeta (Stripe)");
+        }
     }
 
     return true;

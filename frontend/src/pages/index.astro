@@ -1,0 +1,48 @@
+---
+import Base from '../layouts/Base.astro';
+import LandingIsland from '../islands/LandingIsland.jsx';
+import { COPY } from '../data/copy';
+import { SERVICE_META } from '../lib/routes';
+
+const SITE = 'https://kodeo.mx';
+
+// Catálogo de servicios con precio: es lo que permite a un buscador o a un
+// motor generativo responder "¿cuánto cuesta una landing en Kodeo?" con el
+// dato correcto en lugar de inferirlo del texto.
+const catalog = {
+  '@type': 'OfferCatalog',
+  name: 'Servicios de desarrollo web',
+  itemListElement: COPY.es.services.list.map((s) => ({
+    '@type': 'Offer',
+    price: SERVICE_META[s.code].price,
+    priceCurrency: 'MXN',
+    url: `${SITE}/${SERVICE_META[s.code].slug}`,
+    itemOffered: {
+      '@type': 'Service',
+      name: s.name,
+      description: s.lead,
+      provider: { '@id': `${SITE}/#organization` },
+    },
+  })),
+};
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  '@id': `${SITE}/#website`,
+  url: SITE,
+  name: 'Kodeo',
+  inLanguage: 'es-MX',
+  publisher: { '@id': `${SITE}/#organization` },
+  mainEntity: { '@id': `${SITE}/#organization`, hasOfferCatalog: catalog },
+};
+---
+
+<Base
+  title="Kodeo | Agencia Digital"
+  description="Creamos páginas web, sitios corporativos y tiendas en línea a medida. Precios claros desde MX$6,500 y entrega en 8 días. Estudio digital en Veracruz."
+  path="/"
+  schema={schema}
+>
+  <LandingIsland client:load />
+</Base>

@@ -15,6 +15,7 @@ export default function ConfirmModal({ title, message, confirmLabel, cancelLabel
         style={{
           background: 'var(--bg)', border: '1px solid var(--line)',
           borderRadius: 'var(--radius-lg)', padding: 26, maxWidth: 380, width: '100%',
+          boxShadow: '0 24px 48px -12px rgba(0,0,0,.4)',
         }}
       >
         <h3 style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: 20, letterSpacing: '-0.01em', margin: '0 0 10px', color: 'var(--type)' }}>

@@ -1,6 +1,8 @@
 import { Helmet } from 'react-helmet-async';
 
-const BASE_URL = 'https://bykodeo.com';
+// Solo lo usan las rutas de la SPA (portal y transaccionales). Las 11 páginas
+// públicas llevan sus meta en el <head> de Astro, vía src/layouts/Base.astro.
+const BASE_URL = 'https://kodeo.mx';
 const OG_IMAGE = `${BASE_URL}/og-image.png`;
 
 export default function PageMeta({ title, description, path = '' }) {

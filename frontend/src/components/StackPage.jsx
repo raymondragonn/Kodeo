@@ -114,16 +114,19 @@ export default function StackPage({ copy, motionSpeed = 1, onBack, onNavItemClic
                 padding: isMobile ? '20px 16px 24px' : '36px 32px 40px',
               }}
             >
-              <div style={{
+              {/* Categoría del stack: Frontend / Backend / Deploy / Pagos */}
+              <h2 style={{
                 fontFamily: 'var(--ui)',
+                fontWeight: 400,
                 fontSize: 10,
                 letterSpacing: '.28em',
                 textTransform: 'uppercase',
                 color: 'var(--type-soft)',
+                margin: 0,
                 marginBottom: isMobile ? 16 : 28,
               }}>
                 {cat.label}
-              </div>
+              </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 14 }}>
                 {cat.items.map((tech) => (
                   <span key={tech} style={{

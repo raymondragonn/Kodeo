@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '../lib/router-shim';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useMagneticCursor } from '../hooks/useMagneticCursor';

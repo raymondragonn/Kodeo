@@ -953,9 +953,6 @@ export default function AnalyticsPage({ user, onNavigate, onLogout, copy, theme,
 
   return (
     <PortalLayout user={user} onNavigate={onNavigate} onLogout={onLogout} copy={copy} theme={theme} onThemeToggle={onThemeToggle}>
-      <style>{`
-        @keyframes kd-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-      `}</style>
       <div style={{ maxWidth: 960, width: '100%', margin: '0 auto', padding: isMobile ? '32px 16px 60px' : '44px 28px 80px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* ═══════════════════════════════════════════════════════════════════ */}

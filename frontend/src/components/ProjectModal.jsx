@@ -4,11 +4,11 @@ import gsap from 'gsap';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 
 const PROJECT_IMAGES = {
-  '01': ['/assets/projects/incup/incup-1.png',       '/assets/projects/incup/incup-2.png',       '/assets/projects/incup/incup-3.png'],
-  '02': ['/assets/projects/tudi/tudi-1.png',         '/assets/projects/tudi/tudi-2.png',         '/assets/projects/tudi/tudi-3.png'],
-  '03': ['/assets/projects/ferboda/ferboda-2.png',   '/assets/projects/ferboda/ferboda-3.png',   '/assets/projects/ferboda/ferboda-4.png', '/assets/projects/ferboda/ferboda-5.png', '/assets/projects/ferboda/ferboda-6.png'],
-  '04': ['/assets/projects/stratpharma/stratpharma-1.png', '/assets/projects/stratpharma/stratpharma-2.png', '/assets/projects/stratpharma/stratpharma-3.png'],
-  '05': ['/assets/projects/aramondra/aramondra-1.png', '/assets/projects/aramondra/aramondra-2.png', '/assets/projects/aramondra/aramondra-3.png'],
+  '01': ['/assets/projects/incup/incup-1.webp',       '/assets/projects/incup/incup-2.webp',       '/assets/projects/incup/incup-3.webp'],
+  '02': ['/assets/projects/tudi/tudi-1.webp',         '/assets/projects/tudi/tudi-2.webp',         '/assets/projects/tudi/tudi-3.webp'],
+  '03': ['/assets/projects/ferboda/ferboda-2.webp',   '/assets/projects/ferboda/ferboda-3.webp',   '/assets/projects/ferboda/ferboda-4.webp', '/assets/projects/ferboda/ferboda-5.webp', '/assets/projects/ferboda/ferboda-6.webp'],
+  '04': ['/assets/projects/stratpharma/stratpharma-1.webp', '/assets/projects/stratpharma/stratpharma-2.webp', '/assets/projects/stratpharma/stratpharma-3.webp'],
+  '05': ['/assets/projects/aramondra/aramondra-1.webp', '/assets/projects/aramondra/aramondra-2.webp', '/assets/projects/aramondra/aramondra-3.webp'],
 };
 
 const ACCENT_MAP = {

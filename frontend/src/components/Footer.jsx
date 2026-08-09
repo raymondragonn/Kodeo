@@ -1,6 +1,9 @@
-import logoSvg from '../assets/logo_black_transparent.svg';
+import logoSvg from '../assets/logo_black_transparent.svg?url';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { hrefForLabel } from '../lib/routes';
 
+// Los enlaces llevan su destino real en el href, no un "#" con onClick: así el
+// navegador navega solo y, sobre todo, los buscadores pueden seguirlos.
 export default function Footer({ copy, motionSpeed = 1, onNavigate }) {
   const { isMobile } = useBreakpoint();
 
@@ -16,7 +19,7 @@ export default function Footer({ copy, motionSpeed = 1, onNavigate }) {
       }}>
         {/* Brand column — full width on mobile */}
         <div style={{ gridColumn: isMobile ? '1 / -1' : 'auto' }}>
-          <a href="#" style={{ display: 'inline-flex', alignItems: 'center' }}>
+          <a href="/" aria-label="Kodeo — inicio" style={{ display: 'inline-flex', alignItems: 'center' }}>
             <img src={logoSvg} alt="Kodeo" style={{ height: isMobile ? 52 : 64, filter: 'var(--logo-filter)' }} />
           </a>
           <p
@@ -53,22 +56,21 @@ export default function Footer({ copy, motionSpeed = 1, onNavigate }) {
             </div>
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 11 }}>
               {items.map((item) => {
-                const label    = typeof item === 'string' ? item : item.name;
-                const href     = typeof item === 'string' ? '#' : item.url;
-                const external = href !== '#';
+                const external = typeof item !== 'string';
+                const label    = external ? item.name : item;
+                const href     = external ? item.url : (hrefForLabel(label) ?? '/');
                 return (
                   <li key={label}>
                     <a
                       href={href}
                       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                      onClick={!external && onNavigate ? (e) => { e.preventDefault(); onNavigate(label); } : undefined}
                       style={{
                         fontFamily: 'var(--body)',
                         fontSize: isMobile ? 14 : 15,
                         color: 'var(--type)',
                         display: 'inline-block',
                         transition: `transform ${0.5 / motionSpeed}s cubic-bezier(.2,.7,.2,1)`,
-                        cursor: !external && onNavigate ? 'pointer' : 'default',
+                        cursor: 'pointer',
                       }}
                       onMouseEnter={e => e.currentTarget.style.transform = 'translateX(6px)'}
                       onMouseLeave={e => e.currentTarget.style.transform = 'translateX(0)'}
@@ -103,8 +105,7 @@ export default function Footer({ copy, motionSpeed = 1, onNavigate }) {
           {copy.footer.links.map((link) => (
             <a
               key={link}
-              href="#"
-              onClick={onNavigate ? (e) => { e.preventDefault(); onNavigate(link); } : undefined}
+              href={hrefForLabel(link) ?? '/'}
               style={{ color: 'var(--type-soft)', cursor: 'pointer' }}
             >
               {link}

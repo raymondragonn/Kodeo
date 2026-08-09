@@ -34,3 +34,6 @@ deploy/
 *.njsproj
 *.sln
 *.sw?
+
+# Astro
+frontend/.astro/

@@ -1,12 +1,19 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }],
+  "redirects": [
+    { "source": "/extras", "destination": "/costos", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/pago/orden/:token", "destination": "/pago" },
+    { "source": "/resena/:token", "destination": "/resena" },
+    { "source": "/usuarios/:userId", "destination": "/usuarios" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' http://localhost:8000 https://api.kodeo.mx https://*.googleapis.com https://www.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.gstatic.com https://js.stripe.com https://api.stripe.com https://q.stripe.com https://m.stripe.network https://wa.me; object-src 'none'; frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://accounts.google.com https://*.firebaseapp.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+          "value": "default-src 'self'; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' http://localhost:8000 https://api.kodeo.mx https://*.googleapis.com https://www.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.gstatic.com https://js.stripe.com https://api.stripe.com https://q.stripe.com https://m.stripe.network https://www.google-analytics.com https://wa.me; object-src 'none'; frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://accounts.google.com https://*.firebaseapp.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
         },
         { "key": "X-Frame-Options",           "value": "DENY" },
         { "key": "X-Content-Type-Options",     "value": "nosniff" },
@@ -17,6 +24,13 @@
         { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
         { "key": "Cross-Origin-Resource-Policy","value": "same-origin" },
         { "key": "Cross-Origin-Embedder-Policy","value": "unsafe-none" }
+      ]
+    },
+    {
+      "source": "/_astro/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
       ]
     },
     {

@@ -1,9 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import logoSvg from '../assets/logo_black_transparent.svg';
+import logoSvg from '../assets/logo_black_transparent.svg?url';
 import { API_BASE_URL as API } from '../lib/api';
 
 const STAR_VALUES = [1, 2, 3, 4, 5];
+const EXPECTATIVAS_VALUES = ['supero', 'cumplio', 'parcial', 'no_cumplio'];
+
+const choiceBtn = selected => ({
+  padding: '10px 16px',
+  borderRadius: 'var(--radius-pill)',
+  border: `1px solid ${selected ? 'var(--type)' : 'var(--line)'}`,
+  background: selected ? 'var(--type)' : 'transparent',
+  color: selected ? 'var(--bg)' : 'var(--type-soft)',
+  fontFamily: 'var(--body)', fontSize: 13, cursor: 'pointer',
+});
+
+const scaleLabelStyle = {
+  fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase',
+  color: 'var(--type-soft)', display: 'block', lineHeight: 1.6, marginBottom: 6,
+};
+
+// Todos los campos son obligatorios salvo los inputs de autoría (autorNombre/autorRol).
+function RequiredMark() {
+  return <span style={{ color: '#e05050' }} aria-hidden="true"> *</span>;
+}
 
 function Star({ value, filled, onClick, onMouseEnter, onMouseLeave, size = 34 }) {
   return (
@@ -22,6 +42,48 @@ function Star({ value, filled, onClick, onMouseEnter, onMouseLeave, size = 34 })
   );
 }
 
+function StarGroup({ label, value, onChange, size }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div>
+      <label style={scaleLabelStyle}>{label}<RequiredMark /></label>
+      <div style={{ display: 'flex', gap: 2, marginLeft: -4 }}>
+        {STAR_VALUES.map(v => (
+          <Star
+            key={v}
+            value={v}
+            size={size}
+            filled={v <= (hover || value)}
+            onClick={() => onChange(v)}
+            onMouseEnter={() => setHover(v)}
+            onMouseLeave={() => setHover(0)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NumberScale({ label, value, onChange }) {
+  return (
+    <div>
+      <label style={scaleLabelStyle}>{label}<RequiredMark /></label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {STAR_VALUES.map(v => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            style={{ ...choiceBtn(value === v), width: 40, textAlign: 'center' }}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ReviewPage({ copy, onNavigate }) {
   const { token } = useParams();
   const P = copy.review;
@@ -31,12 +93,19 @@ export default function ReviewPage({ copy, onNavigate }) {
   const [projectName, setProjectName] = useState('');
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
-  const [rating, setRating]     = useState(0);
-  const [hover, setHover]       = useState(0);
-  const [feedback, setFeedback] = useState('');
+  const [rating, setRating]                       = useState(0);
+  const [ratingComunicacion, setRatingComunicacion] = useState(0);
+  const [ratingDiseno, setRatingDiseno]             = useState(0);
+  const [ratingVelocidad, setRatingVelocidad]       = useState(0);
+  const [feedback, setFeedback]     = useState('');
+  const [expectativas, setExpectativas] = useState('');
+  const [mejoras, setMejoras]       = useState('');
+  const [puedePublicar, setPuedePublicar] = useState(null);
+  const [autorNombre, setAutorNombre] = useState('');
+  const [autorRol, setAutorRol]       = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess]   = useState(false);
-  const [error, setError]       = useState('');
+  const [success, setSuccess]       = useState(false);
+  const [error, setError]           = useState('');
 
   useEffect(() => {
     if (!token) return;
@@ -59,14 +128,29 @@ export default function ReviewPage({ copy, onNavigate }) {
   const handleSubmit = async e => {
     e.preventDefault();
     setError('');
-    if (rating < 1) { setError(P.ratingRequired); return; }
+    if (rating < 1 || ratingComunicacion < 1 || ratingDiseno < 1 || ratingVelocidad < 1) {
+      setError(P.ratingRequired);
+      return;
+    }
+    if (!feedback.trim()) { setError(P.feedbackRequired); return; }
+    if (!expectativas) { setError(P.expectativasRequired); return; }
+    if (puedePublicar === null) { setError(P.publicarRequired); return; }
 
     setSubmitting(true);
     try {
       const res = await fetch(`${API}/reviews.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, rating, feedback }),
+        body: JSON.stringify({
+          token, rating, feedback,
+          rating_comunicacion: ratingComunicacion,
+          rating_diseno: ratingDiseno,
+          rating_velocidad: ratingVelocidad,
+          expectativas, mejoras,
+          puede_publicar: puedePublicar,
+          autor_nombre: puedePublicar ? autorNombre : '',
+          autor_rol:    puedePublicar ? autorRol : '',
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? P.error); return; }
@@ -149,9 +233,21 @@ export default function ReviewPage({ copy, onNavigate }) {
               <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, letterSpacing: '-0.03em', color: 'var(--type)', margin: '0 0 12px', lineHeight: 1.1 }}>
                 {success ? P.thanksTitle : P.alreadySubmittedTitle}
               </h1>
-              <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: 0, lineHeight: 1.5 }}>
+              <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: '0 0 24px', lineHeight: 1.5 }}>
                 {success ? P.thanksBody : P.alreadySubmittedBody}
               </p>
+              <button
+                type="button"
+                onClick={() => onNavigate?.('/')}
+                style={{
+                  background: 'var(--type)', color: 'var(--bg)', border: 0,
+                  padding: '13px 18px', borderRadius: 'var(--radius-pill)',
+                  fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em',
+                  textTransform: 'uppercase', cursor: 'pointer', width: '100%',
+                }}
+              >
+                {P.backHome}
+              </button>
             </>
           ) : (
             <>
@@ -177,25 +273,11 @@ export default function ReviewPage({ copy, onNavigate }) {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div>
-                  <label style={labelStyle}>{P.ratingLabel}</label>
-                  <div style={{ display: 'flex', gap: 2, marginLeft: -4 }}>
-                    {STAR_VALUES.map(value => (
-                      <Star
-                        key={value}
-                        value={value}
-                        filled={value <= (hover || rating)}
-                        onClick={() => setRating(value)}
-                        onMouseEnter={() => setHover(value)}
-                        onMouseLeave={() => setHover(0)}
-                      />
-                    ))}
-                  </div>
-                </div>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                <StarGroup label={P.ratingLabel} value={rating} onChange={setRating} />
 
                 <div>
-                  <label style={labelStyle}>{P.feedbackLabel}</label>
+                  <label style={labelStyle}>{P.feedbackLabel}<RequiredMark /></label>
                   <textarea
                     value={feedback}
                     onChange={e => setFeedback(e.target.value)}
@@ -205,6 +287,76 @@ export default function ReviewPage({ copy, onNavigate }) {
                     style={fieldStyle}
                   />
                 </div>
+
+                <NumberScale label={P.comunicacionLabel} value={ratingComunicacion} onChange={setRatingComunicacion} />
+                <NumberScale label={P.disenoLabel} value={ratingDiseno} onChange={setRatingDiseno} />
+                <NumberScale label={P.velocidadLabel} value={ratingVelocidad} onChange={setRatingVelocidad} />
+
+                <div>
+                  <label style={labelStyle}>{P.expectativasLabel}<RequiredMark /></label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {EXPECTATIVAS_VALUES.map(v => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setExpectativas(v)}
+                        style={choiceBtn(expectativas === v)}
+                      >
+                        {P.expectativasOptions[v]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>{P.mejorasLabel}</label>
+                  <textarea
+                    value={mejoras}
+                    onChange={e => setMejoras(e.target.value)}
+                    placeholder={P.mejorasPlaceholder}
+                    rows={3}
+                    maxLength={1000}
+                    style={fieldStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>{P.publicarLabel}<RequiredMark /></label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" onClick={() => setPuedePublicar(true)} style={choiceBtn(puedePublicar === true)}>
+                      {P.publicarSi}
+                    </button>
+                    <button type="button" onClick={() => setPuedePublicar(false)} style={choiceBtn(puedePublicar === false)}>
+                      {P.publicarNo}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Solo si autoriza publicar: con qué nombre aparecer. Sin esto
+                    la reseña se publica sin autor. */}
+                {puedePublicar === true && (
+                  <div>
+                    <label style={labelStyle}>{P.autorLabel}</label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        value={autorNombre}
+                        onChange={(e) => setAutorNombre(e.target.value)}
+                        placeholder={P.autorNombrePlaceholder}
+                        maxLength={120}
+                        style={{ ...fieldStyle, flex: '1 1 180px' }}
+                      />
+                      <input
+                        type="text"
+                        value={autorRol}
+                        onChange={(e) => setAutorRol(e.target.value)}
+                        placeholder={P.autorRolPlaceholder}
+                        maxLength={120}
+                        style={{ ...fieldStyle, flex: '1 1 180px' }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <button
                   type="submit"

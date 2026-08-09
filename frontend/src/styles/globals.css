@@ -126,6 +126,12 @@
 
 html { scroll-behavior: smooth; }
 
+/* El HTML se pre-renderiza en la variante móvil. public/boot.js marca esto
+   cuando el visitante está en escritorio; useBreakpoint lo quita en cuanto
+   React hidrata con el breakpoint correcto. Evita ver el layout móvil un
+   instante. */
+html[data-bp-mismatch] body { visibility: hidden; }
+
 body {
   background: var(--bg);
   color: var(--type);
@@ -209,3 +215,126 @@ button { font-family: inherit; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .cta-breathe { animation: none; }
 }
+
+/* ── Portal: kanban, calendario y controles ──────────────────────────────
+   Venían de un <style> dentro de OrdersPage.jsx. Se mueven aquí porque la
+   CSP lleva hashes en style-src, y eso anula 'unsafe-inline' para los
+   <style> que React inserta en runtime. */
+  @keyframes kanbanLand {
+    0%   { transform: scale(1.06); box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    60%  { transform: scale(0.97); }
+    100% { transform: scale(1);    box-shadow: none; }
+  }
+  @keyframes kanbanPlaceholder {
+    0%   { opacity: 0; transform: scaleY(0.6); }
+    100% { opacity: 1; transform: scaleY(1); }
+  }
+  /* Kanban: horizontal scroll en mobile */
+  .kd-kanban-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+  @media (max-width: 767px) {
+    .kd-kanban-grid {
+      display: flex;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory;
+      gap: 10px;
+      padding-bottom: 12px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--line) transparent;
+    }
+    .kd-kanban-grid::-webkit-scrollbar { height: 4px; }
+    .kd-kanban-grid::-webkit-scrollbar-track { background: transparent; }
+    .kd-kanban-grid::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+    .kd-kanban-col {
+      min-width: 260px !important;
+      flex-shrink: 0;
+      scroll-snap-align: start;
+    }
+  }
+  /* Calendario: celdas más compactas en mobile */
+  .kd-cal-cell { min-height: 70px; padding: 8px 8px 6px; }
+  @media (max-width: 767px) {
+    .kd-cal-cell { min-height: 46px; padding: 4px 3px; }
+    .kd-cal-chip { display: none; }
+    .kd-cal-dot  { display: block !important; }
+  }
+  /* date input: quitar estilos nativos en Safari */
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  /* Select: quitar flecha nativa en Firefox/Safari */
+  .kd-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 26px !important;
+  }
+  /* Prevenir tap highlight en iOS/Android */
+  .kd-btn, .kd-card {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+  /* Filtros: stack en mobile */
+  .kd-filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  @media (max-width: 767px) {
+    .kd-filter-row { flex-direction: column; align-items: stretch; }
+    .kd-filter-row > * { width: 100% !important; flex: none !important; }
+    .kd-filter-selects { display: flex; gap: 8px; }
+    .kd-filter-selects select { flex: 1; }
+  }
+  /* Admin edit grid: 3 cols en desktop, 1 en mobile */
+  .kd-edit-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 767px) {
+    .kd-edit-grid { grid-template-columns: 1fr; }
+  }
+  /* View switcher: sin label en mobile pequeño */
+  @media (max-width: 520px) {
+    .kd-view-label { display: none; }
+  }
+  /* Padding general de la página */
+  .kd-page-body { padding: 48px 24px; }
+  @media (max-width: 767px) {
+    .kd-page-body { padding: 28px 16px; }
+  }
+  /* Calendario: filtros de estatus en mobile → scroll horizontal */
+  .kd-cal-filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+  @media (max-width: 767px) {
+    .kd-cal-filters { gap: 6px; }
+    .kd-cal-filters button { padding: 5px 8px !important; font-size: 8px !important; }
+  }
+@keyframes kd-refresh-spin { to { transform: rotate(360deg); } }
+@keyframes kd-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ── Guías: estilos del contenido en Markdown ────────────────────────────
+   Usa los mismos tokens que el resto del sitio; no introduce colores ni
+   tipografías nuevas. */
+.kd-prose { font-family: var(--body); font-size: 17px; line-height: 1.75; color: var(--type-soft); }
+.kd-prose > * + * { margin-top: 22px; }
+.kd-prose h2 {
+  font-family: var(--display); font-weight: 400; font-size: clamp(24px, 4vw, 34px);
+  letter-spacing: -0.025em; line-height: 1.15; color: var(--type);
+  margin-top: 48px; margin-bottom: 16px;
+}
+.kd-prose h3 {
+  font-family: var(--display); font-weight: 400; font-size: clamp(19px, 3vw, 24px);
+  letter-spacing: -0.015em; color: var(--type); margin-top: 34px; margin-bottom: 12px;
+}
+.kd-prose strong { color: var(--type); font-weight: 700; }
+.kd-prose a { color: var(--type); border-bottom: 1px solid var(--line-2); }
+.kd-prose a:hover { border-bottom-color: var(--type); }
+.kd-prose ul, .kd-prose ol { padding-left: 22px; }
+.kd-prose li + li { margin-top: 8px; }
+.kd-prose table { width: 100%; border-collapse: collapse; font-size: 15px; display: block; overflow-x: auto; }
+.kd-prose th, .kd-prose td { border: 1px solid var(--line); padding: 10px 14px; text-align: left; }
+.kd-prose th { color: var(--type); font-family: var(--ui); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+.kd-prose blockquote { border-left: 2px solid var(--line-2); padding-left: 20px; color: var(--type-soft); font-style: italic; }
+.kd-prose code { font-size: 0.9em; background: var(--bg-3); padding: 2px 6px; border-radius: var(--radius-sm); }

@@ -1,0 +1,92 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import NavIsland from '../../islands/NavIsland.jsx';
+import FooterIsland from '../../islands/FooterIsland.jsx';
+
+const SITE = 'https://kodeo.mx';
+
+const guias = (await getCollection('guias', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.publishedAt - a.data.publishedAt);
+
+const fmt = (date) =>
+  new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Blog',
+    name: 'Guías de Kodeo',
+    description: 'Guías prácticas sobre precios, plazos y decisiones al crear un sitio web en México.',
+    url: `${SITE}/guias`,
+    publisher: { '@id': `${SITE}/#organization` },
+    inLanguage: 'es-MX',
+    blogPost: guias.map((g) => ({
+      '@type': 'BlogPosting',
+      headline: g.data.title,
+      description: g.data.description,
+      url: `${SITE}/guias/${g.id}`,
+      datePublished: g.data.publishedAt.toISOString(),
+      author: { '@id': `${SITE}/#organization` },
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE },
+      { '@type': 'ListItem', position: 2, name: 'Guías', item: `${SITE}/guias` },
+    ],
+  },
+];
+---
+
+<Base
+  title="Guías: Precios y Decisiones al Crear tu Sitio Web | Kodeo"
+  description="Cuánto cuesta una página web en México, cuánto tarda, qué necesitas para vender en línea y cómo elegir entre una landing y un sitio completo."
+  path="/guias"
+  schema={schema}
+>
+  <div style="background: var(--bg); min-height: 100vh;">
+    <NavIsland client:load />
+
+    <main style="max-width: 860px; margin: 0 auto; padding: 40px 20px 90px;">
+      <p style="font-family: var(--ui); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--type-soft); margin-bottom: 14px;">
+        Guías
+      </p>
+
+      <h1 style="font-family: var(--display); font-weight: 400; font-size: clamp(38px, 8vw, 72px); line-height: 0.98; letter-spacing: -0.035em; margin: 0 0 20px; padding-bottom: 0.06em;">
+        Antes de hacer tu sitio web
+      </h1>
+
+      <p style="font-family: var(--body); font-size: clamp(16px, 2.4vw, 19px); line-height: 1.7; color: var(--type-soft); max-width: 620px; margin: 0 0 56px;">
+        Respuestas concretas a lo que casi todos preguntan antes de empezar: precios reales, plazos y qué conviene en cada caso.
+      </p>
+
+      {guias.length === 0 && (
+        <p style="font-family: var(--body); color: var(--type-soft);">Muy pronto.</p>
+      )}
+
+      <div style="display: flex; flex-direction: column;">
+        {guias.map((g) => (
+          <a
+            href={`/guias/${g.id}`}
+            style="display: block; padding: 32px 0; border-top: 1px solid var(--line);"
+          >
+            <p style="font-family: var(--ui); font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--type-soft); margin: 0 0 10px;">
+              <time datetime={g.data.publishedAt.toISOString()}>{fmt(g.data.publishedAt)}</time>
+            </p>
+            <h2 style="font-family: var(--display); font-weight: 400; font-size: clamp(24px, 4vw, 34px); line-height: 1.15; letter-spacing: -0.025em; margin: 0 0 12px;">
+              {g.data.title}
+            </h2>
+            <p style="font-family: var(--body); font-size: 15px; line-height: 1.65; color: var(--type-soft); margin: 0; max-width: 640px;">
+              {g.data.description}
+            </p>
+          </a>
+        ))}
+      </div>
+    </main>
+
+    <FooterIsland client:visible />
+  </div>
+</Base>

@@ -4,9 +4,9 @@ import Nav from './Nav';
 import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 const PHOTOS = [
-  '/assets/team/img_KodeoTeam.jpg',
-  '/assets/team/img_KodeoTeam2.jpg',
-  '/assets/team/img_KodeoTeam3.jpg',
+  '/assets/team/img_KodeoTeam.webp',
+  '/assets/team/img_KodeoTeam2.webp',
+  '/assets/team/img_KodeoTeam3.webp',
 ];
 
 function PhotoCarousel({ motionSpeed = 1 }) {
@@ -112,8 +112,12 @@ function AccordionItem({ title, content, motionSpeed = 1 }) {
 
   return (
     <div style={{ borderBottom: '1px solid var(--line)' }}>
+      {/* "¿Quiénes somos?", "Visión" y "Misión" son encabezados reales.
+          `font: inherit` mantiene intacta la tipografía del span interior. */}
+      <h2 style={{ margin: 0, font: 'inherit' }}>
       <button
         onClick={() => setOpen(p => !p)}
+        aria-expanded={open}
         style={{
           width: '100%',
           background: 'none',
@@ -156,6 +160,7 @@ function AccordionItem({ title, content, motionSpeed = 1 }) {
           +
         </span>
       </button>
+      </h2>
 
       <div ref={bodyRef} style={{ height: 0, overflow: 'hidden', opacity: 0 }}>
         <p style={{

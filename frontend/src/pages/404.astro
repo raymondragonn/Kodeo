@@ -1,0 +1,22 @@
+---
+// El router anterior mandaba a "/" cualquier ruta desconocida
+// (<Route path="*" element={<Navigate to="/" replace />} />). Se conserva ese
+// comportamiento para no dejar enlaces antiguos en el aire.
+//
+// Nota: una página 404 propia sería mejor para SEO que redirigir todo a la
+// portada, pero eso implicaría diseñar una pantalla nueva.
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content="0; url=/" />
+    <meta name="robots" content="noindex" />
+    <link rel="canonical" href="https://kodeo.mx/" />
+    <title>Kodeo</title>
+  </head>
+  <body>
+    <a href="/">Volver al inicio</a>
+  </body>
+</html>

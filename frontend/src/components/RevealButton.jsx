@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
@@ -27,6 +27,11 @@ export default function RevealButton({ children, onActivate, className, style, .
   const timerRef = useRef(null);
   const [mode, setMode] = useState('idle');            // idle | hover | closing
   const [geo, setGeo]   = useState({ x: 0, y: 0, hole: 120 });
+
+  // El overlay se monta con createPortal sobre document.body, que no existe
+  // cuando el HTML se genera en build. Es decorativo y arranca invisible, así
+  // que aparecer un tick más tarde no cambia nada.
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
@@ -77,7 +82,7 @@ export default function RevealButton({ children, onActivate, className, style, .
         {children}
       </button>
 
-      {createPortal(
+      {mounted && createPortal(
         <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 9998, pointerEvents: 'none' }}>
           {/* Spotlight: transparente sobre el botón, oscuro hacia afuera */}
           <div style={{

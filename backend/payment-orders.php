@@ -12,6 +12,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/payment-order-helpers.php';
+require_once __DIR__ . '/project-helpers.php';
 
 setCorsHeaders();
 
@@ -85,6 +86,10 @@ if ($method === 'POST') {
     $order  = fetchOrderByToken($db, $token);
     $payUrl = ALLOWED_ORIGIN . '/pago/orden/' . $token;
 
+    $monto = '$' . number_format((float) $order['amount'], 2) . ' ' . $order['currency'];
+    logProjectActivity($db, $projectId, $esExtra ? 'extra_charge_created' : 'order_created',
+        ($esExtra ? 'Cargo extra creado: ' : 'Orden de pago creada: ') . ($descripcion !== '' ? "{$descripcion} · " : '') . $monto);
+
     // Si el proyecto ya tiene cliente ligado, le mandamos el link por correo
     notifyPaymentOrderCreated($order, $payUrl);
 
@@ -103,10 +108,11 @@ if ($method === 'PATCH') {
         jsonError('Estatus inválido. Valores: pagado, cancelado, pendiente');
     }
 
-    $stmt = $db->prepare('SELECT status FROM payment_orders WHERE id = ?');
+    $stmt = $db->prepare('SELECT status, project_id FROM payment_orders WHERE id = ?');
     $stmt->execute([$id]);
-    $current = $stmt->fetchColumn();
-    if ($current === false) jsonError('Orden no encontrada', 404);
+    $existing = $stmt->fetch();
+    if (!$existing) jsonError('Orden no encontrada', 404);
+    $current = $existing['status'];
 
     if ($status === 'pagado') {
         // Confirmación manual = el cliente pagó por transferencia
@@ -115,10 +121,17 @@ if ($method === 'PATCH') {
             SET status = 'pagado', tipo_pago = 'transferencia', paid_at = NOW()
             WHERE id = ? AND status = 'pendiente'
         ")->execute([$id]);
-        if ($current === 'pendiente') notifyPaymentOrderPaid($id);
+        if ($current === 'pendiente') {
+            notifyPaymentOrderPaid($id);
+            logProjectActivity($db, $existing['project_id'], 'order_paid', "Orden de pago #{$id} marcada como pagada (transferencia)");
+        }
     } else {
         $db->prepare('UPDATE payment_orders SET status = ?, paid_at = NULL WHERE id = ?')
            ->execute([$status, $id]);
+        if ($status !== $current) {
+            $label = $status === 'cancelado' ? 'cancelada' : 'reabierta';
+            logProjectActivity($db, $existing['project_id'], 'order_' . $status, "Orden de pago #{$id} {$label}");
+        }
     }
 
     $stmt = $db->prepare('

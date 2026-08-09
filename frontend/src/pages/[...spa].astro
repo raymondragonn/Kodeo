@@ -1,0 +1,49 @@
+---
+import Base from '../layouts/Base.astro';
+import SpaApp from '../islands/SpaApp.jsx';
+
+// Rutas del portal y transaccionales. Se generan como cáscaras vacías que
+// montan la SPA en cliente: están detrás de login o dependen de estado en
+// memoria, así que no hay nada que pre-renderizar.
+//
+// Las tres rutas con parámetro libre (/resena/:token, /pago/orden/:token,
+// /usuarios/:id) no se pueden enumerar en build — se resuelven con rewrites
+// en vercel.json.
+//
+// Astro extrae getStaticPaths a su propio módulo, así que las constantes que
+// use tienen que vivir dentro de la función.
+export function getStaticPaths() {
+const ROUTES = {
+  'login':           ['Iniciar sesión | Kodeo',        'Accede a tu cuenta Kodeo.'],
+  'register':        ['Registrarme | Kodeo',           'Crea tu cuenta en Kodeo.'],
+  'recuperar':       ['Recuperar contraseña | Kodeo',  'Recupera el acceso a tu cuenta Kodeo.'],
+  'restablecer':     ['Restablecer contraseña | Kodeo','Crea una nueva contraseña para tu cuenta Kodeo.'],
+  'comprar':         ['Elige tu proyecto | Kodeo',     'Selecciona el producto que quieres comprar: Landing Page, Sitio Web o Tienda Online.'],
+  'pago':            ['Pago | Kodeo',                  'Completa tu pago de forma segura.'],
+  'pago-confirmado': ['Pago confirmado | Kodeo',       'Confirmación de tu pago.'],
+  'agendar':         ['Agendar cita | Kodeo',          'Reserva una llamada con el equipo de Kodeo.'],
+  'citas':           ['Mis citas | Kodeo',             'Consulta y administra tus citas.'],
+  'panel':           ['Panel | Kodeo',                 'Panel de cliente.'],
+  'proyectos':       ['Mis proyectos | Kodeo',         'Sigue el avance de tus proyectos y aprueba cambios pendientes.'],
+  'pedidos':         ['Mis pedidos | Kodeo',           'Revisa el estado de tus proyectos.'],
+  'cuenta':          ['Mi cuenta | Kodeo',             'Administra tu información de cuenta.'],
+  'analiticas':      ['Analíticas | Kodeo',            'Panel de analítica de la landing.'],
+  'usuarios':        ['Usuarios | Kodeo',              'Gestión de usuarios y roles.'],
+  'resena':          ['Reseña | Kodeo',                'Cuéntanos cómo fue tu experiencia.'],
+};
+
+// Rutas que cargan Stripe. El resto ya no descarga el script.
+const STRIPE_ROUTES = new Set(['pago', 'pago-confirmado']);
+
+  return Object.entries(ROUTES).map(([slug, [title, description]]) => ({
+    params: { spa: slug },
+    props: { title, description, stripe: STRIPE_ROUTES.has(slug) },
+  }));
+}
+
+const { title, description, stripe } = Astro.props;
+---
+
+<Base title={title} description={description} stripe={stripe} noindex>
+  <SpaApp client:only="react" />
+</Base>

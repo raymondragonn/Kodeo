@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
 import { trackScrollDepth } from '../lib/analytics';
 
 const THRESHOLDS = [25, 50, 75, 90];
 
 export function useScrollDepth() {
-  const location = useLocation();
   const fired = useRef(new Set());
 
   useEffect(() => {
-    if (location.pathname !== '/') return;
+    // Solo mide la landing. Ya no depende de react-router: con páginas
+    // separadas, cada carga trae su propia ruta en window.location.
+    const pathname = window.location.pathname;
+    if (pathname !== '/') return;
     fired.current = new Set();
 
     const onScroll = () => {
@@ -19,12 +20,12 @@ export function useScrollDepth() {
       THRESHOLDS.forEach((threshold) => {
         if (percent >= threshold && !fired.current.has(threshold)) {
           fired.current.add(threshold);
-          trackScrollDepth({ percent: threshold, page_path: location.pathname });
+          trackScrollDepth({ percent: threshold, page_path: pathname });
         }
       });
     };
 
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [location.pathname]);
+  }, []);
 }

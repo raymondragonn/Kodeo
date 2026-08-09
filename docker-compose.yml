@@ -41,6 +41,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.astro
     depends_on:
       - backend
     restart: unless-stopped

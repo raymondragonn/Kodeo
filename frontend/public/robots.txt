@@ -1,3 +1,5 @@
+Sitemap: https://kodeo.mx/sitemap-index.xml
+
 # Bots de búsqueda legítimos
 User-agent: Googlebot
 Allow: /
@@ -10,6 +12,41 @@ Crawl-delay: 2
 User-agent: DuckDuckBot
 Allow: /
 Crawl-delay: 2
+
+# Motores generativos (GEO): permitidos para que puedan citar a Kodeo
+# con datos correctos en sus respuestas.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
 
 # Bloqueo de scrapers y bots de análisis agresivos
 User-agent: AhrefsBot
@@ -42,22 +79,17 @@ Disallow: /
 User-agent: Bytespider
 Disallow: /
 
-User-agent: GPTBot
-Disallow: /
-
-User-agent: CCBot
-Disallow: /
-
-User-agent: anthropic-ai
-Disallow: /
-
-User-agent: Claude-Web
-Disallow: /
-
-User-agent: cohere-ai
-Disallow: /
-
 # Regla general para el resto
 User-agent: *
 Allow: /
+Disallow: /cuenta
+Disallow: /pedidos
+Disallow: /proyectos
+Disallow: /analiticas
+Disallow: /usuarios
+Disallow: /citas
+Disallow: /panel
+Disallow: /pago
+Disallow: /pago-confirmado
+Disallow: /resena
 Crawl-delay: 10
