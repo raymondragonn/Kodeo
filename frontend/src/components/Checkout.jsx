@@ -11,6 +11,7 @@ const ACCENT = {
   '01': 'var(--accent-green)',
   '02': 'var(--accent-blue)',
   '03': 'var(--accent-yellow)',
+  '04': 'var(--accent-orange)',
 };
 
 
@@ -265,7 +266,7 @@ export default function Checkout({
         type: 'info',
         title: 'Voucher OXXO generado',
         lines: [`Monto a pagar: ${displayAmount}`, 'Vigencia: 3 días'],
-        link: data.voucherUrl ? { href: data.voucherUrl, label: 'Ver e imprimir voucher →' } : null,
+        link: data.voucherUrl ? { href: data.voucherUrl, label: 'Ver e imprimir voucher' } : null,
         note: 'Paga en cualquier tienda OXXO antes de que expire.',
         id: data.paymentIntentId,
       });
@@ -349,7 +350,7 @@ export default function Checkout({
               {promoResult?.valid && (
                 <Row label="Descuento">
                   <span style={{ fontFamily: 'var(--display)', fontSize: 14, letterSpacing: '-0.01em', color: '#63C44D' }}>
-                    −{(promoResult.discount_cents / 100).toLocaleString('es-MX', { style: 'currency', currency })}
+                    -{(promoResult.discount_cents / 100).toLocaleString('es-MX', { style: 'currency', currency })}
                   </span>
                 </Row>
               )}

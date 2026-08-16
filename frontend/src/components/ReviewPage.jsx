@@ -91,6 +91,7 @@ export default function ReviewPage({ copy, onNavigate }) {
   const [loading, setLoading]   = useState(!!token);
   const [notFound, setNotFound] = useState(!token);
   const [projectName, setProjectName] = useState('');
+  const [clientName, setClientName]   = useState('');
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
   const [rating, setRating]                       = useState(0);
@@ -116,6 +117,7 @@ export default function ReviewPage({ copy, onNavigate }) {
         const data = await res.json();
         if (!res.ok) { setNotFound(true); return; }
         setProjectName(data.project_name ?? '');
+        setClientName(data.client_name ?? '');
         setAlreadySubmitted(!!data.already_submitted);
       } catch {
         setNotFound(true);
@@ -251,6 +253,11 @@ export default function ReviewPage({ copy, onNavigate }) {
             </>
           ) : (
             <>
+              {clientName && (
+                <p style={{ fontFamily: 'var(--body)', fontSize: 14, color: 'var(--type-soft)', margin: '0 0 6px' }}>
+                  {P.greeting.replace('{name}', clientName)}
+                </p>
+              )}
               <h1 style={{ fontFamily: 'var(--display)', fontSize: 30, letterSpacing: '-0.03em', color: 'var(--type)', margin: '0 0 6px', lineHeight: 1.1 }}>
                 {P.title}
               </h1>
@@ -369,7 +376,7 @@ export default function ReviewPage({ copy, onNavigate }) {
                     width: '100%', opacity: submitting ? 0.6 : 1,
                   }}
                 >
-                  {submitting ? P.submitting : `${P.submit} →`}
+                  {submitting ? P.submitting : P.submit}
                 </button>
               </form>
             </>

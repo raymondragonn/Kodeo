@@ -10,6 +10,7 @@ function inferProjectName(?string $service, ?string $serviceCode): string {
         '01' => 'Landing Page',
         '02' => 'Sitio Web',
         '03' => 'Tienda Online',
+        '04' => 'Tarjeta de Fidelidad',
         default => 'Proyecto en diagnóstico',
     };
 }

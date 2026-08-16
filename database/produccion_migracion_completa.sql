@@ -198,6 +198,21 @@ SET @sql = (SELECT IF(EXISTS(SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
   'ALTER TABLE projects ADD CONSTRAINT fk_projects_appointment FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL'));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- Contacto manual del cliente cuando el proyecto no tiene cuenta ligada
+-- (creado a mano por el admin, sin link de pago de por medio). Los SELECT
+-- hacen COALESCE(u.name, p.client_name): al ligarse el usuario, manda la cuenta.
+SET @sql = (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=@db AND TABLE_NAME='projects' AND COLUMN_NAME='client_name'),
+  'SELECT 1',
+  'ALTER TABLE projects ADD COLUMN client_name VARCHAR(120) NULL AFTER user_id'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=@db AND TABLE_NAME='projects' AND COLUMN_NAME='client_email'),
+  'SELECT 1',
+  'ALTER TABLE projects ADD COLUMN client_email VARCHAR(190) NULL AFTER client_name'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Estatus 'diagnostico' (proyecto nacido de una llamada de diagnóstico).
 ALTER TABLE projects
   MODIFY COLUMN status ENUM('diagnostico','en_diseno','en_desarrollo','completado','cancelado') NOT NULL DEFAULT 'en_diseno';

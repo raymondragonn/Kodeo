@@ -1,15 +1,18 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import Nav from './Nav';
 import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { estimatedDeliveryDate, formatDateEs } from '../utils/deliveryDate';
+import Icon from './Icon';
+import { SERVICE_COVERS } from '../lib/projects';
 
 const ACCENT = {
   '01': 'var(--accent-green)',
   '02': 'var(--accent-blue)',
   '03': 'var(--accent-yellow)',
+  '04': 'var(--accent-orange)',
 };
 
 function priceToCents(price) {
@@ -94,7 +97,7 @@ export default function SelectProductPage({
           data-reveal
           style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gridTemplateColumns: isMobile ? '1fr' : `repeat(${copy.services.list.length}, 1fr)`,
             borderLeft: isMobile ? 'none' : '1px solid var(--line)',
             gap: isMobile ? 16 : 0,
           }}
@@ -120,15 +123,21 @@ export default function SelectProductPage({
 }
 
 function ProductCard({ svc, accent, ctaLabel, priceNote, timeNote, isMobile, onSelect }) {
+  const [hovered, setHovered] = useState(false);
+  const cover = SERVICE_COVERS[svc.code];
+
   return (
     <button
       onClick={onSelect}
       style={{
+        position: 'relative',
+        isolation: 'isolate',
+        overflow: 'hidden',
         borderRight: '1px solid var(--line)',
         borderTop: '1px solid var(--line)',
         borderBottom: '1px solid var(--line)',
         borderLeft: 0,
-        background: 'transparent',
+        background: hovered ? 'var(--bg-2)' : 'transparent',
         display: 'flex',
         flexDirection: 'column',
         textAlign: 'left',
@@ -137,9 +146,33 @@ function ProductCard({ svc, accent, ctaLabel, priceNote, timeNote, isMobile, onS
         width: '100%',
         transition: 'background 0.2s',
       }}
-      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-2)'}
-      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
+      {/* Portada del producto al pasar el cursor: muy difuminada y con velo,
+          igual que en la sección de productos y en su página de detalle. */}
+      {cover && (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
+          <img
+            src={cover}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: 'blur(80px)',
+              transform: 'scale(1.25)',
+              opacity: hovered ? 0.55 : 0,
+              transition: 'opacity 0.45s ease',
+            }}
+          />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', opacity: 0.35 }} />
+        </div>
+      )}
+
       <div style={{ height: 3, background: accent, width: '100%' }} />
 
       <div style={{ padding: isMobile ? '24px 22px' : '28px 28px 32px', flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -230,23 +263,38 @@ function ProductCard({ svc, accent, ctaLabel, priceNote, timeNote, isMobile, onS
           Entrega estimada: {formatDateEs(estimatedDeliveryDate(svc.time))}
         </div>
 
+        {/* Con el fondo difuminado detrás, el CTA se rellena al pasar el
+            cursor para no perderse sobre la imagen. */}
         <div style={{
           marginTop: 'auto',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 12,
           width: '100%',
-          border: '1px solid var(--line)',
+          border: '1px solid',
+          borderColor: hovered ? 'var(--type)' : 'var(--line)',
+          background: hovered ? 'var(--type)' : 'transparent',
           borderRadius: 'var(--radius-pill)',
           padding: '13px 18px',
           fontFamily: 'var(--ui)',
           fontSize: 11,
           letterSpacing: '.18em',
           textTransform: 'uppercase',
-          color: 'var(--type)',
+          color: hovered ? 'var(--bg)' : 'var(--type)',
+          boxShadow: hovered ? '0 10px 30px rgba(0,0,0,0.18)' : 'none',
+          transition: 'background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
         }}>
           {ctaLabel}
-          <span style={{ color: accent }}>→</span>
+          <Icon
+            name="arrowRight"
+            size={16}
+            style={{
+              color: accent,
+              transform: hovered ? 'translateX(4px)' : 'translateX(0)',
+              transition: 'transform 0.3s ease',
+            }}
+          />
         </div>
       </div>
     </button>

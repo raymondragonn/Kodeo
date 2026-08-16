@@ -3,6 +3,7 @@ import PortalLayout from './PortalLayout';
 import RefreshButton from './RefreshButton';
 import { formatDMY } from '../utils/deliveryDate';
 import { API_BASE_URL as API } from '../lib/api';
+import Icon from './Icon';
 
 const STATUS_MAP = {
   pendiente:  { bg: 'rgba(148,163,184,0.1)', color: '#64748b', border: 'rgba(148,163,184,0.3)' },
@@ -527,11 +528,11 @@ function CalendarView({ orders, copy }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Nav mes */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button className="kd-btn" onClick={prev} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius)', color: 'var(--type-soft)', padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui)', fontSize: 14, minWidth: 40 }}>←</button>
+        <button className="kd-btn" onClick={prev} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius)', color: 'var(--type-soft)', padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui)', fontSize: 14, minWidth: 40 }} aria-label={O.months[month]}><Icon name="chevronLeft" size={14} /></button>
         <span style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 16 : 18, letterSpacing: '-0.02em', color: 'var(--type)', textAlign: 'center' }}>
           {O.months[month]} {year}
         </span>
-        <button className="kd-btn" onClick={next} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius)', color: 'var(--type-soft)', padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui)', fontSize: 14, minWidth: 40 }}>→</button>
+        <button className="kd-btn" onClick={next} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius)', color: 'var(--type-soft)', padding: '8px 14px', cursor: 'pointer', fontFamily: 'var(--ui)', fontSize: 14, minWidth: 40 }} aria-label={O.months[month]}><Icon name="chevronRight" size={14} /></button>
       </div>
 
       {/* Grid */}
@@ -588,7 +589,7 @@ function CalendarView({ orders, copy }) {
                               fontFamily: 'var(--ui)', fontSize: 8, color: s.color,
                               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                             }}>
-                              {o._type === 'delivery' ? '↓' : '→'} {o.service}
+                              <Icon name={o._type === 'delivery' ? 'arrowDown' : 'arrowRight'} size={8} /> {o.service}
                             </div>
                           );
                         })}
@@ -618,8 +619,8 @@ function CalendarView({ orders, copy }) {
 
       {/* Leyenda */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}><strong style={{ color: 'var(--type-soft)' }}>↓</strong> {O.delivery}</span>
-        <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}><strong style={{ color: 'var(--type-soft)' }}>→</strong> {O.start}</span>
+        <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}><Icon name="arrowDown" size={11} style={{ color: 'var(--type-soft)' }} /> {O.delivery}</span>
+        <span style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--type-muted)' }}><Icon name="arrowRight" size={11} style={{ color: 'var(--type-soft)' }} /> {O.start}</span>
       </div>
 
       {/* Panel del día seleccionado */}
@@ -629,7 +630,7 @@ function CalendarView({ orders, copy }) {
             <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
               {O.dayOfMonth.replace('{d}', selected).replace('{month}', O.months[month])}
             </span>
-            <button className="kd-btn" onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: 'var(--type-muted)', cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1 }}>✕</button>
+            <button className="kd-btn" onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: 'var(--type-muted)', cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1 }} aria-label={O.close ?? 'Cerrar'}><Icon name="close" size={14} /></button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {selectedOrders.map((o, idx) => {
@@ -708,7 +709,7 @@ function FilterBar({ search, onSearch, statusFilter, onStatus, serviceFilter, on
           <button className="kd-btn" onClick={() => onSearch('')} style={{
             position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
             background: 'none', border: 'none', cursor: 'pointer', color: 'var(--type-muted)', padding: 4, lineHeight: 1,
-          }}>✕</button>
+          }} aria-label={O.close ?? 'Cerrar'}><Icon name="close" size={14} /></button>
         )}
       </div>
 
@@ -895,7 +896,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
         {saveError && (
           <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 'var(--radius)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#dc2626', fontFamily: 'var(--body)', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
             <span>{saveError}</span>
-            <button onClick={() => setSaveError('')} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+            <button onClick={() => setSaveError('')} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1, flexShrink: 0 }} aria-label={O.close ?? 'Cerrar'}><Icon name="close" size={14} /></button>
           </div>
         )}
 
@@ -939,7 +940,7 @@ export default function OrdersPage({ user, onNavigate, onLogout, copy, theme, on
                   </svg>
                   <input type="search" value={search} placeholder={O.searchShort} onChange={e => setSearch(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', padding: '8px 32px 8px 30px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 'var(--radius)', fontFamily: 'var(--body)', fontSize: 13, color: 'var(--type)', outline: 'none', WebkitAppearance: 'none' }}/>
-                  {search && <button className="kd-btn" onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--type-muted)', padding: 4 }}>✕</button>}
+                  {search && <button className="kd-btn" onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--type-muted)', padding: 4 }} aria-label={O.close ?? 'Cerrar'}><Icon name="close" size={14} /></button>}
                 </div>
                 {Object.entries(STATUS_MAP).map(([k, s]) => (
                   <button key={k} className="kd-btn" onClick={() => setStatusFilter(statusFilter === k ? 'todos' : k)} style={{

@@ -131,7 +131,7 @@ export default function RegisterPage({ copy, onNavigate }) {
           onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
           onMouseLeave={e => e.currentTarget.style.color = 'var(--type-soft)'}
         >
-          {copy?.authLogin ?? 'Iniciar sesión'} →
+          {copy?.authLogin ?? 'Iniciar sesión'}
         </a>
       </header>
 
@@ -371,7 +371,7 @@ export default function RegisterPage({ copy, onNavigate }) {
                 opacity: (loading || success || !passwordValid) ? 0.6 : 1,
               }}
             >
-              {loading ? 'Creando cuenta...' : 'Crear cuenta →'}
+              {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </button>
           </form>
           </>

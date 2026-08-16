@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import Nav from './Nav';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import Icon from './Icon';
 
 const DESKTOP_NAV_H = 84;
 
@@ -39,7 +40,7 @@ function SidebarLink({ label, active, onClick }) {
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
     >
       {label}
-      {active && <span style={{ fontSize: 10, color: 'var(--type-soft)' }}>→</span>}
+      {active && <Icon name="arrowRight" size={10} style={{ color: 'var(--type-soft)' }} />}
     </button>
   );
 }
@@ -134,7 +135,7 @@ function PortalSidebar({ user, onNavigate, onLogout, copy }) {
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}
         >
           {L.logout}
-          <span style={{ fontSize: 10 }}>→</span>
+          <Icon name="arrowRight" size={10} />
         </button>
       </div>
     </aside>

@@ -6,6 +6,7 @@ import ConfirmModal from './ConfirmModal';
 import ViewModeSwitch from './ViewModeSwitch';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { API_BASE_URL as API } from '../lib/api';
+import Icon from './Icon';
 
 // Diagnóstico = amarillo, diseño = verde, desarrollo = rojo, despliegue (completado) = azul.
 // Colores vivos: para usos decorativos (barra superior, punto de la tabla) —
@@ -318,6 +319,7 @@ function ProjectDetailModal({ projectId, authFetch, onClose, onChanged, copy, is
   const [showOrderForm, setShowOrderForm] = useState(false);
 
   const [reassignEmail, setReassignEmail] = useState('');
+  const [reassignName, setReassignName]   = useState('');
   const [reassigning, setReassigning]     = useState(false);
   const [reassignMsg, setReassignMsg]     = useState('');
 
@@ -331,6 +333,7 @@ function ProjectDetailModal({ projectId, authFetch, onClose, onChanged, copy, is
       setProject(data.project);
       setNotes(data.project.notes ?? '');
       setReassignEmail(data.project.user_email ?? '');
+      setReassignName(data.project.user_id ? '' : (data.project.client_name ?? ''));
       setLoadError('');
     } catch (err) {
       setLoadError(err.message);
@@ -353,7 +356,10 @@ function ProjectDetailModal({ projectId, authFetch, onClose, onChanged, copy, is
   const handleReassign = async () => {
     setReassigning(true); setReassignMsg('');
     try {
-      await authFetch(`projects.php?id=${projectId}`, { method: 'PATCH', body: JSON.stringify({ user_email: reassignEmail.trim() }) });
+      await authFetch(`projects.php?id=${projectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ user_email: reassignEmail.trim(), client_name: reassignName.trim() }),
+      });
       setReassignMsg(P.reassigned);
       await refreshAll();
     } catch (err) {
@@ -419,7 +425,7 @@ function ProjectDetailModal({ projectId, authFetch, onClose, onChanged, copy, is
                   color: 'var(--type-muted)', cursor: 'pointer', fontSize: 14, lineHeight: 1,
                 }}
               >
-                ✕
+                <Icon name="close" size={14} />
               </button>
             </div>
 
@@ -452,7 +458,14 @@ function ProjectDetailModal({ projectId, authFetch, onClose, onChanged, copy, is
 
             <div style={{ padding: isMobile ? '18px 20px' : '20px 24px', borderBottom: '1px solid var(--line)' }}>
               <p style={{ ...eyebrowStyle, margin: '0 0 10px' }}>{P.reassignLabel}</p>
+              <p style={{ ...hintText, margin: '0 0 10px' }}>{P.reassignHint}</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <input
+                  value={reassignName}
+                  onChange={e => setReassignName(e.target.value)}
+                  placeholder={P.reassignNamePlaceholder}
+                  style={{ ...inputStyle, flex: 1, minWidth: 180 }}
+                />
                 <input
                   value={reassignEmail}
                   onChange={e => setReassignEmail(e.target.value)}
@@ -997,6 +1010,7 @@ function NewProjectForm({ authFetch, onCreated, onCancel, copy, clients }) {
   const P = copy.portal.projects;
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
+  const [clientName, setClientName] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy]   = useState(false);
   const [error, setError] = useState(null);
@@ -1007,9 +1021,9 @@ function NewProjectForm({ authFetch, onCreated, onCancel, copy, clients }) {
     try {
       await authFetch('projects.php', {
         method: 'POST',
-        body: JSON.stringify({ name, user_email: email, notes }),
+        body: JSON.stringify({ name, user_email: email, client_name: clientName, notes }),
       });
-      setName(''); setEmail(''); setNotes('');
+      setName(''); setEmail(''); setClientName(''); setNotes('');
       onCreated();
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
@@ -1020,6 +1034,12 @@ function NewProjectForm({ authFetch, onCreated, onCancel, copy, clients }) {
       <p style={{ ...eyebrowStyle, margin: 0 }}>{P.newProjectTitle}</p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <input value={name} onChange={e => setName(e.target.value)} placeholder={P.projectNamePlaceholder} required style={{ ...inputStyle, flex: 2, minWidth: 200 }} />
+        <input
+          value={clientName}
+          onChange={e => setClientName(e.target.value)}
+          placeholder={P.clientNamePlaceholder}
+          style={{ ...inputStyle, flex: 2, minWidth: 180 }}
+        />
         <input
           value={email}
           onChange={e => setEmail(e.target.value)}

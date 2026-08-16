@@ -113,6 +113,37 @@ export const SERVICE_FIELDS = {
       required: true,
     },
   ],
+  '04': [
+    {
+      key: 'reward_type',
+      label: '¿Qué recompensa quieres dar a tus clientes?',
+      type: 'text',
+      placeholder: 'Ej. Un café gratis después de 5 compras',
+      required: true,
+    },
+    {
+      key: 'reward_trigger',
+      label: '¿Con qué se acumula el progreso?',
+      type: 'radio',
+      options: [
+        { value: 'purchases', label: 'Número de compras' },
+        { value: 'visits',    label: 'Número de visitas' },
+        { value: 'points',    label: 'Puntos por monto gastado' },
+      ],
+      required: true,
+    },
+    {
+      key: 'has_brand_assets',
+      label: '¿Tienes logotipo y colores de tu marca?',
+      type: 'radio',
+      options: [
+        { value: 'yes',     label: 'Sí, ya los tengo' },
+        { value: 'no',      label: 'No, necesito ayuda' },
+        { value: 'unknown', label: 'No lo sé' },
+      ],
+      required: true,
+    },
+  ],
 };
 
 export const OPTION_LABELS = {
@@ -122,6 +153,8 @@ export const OPTION_LABELS = {
   needs_blog:    { yes: 'Sí', no: 'No' },
   product_count: { '1-50': 'Menos de 50', '51-200': '50–200', '200+': 'Más de 200' },
   has_payment:   { yes: 'Sí', no: 'No', unknown: 'No lo sé' },
+  reward_trigger:   { purchases: 'Número de compras', visits: 'Número de visitas', points: 'Puntos por monto' },
+  has_brand_assets: { yes: 'Sí', no: 'No', unknown: 'No lo sé' },
 };
 
 export function getFieldsForService(serviceCode) {

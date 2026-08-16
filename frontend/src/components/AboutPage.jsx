@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import Nav from './Nav';
 import Footer from './Footer';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import Icon from './Icon';
 const PHOTOS = [
   '/assets/team/img_KodeoTeam.webp',
   '/assets/team/img_KodeoTeam2.webp',
@@ -62,7 +63,7 @@ function PhotoCarousel({ motionSpeed = 1 }) {
         onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.6)'}
         onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.35)'}
       >
-        ‹
+        <Icon name="chevronLeft" size={18} />
       </button>
       <button
         onClick={next}
@@ -70,7 +71,7 @@ function PhotoCarousel({ motionSpeed = 1 }) {
         onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.6)'}
         onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.35)'}
       >
-        ›
+        <Icon name="chevronRight" size={18} />
       </button>
 
       {/* Dots */}

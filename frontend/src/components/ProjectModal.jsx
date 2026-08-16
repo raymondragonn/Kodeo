@@ -130,31 +130,12 @@ export default function ProjectModal({ project, copy, onClose }) {
           {/* ── Top bar ── */}
           <div style={{
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             alignItems: 'center',
             padding: isMobile ? '14px 20px' : '16px 24px',
             borderBottom: '1px solid var(--line)',
             flexShrink: 0,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{
-                width: 7, height: 7,
-                borderRadius: '50%',
-                background: accent,
-                boxShadow: `0 0 8px ${accent}`,
-                flexShrink: 0,
-              }} />
-              <span style={{
-                fontFamily: 'var(--ui)',
-                fontSize: 10,
-                letterSpacing: '.24em',
-                textTransform: 'uppercase',
-                color: 'var(--type-soft)',
-              }}>
-                {project.idx} · {project.tag}
-              </span>
-            </div>
-
             <button
               onClick={handleClose}
               style={{
@@ -278,17 +259,6 @@ export default function ProjectModal({ project, copy, onClose }) {
                 padding: '28px 28px 24px',
                 overflow: 'hidden',
               }}>
-                <div style={{
-                  fontFamily: 'var(--ui)',
-                  fontSize: 10,
-                  letterSpacing: '.24em',
-                  textTransform: 'uppercase',
-                  color: 'var(--type-soft)',
-                  marginBottom: 10,
-                }}>
-                  {project.kind}
-                </div>
-
                 <h2 style={{
                   fontFamily: 'var(--display)',
                   fontWeight: 400,
@@ -378,7 +348,7 @@ export default function ProjectModal({ project, copy, onClose }) {
                       onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
                       onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                     >
-                      {copy.projects.visitSite} ↗
+                      {copy.projects.visitSite}
                     </a>
                   )}
                 </div>
@@ -398,17 +368,6 @@ function MobileBody({ project, images, activeImg, setActiveImg, fade, setFade, c
 
   return (
     <>
-      <div style={{
-        fontFamily: 'var(--ui)',
-        fontSize: 10,
-        letterSpacing: '.24em',
-        textTransform: 'uppercase',
-        color: 'var(--type-soft)',
-        marginBottom: 8,
-      }}>
-        {project.kind}
-      </div>
-
       <h2 style={{
         fontFamily: 'var(--display)',
         fontWeight: 400,
@@ -526,7 +485,7 @@ function MobileBody({ project, images, activeImg, setActiveImg, fade, setFade, c
               textDecoration: 'none',
             }}
           >
-            {copy.projects.visitSite} ↗
+            {copy.projects.visitSite}
           </a>
         )}
       </div>

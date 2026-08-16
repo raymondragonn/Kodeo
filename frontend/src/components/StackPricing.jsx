@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { trackCtaClick } from '../lib/analytics';
 import { SERVICE_SLUGS } from '../lib/routes';
+import Icon from './Icon';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -11,6 +12,7 @@ const ACCENT = {
   '01': 'var(--accent-green)',
   '02': 'var(--accent-blue)',
   '03': 'var(--accent-yellow)',
+  '04': 'var(--accent-orange)',
 };
 
 export default function StackPricing({ copy, motionSpeed = 1 }) {
@@ -280,7 +282,7 @@ function PricingCard({ svc, accent, ctaLabel, maxIncludes, motionSpeed, isMobile
                 lineHeight: 1.45,
                 color: 'var(--type-soft)',
               }}>
-                <span style={{ color: accent, flexShrink: 0, marginTop: 1 }}>✓</span>
+                <Icon name="check" size={14} style={{ color: accent, marginTop: 3 }} />
                 {name}
               </li>
             );
@@ -319,7 +321,7 @@ function PricingCard({ svc, accent, ctaLabel, maxIncludes, motionSpeed, isMobile
           }}
         >
           {ctaLabel}
-          <span style={{ color: accent }}>↗</span>
+          <Icon name="arrowUpRight" size={14} style={{ color: accent }} />
         </a>
       </div>
     </div>

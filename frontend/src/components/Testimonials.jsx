@@ -53,17 +53,6 @@ export default function Testimonials({ copy, motionSpeed = 1 }) {
       style={{ padding: isMobile ? '70px 20px' : '120px 40px', borderTop: '1px solid var(--line)' }}
     >
       <div style={{
-        fontFamily: 'var(--ui)',
-        fontSize: 11,
-        letterSpacing: '.22em',
-        textTransform: 'uppercase',
-        color: 'var(--type-soft)',
-        marginBottom: 30,
-      }}>
-          04 — Voces
-      </div>
-
-      <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))',
         gap: isMobile ? 44 : 70,

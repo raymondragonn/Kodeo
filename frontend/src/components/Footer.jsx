@@ -112,7 +112,6 @@ export default function Footer({ copy, motionSpeed = 1, onNavigate }) {
             </a>
           ))}
         </span>
-        <span>KODEO ✦</span>
       </div>
 
     </footer>

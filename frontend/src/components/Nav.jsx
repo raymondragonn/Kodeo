@@ -3,8 +3,9 @@ import logoSvg from '../assets/logo_black_transparent.svg?url';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { useLang, toggleLang } from '../lib/lang';
 import { hrefForNavItem, SERVICE_SLUGS } from '../lib/routes';
+import Icon from './Icon';
 
-const SERVICES_LABELS = new Set(['Servicios', 'Services']);
+const SERVICES_LABELS = new Set(['Productos', 'Products']);
 
 function HamburgerIcon({ open }) {
   return (
@@ -289,7 +290,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                           {user.email}
                         </span>
                       </span>
-                      <span style={{ fontSize: 16, color: 'var(--type-soft)' }}>→</span>
+                      <Icon name="arrowRight" size={16} style={{ color: 'var(--type-soft)' }} />
                     </button>
                   ) : (
                     <div style={{ display: 'flex', gap: 10, paddingBottom: 20, borderBottom: '1px solid var(--line)' }}>
@@ -334,7 +335,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                       }}
                     >
                       {n}
-                      <span style={{ color: 'var(--type-soft)', fontSize: 18 }}>→</span>
+                      <Icon name="arrowRight" size={18} style={{ color: 'var(--type-soft)' }} />
                     </a>
                   ))}
                 </nav>
@@ -402,7 +403,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
               <a
                 href={hrefForNavItem(n)}
                 onClick={e => {
-                  // "Servicios" abre el desplegable en vez de navegar, pero
+                  // "Productos" abre el desplegable en vez de navegar, pero
                   // conserva su href para que el enlace sea rastreable.
                   if (isServices) {
                     e.preventDefault();
@@ -420,13 +421,12 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                 {n}
                 {isServices && (
                   <span style={{
-                    fontSize: 8,
                     opacity: open ? 1 : 0.5,
                     transition: 'opacity 0.2s, transform 0.2s',
                     transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-                    display: 'inline-block',
+                    display: 'inline-flex',
                   }}>
-                    ▾
+                    <Icon name="chevronDown" size={10} />
                   </span>
                 )}
               </a>
@@ -507,7 +507,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                           {svc.lead}
                         </div>
                       </div>
-                      <span style={{ color: 'var(--type-soft)', fontSize: 13, flexShrink: 0 }}>↗</span>
+                      <Icon name="arrowUpRight" size={13} style={{ color: 'var(--type-soft)' }} />
                     </a>
                   ))}
                 </div>
@@ -620,7 +620,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
                     {label}
-                    <span style={{ color: 'var(--type-soft)', fontSize: 13 }}>→</span>
+                    <Icon name="arrowRight" size={13} style={{ color: 'var(--type-soft)' }} />
                   </button>
                 ))}
 
@@ -638,7 +638,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   Cerrar sesión
-                  <span style={{ fontSize: 13 }}>→</span>
+                  <Icon name="arrowRight" size={13} />
                 </button>
               </>
             ) : (
@@ -662,7 +662,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   {label}
-                  <span style={{ color: 'var(--type-soft)', fontSize: 13 }}>→</span>
+                  <Icon name="arrowRight" size={13} style={{ color: 'var(--type-soft)' }} />
                 </button>
               ))
             )}
@@ -687,7 +687,7 @@ export default function Nav({ copy, onContact, onLogoClick, onNavItemClick, onSe
           onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}
         >
-          {copy.navContactBtn} →
+          {copy.navContactBtn}
         </button>
       </div>
     </header>

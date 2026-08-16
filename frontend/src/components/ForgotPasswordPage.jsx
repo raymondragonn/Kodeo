@@ -78,7 +78,7 @@ export default function ForgotPasswordPage({ copy, onNavigate }) {
           onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
           onMouseLeave={e => e.currentTarget.style.color = 'var(--type-soft)'}
         >
-          {copy?.authLogin ?? 'Iniciar sesión'} →
+          {copy?.authLogin ?? 'Iniciar sesión'}
         </a>
       </header>
 
@@ -156,7 +156,7 @@ export default function ForgotPasswordPage({ copy, onNavigate }) {
                     opacity: loading ? 0.6 : 1,
                   }}
                 >
-                  {loading ? 'Enviando...' : 'Enviar enlace →'}
+                  {loading ? 'Enviando...' : 'Enviar enlace'}
                 </button>
               </form>
             </>

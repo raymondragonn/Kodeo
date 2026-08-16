@@ -2,7 +2,7 @@ import ServicePage from '../components/ServicePage';
 import { useSharedNavProps } from '../lib/useSharedNavProps';
 
 /**
- * `code` ('01' | '02' | '03') llega desde la página Astro, que lo resuelve del
+ * `code` ('01' | '02' | '03' | '04') llega desde la página Astro, que lo resuelve del
  * slug en build. El servicio se busca en el copy ya traducido, igual que hacía
  * ServicePageRoute en App.jsx.
  */

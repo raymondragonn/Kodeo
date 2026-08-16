@@ -20,6 +20,15 @@ export const PROJECT_COVERS = {
   '05': '/assets/projects/aramondra/aramondra-mockup-cover.webp',
 };
 
+// Portadas de cada producto (los mockups del panel de la sección Productos).
+// Las comparten la sección y la página de detalle de cada producto.
+export const SERVICE_COVERS = {
+  '01': '/assets/projects/landingpage-cover.webp',
+  '02': '/assets/projects/website-cover.webp',
+  '03': '/assets/projects/tiendaenlinea-cover.webp',
+  '04': '/assets/projects/tarjetafidelidad-cover.webp',
+};
+
 export const PROJECT_SHOTS = {
   '01': ['/assets/projects/incup/incup-1.webp', '/assets/projects/incup/incup-2.webp', '/assets/projects/incup/incup-3.webp'],
   '02': ['/assets/projects/tudi/tudi-1.webp', '/assets/projects/tudi/tudi-2.webp', '/assets/projects/tudi/tudi-3.webp'],

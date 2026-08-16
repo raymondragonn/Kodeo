@@ -126,7 +126,7 @@ export default function LoginPage({ copy, onNavigate, onLoginSuccess }) {
           onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
           onMouseLeave={e => e.currentTarget.style.color = 'var(--type-soft)'}
         >
-          {copy?.authRegister ?? 'Registrarme'} →
+          {copy?.authRegister ?? 'Registrarme'}
         </a>
       </header>
 
@@ -332,7 +332,7 @@ export default function LoginPage({ copy, onNavigate, onLoginSuccess }) {
                 opacity: loading ? 0.6 : 1,
               }}
             >
-              {loading ? 'Entrando...' : 'Entrar →'}
+              {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
           </>

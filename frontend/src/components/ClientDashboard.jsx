@@ -8,6 +8,7 @@ import ConfirmModal from './ConfirmModal';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { API_BASE_URL as API } from '../lib/api';
 import { inputStyle } from '../data/projectFormFields';
+import Icon from './Icon';
 
 // WhatsApp de Kodeo al que llega la solicitud de cita (mismo número que /agendar)
 const WA_PHONE = '522298483706';
@@ -32,6 +33,7 @@ const ACCENT = {
   '01': 'var(--accent-green)',
   '02': 'var(--accent-blue)',
   '03': 'var(--accent-yellow)',
+  '04': 'var(--accent-orange)',
 };
 
 const MX_TZ = 'America/Mexico_City';
@@ -299,8 +301,8 @@ function CitasCalendar({ citas, isAdmin, token, onRefresh, isMobile, T, locale }
             {monthFmt.format(viewMonth)}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button aria-label={T.prevMonth} onClick={() => changeMonth(-1)} style={navBtn}>←</button>
-            <button aria-label={T.nextMonth} onClick={() => changeMonth(1)} style={navBtn}>→</button>
+            <button aria-label={T.prevMonth} onClick={() => changeMonth(-1)} style={navBtn}><Icon name="chevronLeft" size={14} /></button>
+            <button aria-label={T.nextMonth} onClick={() => changeMonth(1)} style={navBtn}><Icon name="chevronRight" size={14} /></button>
           </div>
         </div>
 

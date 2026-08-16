@@ -53,7 +53,9 @@ function notifyPaymentOrderPaid(int $orderId): void {
     try {
         $db   = getDb();
         $stmt = $db->prepare('
-            SELECT po.*, p.name AS project_name, u.name AS user_name, u.email AS user_email
+            SELECT po.*, p.name AS project_name,
+                   COALESCE(u.name, p.client_name) AS user_name,
+                   COALESCE(u.email, p.client_email) AS user_email
             FROM payment_orders po
             JOIN projects p ON p.id = po.project_id
             LEFT JOIN users u ON u.id = p.user_id

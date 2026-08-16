@@ -6,6 +6,7 @@ import { useMagneticCursor } from '../hooks/useMagneticCursor';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { trackCtaClick } from '../lib/analytics';
 import RevealButton from './RevealButton';
+import Icon from './Icon';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -49,20 +50,6 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
       }} />
 
       <div style={{ position: 'relative' }}>
-        <div
-          data-reveal
-          style={{
-            fontFamily: 'var(--ui)',
-            fontSize: 11,
-            letterSpacing: '.22em',
-            textTransform: 'uppercase',
-            color: 'var(--type-soft)',
-            marginBottom: 30,
-          }}
-        >
-          {copy.cta.label}
-        </div>
-
         <h2
           data-reveal
           style={{
@@ -122,7 +109,7 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
               fontSize: isMobile ? 18 : 22,
               flexShrink: 0,
             }}>
-              ↗
+              <Icon name="arrowUpRight" size={isMobile ? 18 : 22} />
             </span>
           </a>
 
@@ -150,7 +137,7 @@ export default function CtaSection({ copy, motionSpeed = 1 }) {
               justifyContent: 'center',
             }}
           >
-            {copy.cta.btn} →
+            {copy.cta.btn}
           </RevealButton>
         </div>
       </div>

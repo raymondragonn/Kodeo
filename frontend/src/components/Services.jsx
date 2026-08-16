@@ -2,16 +2,15 @@ import { useState, useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useBreakpoint } from '../hooks/useBreakpoint';
-import { trackDownload, trackCtaClick } from '../lib/analytics';
+import { trackCtaClick } from '../lib/analytics';
 import { SERVICE_SLUGS } from '../lib/routes';
-const landingCover = '/assets/projects/landingpage-cover.webp';
-const websiteCover = '/assets/projects/website-cover.webp';
-const tiendaCover  = '/assets/projects/tiendaenlinea-cover.webp';
-const SERVICE_COVERS = { '01': landingCover, '02': websiteCover, '03': tiendaCover };
-const PDF_MAP        = {
-  '01': '/LANDING PAGE - KODEO.pdf',
-  '02': '/SITIO WEB - KODEO.pdf',
-  '03': '/TIENDA ONLINE - KODEO.pdf',
+import { SERVICE_COVERS } from '../lib/projects';
+import Icon from './Icon';
+const SERVICE_ACCENTS = {
+  '01': 'var(--accent-green)',
+  '02': 'var(--accent-blue)',
+  '03': 'var(--accent-yellow)',
+  '04': 'var(--accent-orange)',
 };
 
 gsap.registerPlugin(ScrollTrigger);
@@ -71,21 +70,41 @@ export default function Services({ copy, motionSpeed = 1 }) {
         gap: 60,
       }}
     >
-      <div>
-        <div
-          ref={headRef}
-          style={{
-            fontFamily: 'var(--ui)',
-            fontSize: 11,
-            letterSpacing: '.22em',
-            textTransform: 'uppercase',
-            color: 'var(--type-soft)',
-            marginBottom: 18,
-          }}
-        >
-          {copy.services.label}
+      {/* Fondo del producto señalado: la misma portada del panel, muy difuminada.
+          Va detrás de todo y sin capturar el cursor; encima lleva un velo del
+          color de fondo para que el texto conserve su contraste. */}
+      {!isMobile && (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {copy.services.list.map((s, i) => SERVICE_COVERS[s.code] && (
+            <img
+              key={s.code}
+              src={SERVICE_COVERS[s.code]}
+              alt=""
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: 'blur(80px)',
+                transform: 'scale(1.25)',
+                opacity: hoverIdx === i ? 0.55 : 0,
+                transition: `opacity ${slow}`,
+              }}
+            />
+          ))}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'var(--bg)',
+            opacity: 0.35,
+          }} />
         </div>
-        <h2 style={{
+      )}
+
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <h2 ref={headRef} style={{
           fontFamily: 'var(--display)',
           fontWeight: 400,
           fontSize: 'clamp(42px, 5vw, 72px)',
@@ -169,33 +188,6 @@ export default function Services({ copy, motionSpeed = 1 }) {
                       <span style={{ fontSize: 8, letterSpacing: '.1em', opacity: 0.6, marginTop: 2 }}>{copy.services.timeNote}</span>
                     </span>
                   </div>
-                  {PDF_MAP[s.code] && (
-                    <a
-                      href={PDF_MAP[s.code]}
-                      download
-                      onClick={e => {
-                        e.stopPropagation();
-                        trackDownload({ resource_name: s.code, resource_url: PDF_MAP[s.code], section: 'services' });
-                      }}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 5,
-                        marginTop: 10,
-                        fontFamily: 'var(--ui)',
-                        fontSize: 9,
-                        letterSpacing: '.18em',
-                        textTransform: 'uppercase',
-                        color: 'var(--type-soft)',
-                        border: '1px solid var(--line)',
-                        borderRadius: 'var(--radius-pill)',
-                        padding: '6px 10px',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      ↓ PDF
-                    </a>
-                  )}
                 </div>
               ) : (
                 <span style={{
@@ -225,13 +217,22 @@ export default function Services({ copy, motionSpeed = 1 }) {
               )}
 
               <span style={{
-                textAlign: 'right',
-                color: 'var(--type-soft)',
+                justifySelf: 'end',
+                display: 'grid',
+                placeItems: 'center',
+                width: 34,
+                height: 34,
+                borderRadius: '50%',
+                border: '1px solid',
+                borderColor: hoverIdx === i ? 'var(--type)' : 'var(--line)',
+                background: hoverIdx === i ? 'var(--type)' : 'transparent',
+                color: hoverIdx === i ? 'var(--bg)' : 'var(--type-soft)',
+                boxShadow: hoverIdx === i ? '0 8px 22px rgba(0,0,0,0.18)' : 'none',
                 transform: hoverIdx === i ? 'translateX(0)' : 'translateX(-6px)',
                 opacity: isMobile ? 0.6 : (hoverIdx === i ? 1 : 0.4),
-                transition: `transform ${slow}, opacity ${slow}`,
+                transition: `transform ${slow}, opacity ${slow}, background ${slow}, color ${slow}, border-color ${slow}, box-shadow ${slow}`,
               }}>
-                →
+                <Icon name="arrowRight" size={16} />
               </span>
             </a>
           ))}
@@ -242,7 +243,7 @@ export default function Services({ copy, motionSpeed = 1 }) {
       {!isMobile && (
         <div
           ref={previewRef}
-          style={{ position: 'sticky', top: 100, height: 540, alignSelf: 'start' }}
+          style={{ position: 'sticky', top: 100, height: 540, alignSelf: 'start', zIndex: 1 }}
         >
           <div style={{
             position: 'relative',
@@ -271,7 +272,7 @@ export default function Services({ copy, motionSpeed = 1 }) {
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    objectPosition: 'top',
+                    objectPosition: 'center',
                     opacity: isAuto ? (fade ? 1 : 0) : 1,
                     transition: isAuto ? 'opacity 0.3s ease' : `opacity ${slow}`,
                   }}
@@ -284,7 +285,7 @@ export default function Services({ copy, motionSpeed = 1 }) {
               position: 'absolute',
               top: 0, left: 0, right: 0,
               height: 3,
-              background: ['var(--accent-green)', 'var(--accent-blue)', 'var(--accent-yellow)'][hoverIdx !== null ? hoverIdx : autoIdx],
+              background: SERVICE_ACCENTS[copy.services.list[hoverIdx !== null ? hoverIdx : autoIdx].code] || 'var(--accent-green)',
               transition: `background ${slow}`,
             }} />
 
@@ -301,27 +302,14 @@ export default function Services({ copy, motionSpeed = 1 }) {
               inset: 0,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               padding: 28,
             }}>
               {(() => {
                 const activeIdx = hoverIdx !== null ? hoverIdx : autoIdx;
                 const svc = copy.services.list[activeIdx];
                 return (
-                  <>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontFamily: 'var(--ui)',
-                      fontSize: 10,
-                      letterSpacing: '.24em',
-                      textTransform: 'uppercase',
-                      color: 'rgba(255,255,255,0.7)',
-                    }}>
-                      <span>Preview</span>
-                      <span>{svc.code} / 03</span>
-                    </div>
-                    <div>
+                  <div>
                       <div style={{
                         fontFamily: 'var(--ui)',
                         fontSize: 10,
@@ -335,19 +323,6 @@ export default function Services({ copy, motionSpeed = 1 }) {
                         {hoverIdx === null ? copy.services.previewHint : copy.services.previewSelected}
                       </div>
                       <div style={{
-                        fontFamily: 'var(--display)',
-                        fontSize: 'clamp(28px, 3.5vw, 42px)',
-                        lineHeight: 1.2,
-                        letterSpacing: '-0.02em',
-                        paddingBottom: '0.1em',
-                        color: '#fff',
-                        opacity: hoverIdx === null ? (fade ? 1 : 0) : 1,
-                        transition: hoverIdx === null ? 'opacity 0.3s ease' : `opacity ${slow}`,
-                      }}>
-                        {svc.name}
-                      </div>
-                      <div style={{
-                        marginTop: 16,
                         fontFamily: 'var(--ui)',
                         fontSize: 11,
                         letterSpacing: '.14em',
@@ -358,8 +333,7 @@ export default function Services({ copy, motionSpeed = 1 }) {
                       }}>
                         {svc.price} · {svc.time}
                       </div>
-                    </div>
-                  </>
+                  </div>
                 );
               })()}
             </div>

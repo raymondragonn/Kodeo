@@ -26,12 +26,14 @@
   --accent-green: #63C44D;
   --accent-red: #FF3131;
   --accent-blue: #5170ff;
+  --accent-orange: #F6B910;
   /* Versiones legibles como texto/borde: los acentos de arriba pierden
      contraste sobre fondos claros — se sobreescriben en tema claro */
   --accent-yellow-text: #FFDE59;
   --accent-green-text:  #63C44D;
   --accent-red-text:    #FF3131;
   --accent-blue-text:   #5170ff;
+  --accent-orange-text: #F6B910;
 
   /* Typography */
   --display: Arial, "Helvetica Neue", sans-serif;
@@ -69,6 +71,7 @@
     --accent-green-text:  #166534;
     --accent-red-text:    #991b1b;
     --accent-blue-text:   #1e40af;
+    --accent-orange-text: #a16207;
   }
 }
 
@@ -95,6 +98,7 @@
   --accent-green-text:  #166534;
   --accent-red-text:    #991b1b;
   --accent-blue-text:   #1e40af;
+  --accent-orange-text: #a16207;
 }
 
 [data-theme="dark"] {
@@ -120,6 +124,7 @@
   --accent-green-text:  #63C44D;
   --accent-red-text:    #FF3131;
   --accent-blue-text:   #5170ff;
+  --accent-orange-text: #F6B910;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -188,11 +193,6 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
-}
-
-@keyframes scrollline {
-  0%, 100% { transform: translateX(-100%); }
-  50%       { transform: translateX(0); }
 }
 
 @keyframes pulse {

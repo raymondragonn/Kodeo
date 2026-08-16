@@ -3,15 +3,15 @@
 // wrappers de isla (en cliente).
 
 export const NAV_SECTION_MAP = {
-  'Servicios': 'services', 'Services': 'services',
+  'Productos': 'services', 'Products': 'services',
   'Trabajo': 'work',       'Work': 'work',
   'Contacto': 'contact',   'Contact': 'contact',
 };
 
 export const FAQ_ITEMS = new Set(['Preguntas', 'FAQ']);
 
-export const SERVICE_SLUGS = { '01': 'landing-page', '02': 'sitio-web', '03': 'tienda-online' };
-export const SLUG_CODES    = { 'landing-page': '01', 'sitio-web': '02',  'tienda-online': '03' };
+export const SERVICE_SLUGS = { '01': 'landing-page', '02': 'sitio-web', '03': 'tienda-online', '04': 'tarjeta-fidelidad' };
+export const SLUG_CODES    = { 'landing-page': '01', 'sitio-web': '02',  'tienda-online': '03', 'tarjeta-fidelidad': '04' };
 
 export const FOOTER_URL_MAP = {
   'Sobre nosotros': '/sobre-nosotros',     'About us': '/sobre-nosotros',
@@ -19,6 +19,7 @@ export const FOOTER_URL_MAP = {
   'Landing Page': '/landing-page',
   'Sitio Web': '/sitio-web',               'Website': '/sitio-web',
   'Tienda Online': '/tienda-online',       'Online Store': '/tienda-online',
+  'Tarjeta Fidelidad': '/tarjeta-fidelidad', 'Loyalty Card': '/tarjeta-fidelidad',
   'Privacidad': '/privacidad',             'Privacy': '/privacidad',
   'Términos': '/terminos',                 'Terms': '/terminos',
   'Trabajo': '#work',                      'Work': '#work',
@@ -78,5 +79,11 @@ export const SERVICE_META = {
     title: 'Crear una Tienda en Línea: Ecommerce a Medida | Kodeo',
     description: 'Tienda en línea con catálogo, carrito, panel de administrador y pasarela de pago (Stripe, PayPal, Mercado Pago). Desde MX$12,000 y 20 días hábiles.',
     price: 12000,
+  },
+  '04': {
+    slug: 'tarjeta-fidelidad',
+    title: 'Tarjeta de Fidelidad Digital para Negocios | Kodeo',
+    description: 'Tarjeta de lealtad en Apple Wallet y Google Wallet: acumula compras, otorga recompensas y actualiza el progreso solo. Desde MX$3,000 y 10 días hábiles.',
+    price: 3000,
   },
 };

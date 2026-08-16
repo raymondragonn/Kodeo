@@ -206,7 +206,7 @@ export default function ResetPasswordPage({ copy, onNavigate }) {
                     opacity: loading ? 0.6 : 1,
                   }}
                 >
-                  {loading ? 'Guardando...' : 'Restablecer contraseña →'}
+                  {loading ? 'Guardando...' : 'Restablecer contraseña'}
                 </button>
               </form>
             </>

@@ -16,7 +16,7 @@ const guias = defineCollection({
     updatedAt: z.coerce.date().optional(),
     author: z.string().default('Kodeo'),
     /** Servicio con el que se relaciona, para el enlace interno. */
-    service: z.enum(['landing-page', 'sitio-web', 'tienda-online']).optional(),
+    service: z.enum(['landing-page', 'sitio-web', 'tienda-online', 'tarjeta-fidelidad']).optional(),
     draft: z.boolean().default(false),
   }),
 });

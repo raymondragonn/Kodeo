@@ -6,33 +6,23 @@ import Footer from './Footer';
 import Nav from './Nav';
 import RevealButton from './RevealButton';
 import { useBreakpoint } from '../hooks/useBreakpoint';
-const incupCover       = '/assets/projects/incup/incup-mockup-cover.webp';
-const tudiCover        = '/assets/projects/tudi/tudi-mockup-cover.webp';
-const ferbodaCover     = '/assets/projects/ferboda/ferboda-mockup-cover.webp';
-const stratpharmaCover = '/assets/projects/stratpharma/stratpharma-mockup-cover.webp';
-const aramondraCover   = '/assets/projects/aramondra/aramondra-mockup-cover.webp';
-
+import { SERVICE_COVERS } from '../lib/projects';
+import { SERVICE_SLUGS } from '../lib/routes';
 const landingPdf  = '/LANDING PAGE - KODEO.pdf';
 const sitioWebPdf = '/SITIO WEB - KODEO.pdf';
 const tiendaPdf   = '/TIENDA ONLINE - KODEO.pdf';
+const tarjetaPdf  = '/TARJETA DE FIDELIDAD - KODEO.pdf';
 
 gsap.registerPlugin(ScrollTrigger);
-
-const PROJECT_COVERS = {
-  '01': incupCover,
-  '02': tudiCover,
-  '03': ferbodaCover,
-  '04': stratpharmaCover,
-  '05': aramondraCover,
-};
 
 const ACCENT = {
   '01': 'var(--accent-green)',
   '02': 'var(--accent-blue)',
   '03': 'var(--accent-yellow)',
+  '04': 'var(--accent-orange)',
 };
 
-const PDF_MAP = { '01': landingPdf, '02': sitioWebPdf, '03': tiendaPdf };
+const PDF_MAP = { '01': landingPdf, '02': sitioWebPdf, '03': tiendaPdf, '04': tarjetaPdf };
 
 function LineBlock({ lines = 3, opacity = 0.4, height = 5 }) {
   const widths = Array.from({ length: lines }, (_, i) =>
@@ -64,8 +54,7 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
   const navigate     = useNavigate();
 
   const handleCheckout = () => {
-    const amount = Number(service.price.replace(/[^\d]/g, '')) * 100;
-    navigate('/agendar', { state: { amount, service: service.name, code: service.code } });
+    navigate(`/agendar?producto=${SERVICE_SLUGS[service.code]}`);
   };
 
   useEffect(() => {
@@ -83,9 +72,6 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
   }, [service.code, motionSpeed]);
 
   const sectionPad = isMobile ? '60px 20px' : '90px 36px';
-  const relatedLimit = isMobile ? 2 : 3;
-  const matchingProjects = copy.projects.items.filter(p => p.serviceCodes?.includes(service.code));
-  const relatedProjects = (matchingProjects.length ? matchingProjects : copy.projects.items).slice(0, relatedLimit);
   const serviceFaqItems = sp.serviceFaq?.items?.[service.code] ?? [];
 
   return (
@@ -104,7 +90,36 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
       />
 
       {/* HERO */}
-      <section ref={heroRef} style={{ padding: isMobile ? '40px 20px 60px' : '60px 36px 90px', position: 'relative' }}>
+      <section ref={heroRef} style={{ padding: isMobile ? '40px 20px 60px' : '60px 36px 90px', position: 'relative', isolation: 'isolate', overflow: 'hidden' }}>
+        {/* Portada del producto de fondo: difuminada y tenue, con velo para que
+            el titular y el texto se sigan leyendo. zIndex -1 la manda detrás de
+            todo el contenido sin tener que posicionar cada bloque. */}
+        {SERVICE_COVERS[service.code] && (
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}>
+            <img
+              src={SERVICE_COVERS[service.code]}
+              alt=""
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: 'blur(80px)',
+                transform: 'scale(1.25)',
+                opacity: 0.55,
+              }}
+            />
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'var(--bg)',
+              opacity: 0.35,
+            }} />
+          </div>
+        )}
+
         <div data-reveal style={{
           fontFamily: 'var(--ui)',
           fontSize: 11,
@@ -190,9 +205,11 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
               ))}
             </dl>
             <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <button
+              {/* Mismo reveal de linterna que el CTA de la portada: RevealButton
+                  ya trae el scale de hover y el fade antes de navegar. */}
+              <RevealButton
                 className="cta-breathe"
-                onClick={handleCheckout}
+                onActivate={handleCheckout}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -207,13 +224,12 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
                   borderRadius: 'var(--radius-pill)',
                   padding: '10px 18px',
                   cursor: 'pointer',
-                  transition: 'transform 0.2s ease',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+                  transition: 'transform 0.2s ease, box-shadow 0.3s ease',
                 }}
-                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
               >
-                {sp.ctaStart} {service.name} →
-              </button>
+                {sp.ctaStart} {service.name}
+              </RevealButton>
               {PDF_MAP[service.code] && (
                 <a
                   href={PDF_MAP[service.code]}
@@ -226,17 +242,26 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
                     fontSize: 11,
                     letterSpacing: '.18em',
                     textTransform: 'uppercase',
-                    color: 'var(--type-soft)',
+                    color: 'var(--type)',
+                    background: 'var(--bg-2)',
                     border: '1px solid var(--line)',
                     borderRadius: 'var(--radius-pill)',
                     padding: '10px 16px',
                     textDecoration: 'none',
-                    transition: 'border-color 0.2s, color 0.2s',
+                    transition: 'background 0.3s ease, color 0.3s ease, border-color 0.3s ease',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'var(--type)';
+                    e.currentTarget.style.borderColor = 'var(--type)';
+                    e.currentTarget.style.color = 'var(--bg)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'var(--bg-2)';
+                    e.currentTarget.style.borderColor = 'var(--line)';
+                    e.currentTarget.style.color = 'var(--type)';
+                  }}
                 >
-                  ↓ {sp.downloadPdf ?? 'Descargar PDF'}
+                  {sp.downloadPdf ?? 'Descargar PDF'}
                 </a>
               )}
             </div>
@@ -331,9 +356,6 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
           <h2 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 'clamp(32px, 8vw, 54px)' : 'clamp(42px, 6vw, 64px)', margin: 0, letterSpacing: '-0.03em', paddingBottom: '0.06em' }}>
             {sp.includes.heading}
           </h2>
-          <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
-            {String((service.includes || sp.includes.items).length).padStart(2, '0')} {sp.includes.count.replace(/^\d+\s*/, '')}
-          </span>
         </div>
         <div style={{
           display: 'grid',
@@ -515,7 +537,7 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
                 justifyContent: 'center',
               }}
             >
-              {sp.ctaStart} {service.name} →
+              {sp.ctaStart} {service.name}
             </RevealButton>
             {PDF_MAP[service.code] && (
               <a
@@ -542,60 +564,15 @@ export default function ServicePage({ copy, service, motionSpeed = 1, onBack, on
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.color = 'var(--type)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--type-soft)'; }}
               >
-                ↓ {sp.downloadPdf ?? 'Descargar PDF'}
+                {sp.downloadPdf ?? 'Descargar PDF'}
               </a>
             )}
           </div>
         </div>
       </section>
 
-      {/* RELATED PROJECTS */}
-      <Section pad={sectionPad}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
-          marginBottom: 28,
-          flexWrap: 'wrap',
-          gap: 12,
-        }}>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 'clamp(28px, 7vw, 44px)' : 'clamp(36px, 5vw, 54px)', margin: 0, letterSpacing: '-0.025em', fontWeight: 400 }}>
-            {sp.related.heading}
-          </h2>
-          <span style={{ fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
-            {sp.related.count}
-          </span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', gap: isMobile ? 20 : 22 }}>
-          {relatedProjects.map(p => (
-            <a
-              key={p.idx}
-              href={p.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-            >
-              <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--line)', height: isMobile ? 180 : 240, position: 'relative', background: 'var(--card-frost)' }}>
-                {PROJECT_COVERS[p.idx] && (
-                  <img
-                    src={PROJECT_COVERS[p.idx]}
-                    alt={p.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
-                )}
-              </div>
-              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-soft)' }}>
-                <span>{p.idx}</span><span>{p.tag}</span>
-              </div>
-              <h3 style={{ fontFamily: 'var(--display)', fontSize: isMobile ? 22 : 26, margin: '4px 0 0', letterSpacing: '-0.02em', fontWeight: 400 }}>
-                {p.name}
-              </h3>
-            </a>
-          ))}
-        </div>
-      </Section>
-
       <Footer copy={copy} motionSpeed={motionSpeed} onNavigate={onNavigate} />
+
     </div>
   );
 }

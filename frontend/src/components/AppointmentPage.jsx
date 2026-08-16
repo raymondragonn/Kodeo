@@ -5,11 +5,14 @@ import Footer from './Footer';
 import PageMeta from './PageMeta';
 import BookingCalendar from './BookingCalendar';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { SERVICE_SLUGS } from '../lib/routes';
+import Icon from './Icon';
 
 const ACCENT = {
   '01': 'var(--accent-green)',
   '02': 'var(--accent-blue)',
   '03': 'var(--accent-yellow)',
+  '04': 'var(--accent-orange)',
   otro: 'var(--type-soft)',
 };
 
@@ -27,11 +30,17 @@ export default function AppointmentPage({
   const bk           = copy.booking;
   const locale       = navigator.language || 'es-MX';
 
-  // Si el usuario llega desde /comprar o desde una página de servicio ya
+  // Si el usuario llega desde /comprar o desde una página de producto ya
   // sabemos qué le interesa; si entra en frío se lo preguntamos (paso 1).
+  // El `state` solo sobrevive dentro de la SPA; desde las páginas estáticas de
+  // producto el dato llega como ?producto={slug}, así que se mira también ahí.
   const { service, code } = location.state || {};
+  const slugParam   = new URLSearchParams(location.search).get('producto');
+  const fromUrl     = copy.services.list.find(s => SERVICE_SLUGS[s.code] === slugParam);
   const [selected, setSelected] = useState(
-    service ? { name: service, code: code || '01' } : null
+    service ? { name: service, code: code || '01' }
+      : fromUrl ? { name: fromUrl.name, code: fromUrl.code }
+      : null
   );
   const [slot, setSlot]     = useState(null);
   const [booked, setBooked] = useState(false);
@@ -236,7 +245,7 @@ function ServiceStep({ copy, services, isMobile, onSelect }) {
               }}>
                 {opt.name}
               </span>
-              <span style={{ color: ACCENT[opt.code], fontSize: 18 }}>→</span>
+              <Icon name="arrowRight" size={18} style={{ color: ACCENT[opt.code] }} />
             </div>
             <p style={{
               fontFamily: 'var(--body)', fontSize: 13, lineHeight: 1.55,

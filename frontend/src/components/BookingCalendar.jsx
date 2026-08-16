@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import Icon from './Icon';
 
 // Calendario de agenda propio (reemplaza el embed de Cal.com en /agendar).
 // Layout estilo cal.com: mes navegable a la izquierda, horarios del día a la
@@ -133,8 +134,8 @@ export default function BookingCalendar({
             {monthFmt.format(viewMonth)}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button aria-label="Mes anterior" disabled={!canGoPrev} onClick={() => changeMonth(-1)} style={navBtn(canGoPrev)}>←</button>
-            <button aria-label="Mes siguiente" disabled={!canGoNext} onClick={() => changeMonth(1)} style={navBtn(canGoNext)}>→</button>
+            <button aria-label="Mes anterior" disabled={!canGoPrev} onClick={() => changeMonth(-1)} style={navBtn(canGoPrev)}><Icon name="chevronLeft" size={14} /></button>
+            <button aria-label="Mes siguiente" disabled={!canGoNext} onClick={() => changeMonth(1)} style={navBtn(canGoNext)}><Icon name="chevronRight" size={14} /></button>
           </div>
         </div>
 

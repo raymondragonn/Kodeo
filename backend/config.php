@@ -83,6 +83,7 @@ const SERVICE_ACCENTS = [
     'Landing Page'   => '#63C44D', // --accent-green
     'Sitio Web'      => '#5170ff', // --accent-blue
     'Tienda Online'  => '#FFDE59', // --accent-yellow
+    'Tarjeta de Fidelidad' => '#FF3131', // --accent-red
 ];
 const DEFAULT_EMAIL_ACCENT = '#5170ff';
 
@@ -249,6 +250,7 @@ const SERVICE_DEV_DAYS = [
     '01' => 8,  // Landing Page
     '02' => 16, // Sitio Web
     '03' => 20, // Tienda Online
+    '04' => 10, // Tarjeta de Fidelidad
 ];
 const DEFAULT_DEV_DAYS = 8;
 

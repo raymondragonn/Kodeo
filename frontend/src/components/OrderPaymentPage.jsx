@@ -248,7 +248,7 @@ export default function OrderPaymentPage({
               <Row label="Moneda">{currency}</Row>
               {pending && promoResult?.valid && (
                 <Row label="Descuento">
-                  <span style={{ color: '#63C44D' }}>−{money(promoResult.discount_cents, currency)}</span>
+                  <span style={{ color: '#63C44D' }}>-{money(promoResult.discount_cents, currency)}</span>
                 </Row>
               )}
               {pending && installments > 0 && (
@@ -392,7 +392,7 @@ function SuccessBox({ onNavigate, justPaid }) {
           fontFamily: 'var(--ui)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
         }}
       >
-        Ir a mi panel →
+        Ir a mi panel
       </button>
     </div>
   );

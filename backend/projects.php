@@ -159,7 +159,8 @@ if ($method === 'GET' && isset($_GET['id'])) {
     if (!$id) jsonError('ID requerido');
 
     $stmt = $db->prepare('
-        SELECT p.*, u.name AS user_name, u.email AS user_email
+        SELECT p.*, COALESCE(u.name, p.client_name) AS user_name,
+               COALESCE(u.email, p.client_email) AS user_email
         FROM projects p LEFT JOIN users u ON u.id = p.user_id
         WHERE p.id = ?
     ');
@@ -184,7 +185,8 @@ if ($method === 'GET') {
 
     if ($isAdmin) {
         $stmt = $db->query('
-            SELECT p.*, u.name AS user_name, u.email AS user_email
+            SELECT p.*, COALESCE(u.name, p.client_name) AS user_name,
+               COALESCE(u.email, p.client_email) AS user_email
             FROM projects p
             LEFT JOIN users u ON u.id = p.user_id
             WHERE p.status <> \'cancelado\'
@@ -193,7 +195,8 @@ if ($method === 'GET') {
     } else {
         syncClaimedProjectsForUser($db, (int) $auth['sub']);
         $stmt = $db->prepare('
-            SELECT p.*, u.name AS user_name, u.email AS user_email
+            SELECT p.*, COALESCE(u.name, p.client_name) AS user_name,
+               COALESCE(u.email, p.client_email) AS user_email
             FROM projects p
             LEFT JOIN users u ON u.id = p.user_id
             WHERE p.user_id = ? AND p.status NOT IN (\'diagnostico\', \'cancelado\')
@@ -209,15 +212,39 @@ if ($method === 'GET') {
 
 if (!$isAdmin) jsonError('Acceso denegado', 403);
 
-/** Resuelve un correo a user_id; null si viene vacío (proyecto para prospecto sin cuenta). */
-function resolveUserId(PDO $db, string $email): ?int {
-    if ($email === '') return null;
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonError('Correo de cliente inválido');
-    $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
-    $stmt->execute([$email]);
-    $id = $stmt->fetchColumn();
-    if (!$id) jsonError('No existe un usuario con ese correo. Déjalo vacío: el cliente quedará ligado al abrir su link de pago.', 404);
-    return (int) $id;
+/**
+ * Resuelve el cliente de un proyecto a [user_id, client_name, client_email].
+ *
+ * Si el correo corresponde a una cuenta existente, gana la cuenta y el contacto
+ * manual se limpia. Si no hay cuenta (prospecto que nunca abrió un link de
+ * pago), el admin lo liga a mano: nombre obligatorio, correo opcional.
+ * Todo vacío = proyecto sin cliente.
+ */
+function resolveClientAssignment(PDO $db, string $email, string $name): array {
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) jsonError('Correo de cliente inválido');
+    if (mb_strlen($name) > 120)  jsonError('El nombre del cliente no puede superar los 120 caracteres.');
+    if (mb_strlen($email) > 190) jsonError('El correo del cliente no puede superar los 190 caracteres.');
+
+    if ($email !== '') {
+        $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        $id = $stmt->fetchColumn();
+        if ($id) return [(int) $id, null, null];
+    }
+
+    if ($name === '') {
+        if ($email === '') return [null, null, null];
+        jsonError('Ese correo no tiene cuenta todavía. Escribe también el nombre del cliente para ligarlo a mano.');
+    }
+
+    return [null, $name, $email ?: null];
+}
+
+/** Texto de bitácora para una asignación de cliente. */
+function clientAssignmentDetail(?int $userId, ?string $manualName, ?string $manualEmail, string $email): string {
+    if ($userId !== null)     return "asignado a la cuenta {$email}";
+    if ($manualName !== null) return 'ligado a ' . $manualName . ($manualEmail ? " ({$manualEmail})" : ' (sin correo)');
+    return 'sin cliente asignado';
 }
 
 // ── POST ?id= : generar (o recuperar) el link de encuesta de satisfacción ──
@@ -228,12 +255,16 @@ if ($method === 'POST' && isset($_GET['id'])) {
     $id = (int) $_GET['id'];
     if (!$id) jsonError('ID requerido');
 
-    $stmt = $db->prepare('SELECT status FROM projects WHERE id = ?');
+    $stmt = $db->prepare('SELECT status, user_id, client_name FROM projects WHERE id = ?');
     $stmt->execute([$id]);
-    $status = $stmt->fetchColumn();
-    if ($status === false) jsonError('Proyecto no encontrado', 404);
-    if ($status !== 'completado') {
+    $project = $stmt->fetch();
+    if (!$project) jsonError('Proyecto no encontrado', 404);
+    if ($project['status'] !== 'completado') {
         jsonError('Solo puedes generar la encuesta de satisfacción cuando el proyecto está completado.', 409);
+    }
+    // Sin cliente no sabríamos de quién es la respuesta: se liga primero.
+    if ($project['user_id'] === null && ($project['client_name'] ?? '') === '') {
+        jsonError('Liga primero el cliente del proyecto (nombre y, si lo tienes, correo) para saber de quién es la reseña.', 409);
     }
 
     $review = createProjectReview($db, $id);
@@ -246,23 +277,25 @@ if ($method === 'POST' && isset($_GET['id'])) {
 
 // ── POST: crear proyecto (solo admin) ──────────────────────────
 if ($method === 'POST') {
-    $body  = json_decode(file_get_contents('php://input'), true) ?? [];
-    $name  = trim($body['name'] ?? '');
-    $notes = trim($body['notes'] ?? '');
-    $email = trim($body['user_email'] ?? '');
+    $body       = json_decode(file_get_contents('php://input'), true) ?? [];
+    $name       = trim($body['name'] ?? '');
+    $notes      = trim($body['notes'] ?? '');
+    $email      = trim($body['user_email'] ?? '');
+    $clientName = trim($body['client_name'] ?? '');
 
     if ($name === '') jsonError('El nombre del proyecto es requerido');
 
-    $userId = resolveUserId($db, $email);
+    [$userId, $manualName, $manualEmail] = resolveClientAssignment($db, $email, $clientName);
 
-    $db->prepare('INSERT INTO projects (user_id, name, notes) VALUES (?, ?, ?)')
-       ->execute([$userId, $name, $notes ?: null]);
+    $db->prepare('INSERT INTO projects (user_id, client_name, client_email, name, notes) VALUES (?, ?, ?, ?, ?)')
+       ->execute([$userId, $manualName, $manualEmail, $name, $notes ?: null]);
     $newId = (int) $db->lastInsertId();
 
-    logProjectActivity($db, $newId, 'created', 'Proyecto creado' . ($email !== '' ? " y asignado a {$email}" : ' (prospecto sin cuenta)'));
+    logProjectActivity($db, $newId, 'created', 'Proyecto creado, ' . clientAssignmentDetail($userId, $manualName, $manualEmail, $email));
 
     $stmt = $db->prepare('
-        SELECT p.*, u.name AS user_name, u.email AS user_email
+        SELECT p.*, COALESCE(u.name, p.client_name) AS user_name,
+               COALESCE(u.email, p.client_email) AS user_email
         FROM projects p LEFT JOIN users u ON u.id = p.user_id
         WHERE p.id = ?
     ');
@@ -322,12 +355,19 @@ if ($method === 'PATCH') {
     if (array_key_exists('notes', $body)) {
         $sets[] = 'notes = ?';  $values[] = trim($body['notes']) ?: null;
     }
-    if (array_key_exists('user_email', $body)) {
-        $emailInput = trim($body['user_email']);
-        $sets[] = 'user_id = ?'; $values[] = resolveUserId($db, $emailInput);
+    if (array_key_exists('user_email', $body) || array_key_exists('client_name', $body)) {
+        $emailInput = trim($body['user_email'] ?? '');
+        $nameInput  = trim($body['client_name'] ?? '');
+        [$userId, $manualName, $manualEmail] = resolveClientAssignment($db, $emailInput, $nameInput);
+
+        $sets[] = 'user_id = ?';      $values[] = $userId;
+        $sets[] = 'client_name = ?';  $values[] = $manualName;
+        $sets[] = 'client_email = ?'; $values[] = $manualEmail;
         $activityLog[] = [
             'event'  => 'assigned',
-            'detail' => $emailInput === '' ? 'Proyecto desasignado de cliente' : "Proyecto asignado a {$emailInput}",
+            'detail' => $userId === null && $manualName === null
+                ? 'Proyecto desasignado de cliente'
+                : 'Proyecto ' . clientAssignmentDetail($userId, $manualName, $manualEmail, $emailInput),
         ];
     }
 
@@ -341,7 +381,8 @@ if ($method === 'PATCH') {
     }
 
     $stmt = $db->prepare('
-        SELECT p.*, u.name AS user_name, u.email AS user_email
+        SELECT p.*, COALESCE(u.name, p.client_name) AS user_name,
+               COALESCE(u.email, p.client_email) AS user_email
         FROM projects p LEFT JOIN users u ON u.id = p.user_id
         WHERE p.id = ?
     ');

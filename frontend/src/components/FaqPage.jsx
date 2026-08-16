@@ -140,20 +140,6 @@ export default function FaqPage({ copy, motionSpeed = 1, onBack, onNavItemClick,
       }}>
         {/* Left column */}
         <div ref={headRef} style={{ position: isMobile ? 'static' : 'sticky', top: 120 }}>
-          <div
-            data-reveal
-            style={{
-              fontFamily: 'var(--ui)',
-              fontSize: 11,
-              letterSpacing: '.22em',
-              textTransform: 'uppercase',
-              color: 'var(--type-soft)',
-              marginBottom: 24,
-            }}
-          >
-            {faq.label}
-          </div>
-
           <h1
             data-reveal
             style={{

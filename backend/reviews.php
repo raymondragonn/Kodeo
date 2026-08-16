@@ -20,7 +20,8 @@ $db     = getDb();
 function fetchReviewByToken(PDO $db, string $token): ?array {
     $stmt = $db->prepare('
         SELECT r.*, p.name AS project_name, p.user_id AS project_user_id,
-               u.name AS user_name, u.email AS user_email
+               COALESCE(u.name, p.client_name) AS user_name,
+               COALESCE(u.email, p.client_email) AS user_email
         FROM project_reviews r
         JOIN projects p ON p.id = r.project_id
         LEFT JOIN users u ON u.id = p.user_id
@@ -81,6 +82,8 @@ if ($method === 'GET') {
 
     jsonSuccess([
         'project_name'      => $review['project_name'],
+        // Cuenta ligada o contacto que capturó el admin (COALESCE en la query).
+        'client_name'       => $review['user_name'],
         'already_submitted' => $review['submitted_at'] !== null,
         'rating'            => $review['submitted_at'] !== null ? (int) $review['rating'] : null,
         'feedback'          => $review['submitted_at'] !== null ? $review['feedback'] : null,
@@ -125,7 +128,7 @@ if ($method === 'POST') {
     $expectativasValidas = ['supero', 'cumplio', 'parcial', 'no_cumplio'];
     $expectativas = trim((string) ($body['expectativas'] ?? ''));
     if (!in_array($expectativas, $expectativasValidas, true)) {
-        jsonError('Selecciona si el sitio cumplió tus expectativas.');
+        jsonError('Selecciona si el producto web cumplió tus expectativas.');
     }
 
     $puedePublicar = filter_var($body['puede_publicar'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);

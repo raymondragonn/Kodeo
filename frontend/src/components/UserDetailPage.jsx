@@ -4,6 +4,7 @@ import PortalLayout from './PortalLayout';
 import RefreshButton from './RefreshButton';
 import { API_BASE_URL } from '../lib/api';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import Icon from './Icon';
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ export default function UserDetailPage({ user, onNavigate, onLogout, copy, theme
           onMouseEnter={e => e.currentTarget.style.color = 'var(--type)'}
           onMouseLeave={e => e.currentTarget.style.color = 'var(--type-muted)'}
         >
-          <span style={{ fontSize: 14 }}>←</span> {D.back}
+          <Icon name="arrowLeft" size={14} /> {D.back}
         </button>
 
         {loading && (

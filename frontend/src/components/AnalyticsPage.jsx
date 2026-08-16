@@ -4,6 +4,7 @@ import RefreshButton from './RefreshButton';
 import ViewModeSwitch from './ViewModeSwitch';
 import { API_BASE_URL } from '../lib/api';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import Icon from './Icon';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -470,7 +471,7 @@ function KpiCard({ label, value, previous, suffix = '', format = fmt, A }) {
       <span style={{ fontFamily: 'var(--ui)', fontSize: 10, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--type-muted)' }}>{label}</span>
       <span style={{ fontFamily: 'var(--display)', fontSize: 30, letterSpacing: '-0.03em', color: 'var(--type)', lineHeight: 1.1 }}>{format(value)}{suffix}</span>
       {pct !== null
-        ? <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: up ? '#16a34a' : '#dc2626', display: 'flex', alignItems: 'center', gap: 3 }}>{up ? '↑' : '↓'} {A.vsPrev.replace('{n}', Math.abs(pct))}</span>
+        ? <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: up ? '#16a34a' : '#dc2626', display: 'flex', alignItems: 'center', gap: 3 }}><Icon name={up ? 'arrowUp' : 'arrowDown'} size={11} /> {A.vsPrev.replace('{n}', Math.abs(pct))}</span>
         : <span style={{ fontFamily: 'var(--ui)', fontSize: 11, color: 'var(--type-muted)' }}>{A.noPrev}</span>
       }
     </div>

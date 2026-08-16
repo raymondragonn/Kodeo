@@ -175,37 +175,6 @@ export default function Hero({ copy, motionSpeed = 1 }) {
         </div>
       </div>
 
-      {/* Scroll indicator */}
-      <div style={{
-        position: 'absolute',
-        bottom: 30,
-        left: isMobile ? 20 : 40,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        color: 'var(--type-soft)',
-        fontFamily: 'var(--ui)',
-        fontSize: 10,
-        letterSpacing: '.24em',
-        textTransform: 'uppercase',
-      }}>
-        <span style={{
-          width: 36,
-          height: 1,
-          background: 'var(--line-2)',
-          position: 'relative',
-          overflow: 'hidden',
-          display: 'inline-block',
-        }}>
-          <span style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'var(--type)',
-            animation: `scrollline ${3 / motionSpeed}s ease-in-out infinite`,
-          }} />
-        </span>
-        {copy.hero.scroll}
-      </div>
     </section>
   );
 }

@@ -51,7 +51,7 @@ export function useContentProtection() {
 
     /* ── Consola: advertencia visible en DevTools ─────────── */
     const warnMsg = [
-      '%c⚠ Sitio protegido',
+      '%cSitio protegido',
       'color:#FF3131;font-size:20px;font-weight:bold;',
     ];
     console.log(...warnMsg);
